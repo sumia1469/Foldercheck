@@ -1,0 +1,40 @@
+{
+  "name": "folder-watcher",
+  "version": "1.0.0",
+  "description": "폴더 내 파일 변경/수정/삭제 감시 프로그램",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:portable": "electron-builder --win portable"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.folderwatcher.app",
+    "productName": "폴더 감시 프로그램",
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "폴더 감시 프로그램",
+      "installerLanguages": ["ko-KR", "en-US"],
+      "language": "1042"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "public/**/*",
+      "folderList.json"
+    ]
+  }
+}

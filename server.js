@@ -199,6 +199,13 @@ const server = http.createServer((req, res) => {
 loadConfig();
 startAllWatchers();
 
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.log(`포트 ${PORT}가 이미 사용 중입니다. 기존 인스턴스가 실행 중일 수 있습니다.`);
+        process.exit(1);
+    }
+});
+
 server.listen(PORT, () => {
     console.log(`\n========================================`);
     console.log(`  폴더 감시 서버 실행 중`);

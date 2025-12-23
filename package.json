@@ -19,7 +19,8 @@
     "productName": "폴더 감시 프로그램",
     "win": {
       "target": ["nsis", "portable"],
-      "icon": "icon.ico"
+      "icon": "icon.ico",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

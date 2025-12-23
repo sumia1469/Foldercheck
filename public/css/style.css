@@ -1,0 +1,171 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #00d9ff;
+}
+
+h2 {
+    margin-bottom: 15px;
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+}
+
+input[type="text"] {
+    flex: 1;
+    padding: 12px 15px;
+    border: none;
+    border-radius: 5px;
+    background: #0f3460;
+    color: #fff;
+    font-size: 14px;
+}
+
+input[type="text"]::placeholder {
+    color: #888;
+}
+
+button {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    background: #00d9ff;
+    color: #1a1a2e;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: #00b8d9;
+}
+
+.btn-small {
+    padding: 5px 12px;
+    font-size: 12px;
+    background: #e94560;
+}
+
+.btn-small:hover {
+    background: #c73e54;
+}
+
+.folder-list {
+    list-style: none;
+}
+
+.folder-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #0f3460;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.folder-list li .path {
+    word-break: break-all;
+}
+
+.folder-list li button {
+    padding: 5px 12px;
+    font-size: 12px;
+    background: #e94560;
+}
+
+.folder-list .empty {
+    color: #888;
+    text-align: center;
+    padding: 20px;
+}
+
+.log-container {
+    max-height: 400px;
+    overflow-y: auto;
+    background: #0f3460;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+.log-entry {
+    padding: 10px;
+    border-bottom: 1px solid #1a1a2e;
+    font-size: 13px;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry .time {
+    color: #888;
+    font-size: 11px;
+}
+
+.log-entry .action {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    margin: 0 5px;
+}
+
+.log-entry .action.create {
+    background: #4caf50;
+    color: #fff;
+}
+
+.log-entry .action.modify {
+    background: #ff9800;
+    color: #fff;
+}
+
+.log-entry .action.delete {
+    background: #f44336;
+    color: #fff;
+}
+
+.log-entry .file {
+    color: #00d9ff;
+}
+
+.log-empty {
+    color: #888;
+    text-align: center;
+    padding: 30px;
+}

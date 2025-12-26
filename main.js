@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { execSync } = require('child_process');
 const net = require('net');
 
@@ -7,6 +8,32 @@ let mainWindow;
 let tray;
 
 const PORT = 4400;
+
+// 캐시 삭제 함수
+function clearCache() {
+    const userDataPath = app.getPath('userData');
+    const cacheFolders = [
+        'Cache',
+        'Code Cache',
+        'GPUCache',
+        'DawnCache',
+        'blob_storage',
+        'Session Storage',
+        'Local Storage'
+    ];
+
+    cacheFolders.forEach(folder => {
+        const folderPath = path.join(userDataPath, folder);
+        try {
+            if (fs.existsSync(folderPath)) {
+                fs.rmSync(folderPath, { recursive: true, force: true });
+                console.log(`캐시 삭제: ${folder}`);
+            }
+        } catch (e) {
+            console.log(`캐시 삭제 실패: ${folder}`, e.message);
+        }
+    });
+}
 
 // 포트 사용 중인 프로세스 종료
 function killProcessOnPort(port) {
@@ -140,6 +167,9 @@ if (!gotTheLock) {
     });
 
     app.whenReady().then(async () => {
+        // 캐시 삭제 (새 버전 적용을 위해)
+        clearCache();
+
         // 포트 정리 후 서버 시작
         await ensurePortAvailable();
         require('./server.js');

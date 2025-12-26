@@ -29,43 +29,114 @@ let allLogs = [];
 let hourlyChart = null;
 let extensionChart = null;
 let lastLogCount = 0;
+let watchedFolders = [];
 
-// 탭 전환
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-
-        if (btn.dataset.tab === 'stats') {
-            loadStats();
+// 네비게이션 처리
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const section = item.dataset.section;
+        if (section) {
+            navigateTo(section);
         }
     });
 });
+
+// 섹션 링크 처리
+document.querySelectorAll('[data-section]').forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const section = link.dataset.section;
+        if (section) {
+            navigateTo(section);
+        }
+    });
+});
+
+// 퀵 액션 처리
+document.querySelectorAll('.action-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const action = card.dataset.action;
+        switch(action) {
+            case 'folders':
+                navigateTo('folders');
+                break;
+            case 'export':
+                exportCSV();
+                break;
+            case 'stats':
+                navigateTo('stats');
+                break;
+            case 'clear':
+                clearLogs();
+                break;
+        }
+    });
+});
+
+function navigateTo(section) {
+    // 메뉴 활성화
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.section === section) {
+            item.classList.add('active');
+        }
+    });
+
+    // 섹션 표시
+    document.querySelectorAll('.content-section').forEach(sec => {
+        sec.classList.remove('active');
+    });
+    const targetSection = document.getElementById(section);
+    if (targetSection) {
+        targetSection.classList.add('active');
+    }
+
+    // 통계 탭이면 차트 로드
+    if (section === 'stats') {
+        loadStats();
+    }
+}
 
 // 폴더 목록 로드
 async function loadFolders() {
     try {
         const res = await fetch('/api/folders');
         const data = await res.json();
+        watchedFolders = data.folders;
         renderFolders(data.folders);
+        updateFolderCount();
     } catch (e) {
         console.error('폴더 목록 로드 실패:', e);
+    }
+}
+
+// 폴더 수 업데이트
+function updateFolderCount() {
+    const statFolders = document.getElementById('statFolders');
+    if (statFolders) {
+        statFolders.textContent = watchedFolders.length;
     }
 }
 
 // 폴더 목록 렌더링
 function renderFolders(folders) {
     if (folders.length === 0) {
-        folderList.innerHTML = '<li class="empty">감시 중인 폴더가 없습니다.</li>';
+        folderList.innerHTML = `
+            <li class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                </svg>
+                <p>감시 중인 폴더가 없습니다</p>
+            </li>
+        `;
         return;
     }
 
     folderList.innerHTML = folders.map(folder => `
         <li>
-            <span class="path">${escapeHtml(folder)}</span>
-            <button onclick="removeFolder('${escapeHtml(folder.replace(/\\/g, '\\\\'))}')">삭제</button>
+            <span class="folder-path">${escapeHtml(folder)}</span>
+            <button class="btn btn-danger" onclick="removeFolder('${escapeHtml(folder.replace(/\\/g, '\\\\'))}')">삭제</button>
         </li>
     `).join('');
 }
@@ -135,9 +206,52 @@ async function loadLogs() {
 
         renderLogs();
         updateHeaderStats();
+        updateLastUpdate();
+        renderRecentActivity();
     } catch (e) {
         console.error('로그 로드 실패:', e);
     }
+}
+
+// 마지막 업데이트 시간
+function updateLastUpdate() {
+    const lastUpdate = document.getElementById('lastUpdate');
+    const lastCheck = document.getElementById('lastCheck');
+    const now = new Date().toLocaleString('ko-KR');
+    if (lastUpdate) lastUpdate.textContent = now;
+    if (lastCheck) lastCheck.textContent = now;
+}
+
+// 최근 활동 렌더링
+function renderRecentActivity() {
+    const recentActivity = document.getElementById('recentActivity');
+    if (!recentActivity) return;
+
+    const recentLogs = allLogs.slice(0, 5);
+
+    if (recentLogs.length === 0) {
+        recentActivity.innerHTML = `
+            <div class="empty-state">
+                <p>아직 변경 기록이 없습니다</p>
+            </div>
+        `;
+        return;
+    }
+
+    recentActivity.innerHTML = recentLogs.map(log => {
+        const time = new Date(log.timestamp).toLocaleString('ko-KR');
+        const actionClass = getActionClass(log.action);
+        return `
+            <div class="log-entry">
+                <span class="log-time">${time}</span>
+                <span class="log-action ${actionClass}">${log.action}</span>
+                <div class="log-file">
+                    ${escapeHtml(log.file)}
+                    <div class="log-folder">${escapeHtml(log.folder)}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // 로그 렌더링 (필터 적용)
@@ -157,7 +271,15 @@ function renderLogs() {
     }
 
     if (logs.length === 0) {
-        logContainer.innerHTML = '<div class="log-empty">변경 기록이 없습니다.</div>';
+        logContainer.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                </svg>
+                <p>변경 기록이 없습니다</p>
+            </div>
+        `;
         return;
     }
 
@@ -166,10 +288,12 @@ function renderLogs() {
         const actionClass = getActionClass(log.action);
         return `
             <div class="log-entry">
-                <span class="time">${time}</span>
-                <span class="action ${actionClass}">${log.action}</span>
-                <span class="file">${escapeHtml(log.file)}</span>
-                <div style="color:#666;font-size:11px;margin-top:3px;">${escapeHtml(log.folder)}</div>
+                <span class="log-time">${time}</span>
+                <span class="log-action ${actionClass}">${log.action}</span>
+                <div class="log-file">
+                    ${escapeHtml(log.file)}
+                    <div class="log-folder">${escapeHtml(log.folder)}</div>
+                </div>
             </div>
         `;
     }).join('');
@@ -181,9 +305,13 @@ function updateHeaderStats() {
     const modify = allLogs.filter(l => l.action === '수정').length;
     const del = allLogs.filter(l => l.action === '삭제').length;
 
-    document.getElementById('statCreate').textContent = create;
-    document.getElementById('statModify').textContent = modify;
-    document.getElementById('statDelete').textContent = del;
+    const statCreate = document.getElementById('statCreate');
+    const statModify = document.getElementById('statModify');
+    const statDelete = document.getElementById('statDelete');
+
+    if (statCreate) statCreate.textContent = create;
+    if (statModify) statModify.textContent = modify;
+    if (statDelete) statDelete.textContent = del;
 }
 
 // 알림 표시
@@ -221,6 +349,7 @@ async function clearLogs() {
         lastLogCount = 0;
         renderLogs();
         updateHeaderStats();
+        renderRecentActivity();
     } catch (e) {
         alert('로그 삭제 실패');
     }
@@ -237,9 +366,13 @@ async function loadStats() {
         const res = await fetch('/api/stats');
         const stats = await res.json();
 
-        document.getElementById('totalCreate').textContent = stats.created;
-        document.getElementById('totalModify').textContent = stats.modified;
-        document.getElementById('totalDelete').textContent = stats.deleted;
+        const totalCreate = document.getElementById('totalCreate');
+        const totalModify = document.getElementById('totalModify');
+        const totalDelete = document.getElementById('totalDelete');
+
+        if (totalCreate) totalCreate.textContent = stats.created;
+        if (totalModify) totalModify.textContent = stats.modified;
+        if (totalDelete) totalDelete.textContent = stats.deleted;
 
         renderHourlyChart(stats.byHour);
         renderExtensionChart(stats.byExtension);
@@ -250,7 +383,10 @@ async function loadStats() {
 
 // 시간대별 차트
 function renderHourlyChart(data) {
-    const ctx = document.getElementById('hourlyChart').getContext('2d');
+    const canvas = document.getElementById('hourlyChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
 
     if (hourlyChart) {
         hourlyChart.destroy();
@@ -263,9 +399,10 @@ function renderHourlyChart(data) {
             datasets: [{
                 label: '변경 횟수',
                 data: data,
-                backgroundColor: 'rgba(0, 217, 255, 0.6)',
-                borderColor: '#00d9ff',
-                borderWidth: 1
+                backgroundColor: 'rgba(0, 212, 170, 0.6)',
+                borderColor: '#00d4aa',
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: {
@@ -277,11 +414,11 @@ function renderHourlyChart(data) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: { color: '#888' },
-                    grid: { color: 'rgba(255,255,255,0.1)' }
+                    ticks: { color: '#8b949e' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
                 },
                 x: {
-                    ticks: { color: '#888' },
+                    ticks: { color: '#8b949e' },
                     grid: { display: false }
                 }
             }
@@ -291,7 +428,10 @@ function renderHourlyChart(data) {
 
 // 확장자별 차트
 function renderExtensionChart(data) {
-    const ctx = document.getElementById('extensionChart').getContext('2d');
+    const canvas = document.getElementById('extensionChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
 
     if (extensionChart) {
         extensionChart.destroy();
@@ -300,8 +440,8 @@ function renderExtensionChart(data) {
     const labels = Object.keys(data).slice(0, 10);
     const values = labels.map(k => data[k]);
     const colors = [
-        '#00d9ff', '#4caf50', '#ff9800', '#f44336', '#9c27b0',
-        '#2196f3', '#ffeb3b', '#795548', '#607d8b', '#e91e63'
+        '#00d4aa', '#3fb950', '#d29922', '#f85149', '#a371f7',
+        '#58a6ff', '#f778ba', '#79c0ff', '#7ee787', '#ffa657'
     ];
 
     extensionChart = new Chart(ctx, {
@@ -310,7 +450,8 @@ function renderExtensionChart(data) {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: colors.slice(0, labels.length)
+                backgroundColor: colors.slice(0, labels.length),
+                borderWidth: 0
             }]
         },
         options: {
@@ -319,7 +460,11 @@ function renderExtensionChart(data) {
             plugins: {
                 legend: {
                     position: 'right',
-                    labels: { color: '#888' }
+                    labels: {
+                        color: '#8b949e',
+                        padding: 15,
+                        usePointStyle: true
+                    }
                 }
             }
         }
@@ -347,11 +492,11 @@ async function loadSettings() {
         renderFilters();
         renderExcludes();
 
-        notifyDesktop.checked = settings.notifications?.desktop ?? true;
-        notifySound.checked = settings.notifications?.sound ?? true;
-        telegramEnabled.checked = settings.telegram?.enabled ?? false;
-        telegramToken.value = settings.telegram?.botToken ?? '';
-        telegramChatId.value = settings.telegram?.chatId ?? '';
+        if (notifyDesktop) notifyDesktop.checked = settings.notifications?.desktop ?? true;
+        if (notifySound) notifySound.checked = settings.notifications?.sound ?? true;
+        if (telegramEnabled) telegramEnabled.checked = settings.telegram?.enabled ?? false;
+        if (telegramToken) telegramToken.value = settings.telegram?.botToken ?? '';
+        if (telegramChatId) telegramChatId.value = settings.telegram?.chatId ?? '';
     } catch (e) {
         console.error('설정 로드 실패:', e);
     }
@@ -360,8 +505,8 @@ async function loadSettings() {
 // 설정 저장
 async function saveSettings() {
     settings.notifications = {
-        desktop: notifyDesktop.checked,
-        sound: notifySound.checked
+        desktop: notifyDesktop?.checked ?? true,
+        sound: notifySound?.checked ?? true
     };
 
     try {
@@ -377,6 +522,7 @@ async function saveSettings() {
 
 // 필터 렌더링
 function renderFilters() {
+    if (!filterList) return;
     filterList.innerHTML = (settings.filters || []).map(f => `
         <span class="tag">${f}<span class="remove" onclick="removeFilter('${f}')">&times;</span></span>
     `).join('');
@@ -406,6 +552,7 @@ async function removeFilter(filter) {
 
 // 제외 패턴 렌더링
 function renderExcludes() {
+    if (!excludeList) return;
     excludeList.innerHTML = (settings.excludePatterns || []).map(p => `
         <span class="tag">${p}<span class="remove" onclick="removeExclude('${escapeHtml(p)}')">&times;</span></span>
     `).join('');
@@ -435,9 +582,9 @@ async function removeExclude(pattern) {
 // 텔레그램 설정 저장
 async function saveTelegram() {
     settings.telegram = {
-        enabled: telegramEnabled.checked,
-        botToken: telegramToken.value.trim(),
-        chatId: telegramChatId.value.trim()
+        enabled: telegramEnabled?.checked ?? false,
+        botToken: telegramToken?.value.trim() ?? '',
+        chatId: telegramChatId?.value.trim() ?? ''
     };
 
     try {
@@ -470,29 +617,29 @@ function escapeHtml(text) {
 }
 
 // 이벤트 리스너
-addBtn.addEventListener('click', addFolder);
-folderInput.addEventListener('keypress', (e) => {
+if (addBtn) addBtn.addEventListener('click', addFolder);
+if (folderInput) folderInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addFolder();
 });
-clearLogsBtn.addEventListener('click', clearLogs);
-exportBtn.addEventListener('click', exportCSV);
-logFilter.addEventListener('change', renderLogs);
-logSearch.addEventListener('input', renderLogs);
+if (clearLogsBtn) clearLogsBtn.addEventListener('click', clearLogs);
+if (exportBtn) exportBtn.addEventListener('click', exportCSV);
+if (logFilter) logFilter.addEventListener('change', renderLogs);
+if (logSearch) logSearch.addEventListener('input', renderLogs);
 
-addFilterBtn.addEventListener('click', addFilter);
-filterInput.addEventListener('keypress', (e) => {
+if (addFilterBtn) addFilterBtn.addEventListener('click', addFilter);
+if (filterInput) filterInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addFilter();
 });
-addExcludeBtn.addEventListener('click', addExclude);
-excludeInput.addEventListener('keypress', (e) => {
+if (addExcludeBtn) addExcludeBtn.addEventListener('click', addExclude);
+if (excludeInput) excludeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addExclude();
 });
 
-notifyDesktop.addEventListener('change', saveSettings);
-notifySound.addEventListener('change', saveSettings);
-saveTelegramBtn.addEventListener('click', saveTelegram);
-testTelegramBtn.addEventListener('click', testTelegram);
-clearStatsBtn.addEventListener('click', clearStats);
+if (notifyDesktop) notifyDesktop.addEventListener('change', saveSettings);
+if (notifySound) notifySound.addEventListener('change', saveSettings);
+if (saveTelegramBtn) saveTelegramBtn.addEventListener('click', saveTelegram);
+if (testTelegramBtn) testTelegramBtn.addEventListener('click', testTelegram);
+if (clearStatsBtn) clearStatsBtn.addEventListener('click', clearStats);
 
 // 알림 권한 요청
 if (Notification.permission === 'default') {

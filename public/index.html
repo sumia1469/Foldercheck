@@ -8,162 +8,453 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>폴더 감시 프로그램</h1>
-            <div class="header-stats" id="headerStats">
-                <span class="stat-item stat-create">생성: <b id="statCreate">0</b></span>
-                <span class="stat-item stat-modify">수정: <b id="statModify">0</b></span>
-                <span class="stat-item stat-delete">삭제: <b id="statDelete">0</b></span>
+    <div class="app-container">
+        <!-- 좌측 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            <circle cx="12" cy="13" r="2"/>
+                            <path d="M12 11v-1m0 6v1"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <span class="app-name">폴더 감시</span>
+                        <span class="app-subtitle">File Monitor</span>
+                    </div>
+                </div>
             </div>
-        </header>
 
-        <!-- 탭 네비게이션 -->
-        <nav class="tabs">
-            <button class="tab-btn active" data-tab="monitor">모니터링</button>
-            <button class="tab-btn" data-tab="stats">통계</button>
-            <button class="tab-btn" data-tab="settings">설정</button>
-        </nav>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-section="dashboard">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"/>
+                            <rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">대시보드</span>
+                </a>
+                <a href="#" class="nav-item" data-section="monitor">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">모니터링</span>
+                </a>
+                <a href="#" class="nav-item" data-section="folders">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">폴더 관리</span>
+                </a>
+                <a href="#" class="nav-item" data-section="stats">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 20V10M12 20V4M6 20v-6"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">통계</span>
+                </a>
+                <a href="#" class="nav-item" data-section="notifications">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">알림</span>
+                </a>
+            </nav>
 
-        <!-- 모니터링 탭 -->
-        <div id="monitor" class="tab-content active">
-            <section class="section">
-                <h2>감시 폴더 추가</h2>
-                <div class="input-group">
-                    <input type="text" id="folderInput" placeholder="폴더 경로 입력 (예: C:\Users\Documents)">
-                    <button id="addBtn">추가</button>
+            <div class="sidebar-footer">
+                <div class="server-status">
+                    <span class="status-dot online"></span>
+                    <span class="status-text">서버 실행 중</span>
                 </div>
-            </section>
+                <div class="server-info">
+                    <span>localhost:4400</span>
+                </div>
+                <a href="#" class="nav-item settings-btn" data-section="settings">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">설정</span>
+                </a>
+            </div>
+        </aside>
 
-            <section class="section">
-                <h2>감시 중인 폴더</h2>
-                <ul id="folderList" class="folder-list"></ul>
-            </section>
-
-            <section class="section">
-                <h2>
-                    변경 로그
-                    <div class="log-actions">
-                        <button id="exportBtn" class="btn-small btn-export">CSV 내보내기</button>
-                        <button id="clearLogsBtn" class="btn-small">로그 지우기</button>
+        <!-- 메인 콘텐츠 -->
+        <main class="main-content">
+            <!-- 대시보드 섹션 -->
+            <section id="dashboard" class="content-section active">
+                <div class="section-header">
+                    <h1>대시보드</h1>
+                    <div class="header-actions">
+                        <span class="last-update">마지막 업데이트: <span id="lastUpdate">-</span></span>
                     </div>
-                </h2>
-                <div class="log-filter">
-                    <select id="logFilter">
-                        <option value="all">전체</option>
-                        <option value="생성">생성</option>
-                        <option value="수정">수정</option>
-                        <option value="삭제">삭제</option>
-                    </select>
-                    <input type="text" id="logSearch" placeholder="파일명 검색...">
                 </div>
-                <div id="logContainer" class="log-container"></div>
-            </section>
-        </div>
 
-        <!-- 통계 탭 -->
-        <div id="stats" class="tab-content">
-            <section class="section">
-                <h2>변경 통계 <button id="clearStatsBtn" class="btn-small">초기화</button></h2>
+                <!-- 상태 카드 -->
+                <div class="status-banner">
+                    <div class="status-icon success">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                    </div>
+                    <div class="status-info">
+                        <h2>정상 작동 중</h2>
+                        <p>• 모든 폴더가 감시 중입니다</p>
+                        <p>• 마지막 검사: <span id="lastCheck">-</span></p>
+                    </div>
+                </div>
+
+                <!-- 통계 그리드 -->
                 <div class="stats-grid">
-                    <div class="stat-card stat-create">
-                        <div class="stat-value" id="totalCreate">0</div>
-                        <div class="stat-label">생성</div>
+                    <div class="stat-card">
+                        <div class="stat-icon create">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                <path d="M14 2v6h6M12 18v-6M9 15h6"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="statCreate">0</span>
+                            <span class="stat-label">생성됨</span>
+                        </div>
                     </div>
-                    <div class="stat-card stat-modify">
-                        <div class="stat-value" id="totalModify">0</div>
-                        <div class="stat-label">수정</div>
+                    <div class="stat-card">
+                        <div class="stat-icon modify">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="statModify">0</span>
+                            <span class="stat-label">수정됨</span>
+                        </div>
                     </div>
-                    <div class="stat-card stat-delete">
-                        <div class="stat-value" id="totalDelete">0</div>
-                        <div class="stat-label">삭제</div>
+                    <div class="stat-card">
+                        <div class="stat-icon delete">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="statDelete">0</span>
+                            <span class="stat-label">삭제됨</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon folders">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="statFolders">0</span>
+                            <span class="stat-label">감시 폴더</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 퀵 액션 카드 -->
+                <div class="quick-actions">
+                    <div class="action-card" data-action="folders">
+                        <div class="action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                                <line x1="12" y1="11" x2="12" y2="17"/>
+                                <line x1="9" y1="14" x2="15" y2="14"/>
+                            </svg>
+                        </div>
+                        <span class="action-text">폴더 추가</span>
+                    </div>
+                    <div class="action-card" data-action="export">
+                        <div class="action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                        </div>
+                        <span class="action-text">로그 내보내기</span>
+                    </div>
+                    <div class="action-card" data-action="stats">
+                        <div class="action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 20V10M12 20V4M6 20v-6"/>
+                            </svg>
+                        </div>
+                        <span class="action-text">통계 보기</span>
+                    </div>
+                    <div class="action-card" data-action="clear">
+                        <div class="action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </div>
+                        <span class="action-text">로그 지우기</span>
+                    </div>
+                </div>
+
+                <!-- 최근 활동 -->
+                <div class="recent-activity">
+                    <div class="card-header">
+                        <h3>최근 활동</h3>
+                        <a href="#" class="view-all" data-section="monitor">모두 보기 →</a>
+                    </div>
+                    <div class="activity-list" id="recentActivity">
+                        <div class="empty-state">
+                            <p>아직 변경 기록이 없습니다</p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <section class="section">
-                <h2>시간대별 변경</h2>
-                <div class="chart-container">
-                    <canvas id="hourlyChart"></canvas>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2>확장자별 통계</h2>
-                <div class="chart-container chart-small">
-                    <canvas id="extensionChart"></canvas>
-                </div>
-            </section>
-        </div>
-
-        <!-- 설정 탭 -->
-        <div id="settings" class="tab-content">
-            <section class="section">
-                <h2>파일 필터</h2>
-                <p class="help-text">특정 확장자만 감시합니다. 비어있으면 모든 파일을 감시합니다.</p>
-                <div class="input-group">
-                    <input type="text" id="filterInput" placeholder="확장자 입력 (예: .txt)">
-                    <button id="addFilterBtn">추가</button>
-                </div>
-                <div id="filterList" class="tag-list"></div>
-            </section>
-
-            <section class="section">
-                <h2>제외 패턴</h2>
-                <p class="help-text">특정 폴더나 파일을 제외합니다.</p>
-                <div class="input-group">
-                    <input type="text" id="excludeInput" placeholder="제외 패턴 (예: node_modules)">
-                    <button id="addExcludeBtn">추가</button>
-                </div>
-                <div id="excludeList" class="tag-list"></div>
-            </section>
-
-            <section class="section">
-                <h2>알림 설정</h2>
-                <div class="setting-row">
-                    <label>
-                        <input type="checkbox" id="notifyDesktop" checked>
-                        데스크톱 알림
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <label>
-                        <input type="checkbox" id="notifySound" checked>
-                        소리 알림
-                    </label>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2>텔레그램 알림</h2>
-                <p class="help-text">파일 변경 시 텔레그램으로 알림을 받습니다.</p>
-                <div class="setting-row">
-                    <label>
-                        <input type="checkbox" id="telegramEnabled">
-                        텔레그램 알림 사용
-                    </label>
-                </div>
-                <div class="telegram-settings" id="telegramSettings">
-                    <div class="input-group vertical">
-                        <label>Bot Token</label>
-                        <input type="text" id="telegramToken" placeholder="123456:ABC-DEF...">
+            <!-- 모니터링 섹션 -->
+            <section id="monitor" class="content-section">
+                <div class="section-header">
+                    <h1>변경 로그</h1>
+                    <div class="header-actions">
+                        <button id="exportBtn" class="btn btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            CSV 내보내기
+                        </button>
+                        <button id="clearLogsBtn" class="btn btn-danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                            로그 지우기
+                        </button>
                     </div>
-                    <div class="input-group vertical">
-                        <label>Chat ID</label>
-                        <input type="text" id="telegramChatId" placeholder="123456789">
+                </div>
+
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <select id="logFilter" class="filter-select">
+                            <option value="all">전체</option>
+                            <option value="생성">생성</option>
+                            <option value="수정">수정</option>
+                            <option value="삭제">삭제</option>
+                        </select>
                     </div>
-                    <div class="button-group">
-                        <button id="saveTelegramBtn" class="btn-primary">저장</button>
-                        <button id="testTelegramBtn" class="btn-secondary">테스트</button>
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                        <input type="text" id="logSearch" placeholder="파일명 검색...">
+                    </div>
+                </div>
+
+                <div class="log-container" id="logContainer">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                        </svg>
+                        <p>변경 기록이 없습니다</p>
                     </div>
                 </div>
             </section>
-        </div>
+
+            <!-- 폴더 관리 섹션 -->
+            <section id="folders" class="content-section">
+                <div class="section-header">
+                    <h1>폴더 관리</h1>
+                </div>
+
+                <div class="add-folder-card">
+                    <h3>새 폴더 추가</h3>
+                    <p class="help-text">감시할 폴더의 전체 경로를 입력하세요</p>
+                    <div class="input-group">
+                        <input type="text" id="folderInput" placeholder="예: C:\Users\Documents">
+                        <button id="addBtn" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            추가
+                        </button>
+                    </div>
+                </div>
+
+                <div class="folders-list-card">
+                    <h3>감시 중인 폴더</h3>
+                    <ul id="folderList" class="folder-list">
+                        <li class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                            </svg>
+                            <p>감시 중인 폴더가 없습니다</p>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 통계 섹션 -->
+            <section id="stats" class="content-section">
+                <div class="section-header">
+                    <h1>통계</h1>
+                    <div class="header-actions">
+                        <button id="clearStatsBtn" class="btn btn-secondary">초기화</button>
+                    </div>
+                </div>
+
+                <div class="stats-overview">
+                    <div class="overview-card create">
+                        <div class="overview-value" id="totalCreate">0</div>
+                        <div class="overview-label">총 생성</div>
+                    </div>
+                    <div class="overview-card modify">
+                        <div class="overview-value" id="totalModify">0</div>
+                        <div class="overview-label">총 수정</div>
+                    </div>
+                    <div class="overview-card delete">
+                        <div class="overview-value" id="totalDelete">0</div>
+                        <div class="overview-label">총 삭제</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>시간대별 변경</h3>
+                        <div class="chart-container">
+                            <canvas id="hourlyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>확장자별 통계</h3>
+                        <div class="chart-container">
+                            <canvas id="extensionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 알림 섹션 -->
+            <section id="notifications" class="content-section">
+                <div class="section-header">
+                    <h1>알림 설정</h1>
+                </div>
+
+                <div class="settings-card">
+                    <h3>데스크톱 알림</h3>
+                    <div class="setting-item">
+                        <label class="toggle-label">
+                            <span>데스크톱 알림 표시</span>
+                            <p class="setting-desc">파일 변경 시 데스크톱 알림을 표시합니다</p>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="notifyDesktop" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label class="toggle-label">
+                            <span>소리 알림</span>
+                            <p class="setting-desc">파일 변경 시 알림 소리를 재생합니다</p>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="notifySound" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>텔레그램 알림</h3>
+                    <p class="help-text">파일 변경 시 텔레그램으로 알림을 받습니다</p>
+
+                    <div class="setting-item">
+                        <label class="toggle-label">
+                            <span>텔레그램 알림 사용</span>
+                        </label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="telegramEnabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="telegram-config" id="telegramConfig">
+                        <div class="form-group">
+                            <label>Bot Token</label>
+                            <input type="text" id="telegramToken" placeholder="123456:ABC-DEF...">
+                        </div>
+                        <div class="form-group">
+                            <label>Chat ID</label>
+                            <input type="text" id="telegramChatId" placeholder="123456789">
+                        </div>
+                        <div class="button-group">
+                            <button id="saveTelegramBtn" class="btn btn-primary">저장</button>
+                            <button id="testTelegramBtn" class="btn btn-secondary">테스트</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 설정 섹션 -->
+            <section id="settings" class="content-section">
+                <div class="section-header">
+                    <h1>설정</h1>
+                </div>
+
+                <div class="settings-card">
+                    <h3>파일 필터</h3>
+                    <p class="help-text">특정 확장자만 감시합니다. 비어있으면 모든 파일을 감시합니다.</p>
+                    <div class="input-group">
+                        <input type="text" id="filterInput" placeholder="확장자 입력 (예: .txt)">
+                        <button id="addFilterBtn" class="btn btn-primary">추가</button>
+                    </div>
+                    <div id="filterList" class="tag-list"></div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>제외 패턴</h3>
+                    <p class="help-text">특정 폴더나 파일을 제외합니다.</p>
+                    <div class="input-group">
+                        <input type="text" id="excludeInput" placeholder="제외 패턴 (예: node_modules)">
+                        <button id="addExcludeBtn" class="btn btn-primary">추가</button>
+                    </div>
+                    <div id="excludeList" class="tag-list"></div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>정보</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">버전</span>
+                            <span class="info-value">1.0.0</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">서버 포트</span>
+                            <span class="info-value">4400</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <!-- 알림 소리 -->
     <audio id="notificationSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onq+1s6mXhHVrdHmFkZuem5WKfXNtc3qDjZWXlZCHfXVxdHuEjZOUkoqBd3JwdXyFjJCRjoV8c3Byd4GJjo+MhoB3cXB0e4OKjo6KhHxzcHJ4gYiMjYqFfnZycneAh4uMiYR+d3JzdoCHi4uJhH53c3V4gIaKi4mEf3d0dXmAhouLiIR/d3V3eoCGiYqIhH94dXd5gIaJioiEf3h2d3mAhoiJiIR/eHZ4eoCGiImHg396d3h5gIWIiIeDf3p4eHqAhYiHh4N/enh5e4CFh4eGg395eXl7gISGhoaDf3p5enyCg4WFhIN/e3p6fIKDhYSEgn97ent8goOEhIKBf3t7fH2Cg4SEgoF/fHt9fYKDg4OCgX98fH19goKDg4KBf3x8fX6CgoODgoF/fXx+foGCgoOCgYB9fX5+gYKCgoKBgH5+fn+BgYKCgoGAfn5/f4GBgoKBgYB+f39/gYGBgoGBgH9/f4CBgYGBgYGAf39/gIGBgYGBgYB/f4CAgYGBgYGBgH+AgICBgYGBgYGAf4CAgIGBgYGBgYB/gICAgYGBgYGAgH+AgICBgYGBgYCAf4CAgIGBgYGBgIB/gICAgYGBgYGAgH+AgICBgYGBgYCAf4CAgICBgYGBgIB/gICAgYGBgYGAgH+AgICBgYGBgYB/f4CAgIGBgYGBgH9/gICAgYGBgYGAf3+AgICBgYGBgYB/f4CAgIGBgYGBgH9/gICA" type="audio/wav">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onq+1s6mXhHVrdHmFkZuem5WKfXNtc3qDjZWXlZCHfXVxdHuEjZOUkoqBd3JwdXyFjJCRjoV8c3Byd4GJjo+MhoB3cXB0e4OKjo6KhHxzcHJ4gYiMjYqFfnZycneAh4uMiYR+d3JzdoCHi4uJhH53c3V4gIaKi4mEf3d0dXmAhouLiIR/d3V3eoCGiYqIhH94dXd5gIaJioiEf3h2d3mAhoiJiIR/eHZ4eoCGiImHg396d3h5gIWIiIeDf3p4eHqAhYiHh4N/enh5e4CFh4eGg395eXl7gISGhoaDf3p5enyCg4WFhIN/e3p6fIKDhYSEgn97ent8goOEhIKBf3t7fH2Cg4SEgoF/fHt9fYKDg4OCgX98fH19goKDg4KBf3x8fX6CgoODgoF/fXx+foGCgoOCgYB9fX5+gYKCgoKBgH5+fn+BgYKCgoGAfn5/f4GBgoKBgYB+f39/gYGBgoGBgH9/f4CBgYGBgYGAf39/gIGBgYGBgYB/f4CAgYGBgYGBgH+AgICBgYGBgYGAf4CAgIGBgYGBgYB/gICAgYGBgYGAgH+AgICBgYGBgYCAf4CAgIGBgYGBgIB/gICAgYGBgYGAgH+AgICBgYGBgYB/f4CAgIGBgYGBgH9/gICAgYGBgYGAf3+AgICBgYGBgYB/f4CAgIGBgYGBgH9/gICA" type="audio/wav">
     </audio>
 
     <script src="/js/common.js"></script>

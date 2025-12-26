@@ -11,7 +11,8 @@
       "Bash(cmd //c \"taskkill /F /PID 30520\")",
       "Bash(mkdir:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(ls:*)"
     ]
   }
 }

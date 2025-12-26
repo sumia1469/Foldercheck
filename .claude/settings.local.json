@@ -8,7 +8,10 @@
       "Bash(handle \"c:/Users/D101/check/Foldercheck/dist\")",
       "Bash(cmd //c \"taskkill /F /PID 62880 & taskkill /F /PID 62604 & taskkill /F /PID 51028 & taskkill /F /PID 47412\")",
       "Bash(netstat:*)",
-      "Bash(cmd //c \"taskkill /F /PID 30520\")"
+      "Bash(cmd //c \"taskkill /F /PID 30520\")",
+      "Bash(mkdir:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

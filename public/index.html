@@ -5,29 +5,166 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>폴더 감시 프로그램</title>
     <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>폴더 감시 프로그램</h1>
-
-        <section class="section">
-            <h2>감시 폴더 추가</h2>
-            <div class="input-group">
-                <input type="text" id="folderInput" placeholder="폴더 경로 입력 (예: C:\Users\Documents)">
-                <button id="addBtn">추가</button>
+        <header class="header">
+            <h1>폴더 감시 프로그램</h1>
+            <div class="header-stats" id="headerStats">
+                <span class="stat-item stat-create">생성: <b id="statCreate">0</b></span>
+                <span class="stat-item stat-modify">수정: <b id="statModify">0</b></span>
+                <span class="stat-item stat-delete">삭제: <b id="statDelete">0</b></span>
             </div>
-        </section>
+        </header>
 
-        <section class="section">
-            <h2>감시 중인 폴더</h2>
-            <ul id="folderList" class="folder-list"></ul>
-        </section>
+        <!-- 탭 네비게이션 -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="monitor">모니터링</button>
+            <button class="tab-btn" data-tab="stats">통계</button>
+            <button class="tab-btn" data-tab="settings">설정</button>
+        </nav>
 
-        <section class="section">
-            <h2>변경 로그 <button id="clearLogsBtn" class="btn-small">로그 지우기</button></h2>
-            <div id="logContainer" class="log-container"></div>
-        </section>
+        <!-- 모니터링 탭 -->
+        <div id="monitor" class="tab-content active">
+            <section class="section">
+                <h2>감시 폴더 추가</h2>
+                <div class="input-group">
+                    <input type="text" id="folderInput" placeholder="폴더 경로 입력 (예: C:\Users\Documents)">
+                    <button id="addBtn">추가</button>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>감시 중인 폴더</h2>
+                <ul id="folderList" class="folder-list"></ul>
+            </section>
+
+            <section class="section">
+                <h2>
+                    변경 로그
+                    <div class="log-actions">
+                        <button id="exportBtn" class="btn-small btn-export">CSV 내보내기</button>
+                        <button id="clearLogsBtn" class="btn-small">로그 지우기</button>
+                    </div>
+                </h2>
+                <div class="log-filter">
+                    <select id="logFilter">
+                        <option value="all">전체</option>
+                        <option value="생성">생성</option>
+                        <option value="수정">수정</option>
+                        <option value="삭제">삭제</option>
+                    </select>
+                    <input type="text" id="logSearch" placeholder="파일명 검색...">
+                </div>
+                <div id="logContainer" class="log-container"></div>
+            </section>
+        </div>
+
+        <!-- 통계 탭 -->
+        <div id="stats" class="tab-content">
+            <section class="section">
+                <h2>변경 통계 <button id="clearStatsBtn" class="btn-small">초기화</button></h2>
+                <div class="stats-grid">
+                    <div class="stat-card stat-create">
+                        <div class="stat-value" id="totalCreate">0</div>
+                        <div class="stat-label">생성</div>
+                    </div>
+                    <div class="stat-card stat-modify">
+                        <div class="stat-value" id="totalModify">0</div>
+                        <div class="stat-label">수정</div>
+                    </div>
+                    <div class="stat-card stat-delete">
+                        <div class="stat-value" id="totalDelete">0</div>
+                        <div class="stat-label">삭제</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>시간대별 변경</h2>
+                <div class="chart-container">
+                    <canvas id="hourlyChart"></canvas>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>확장자별 통계</h2>
+                <div class="chart-container chart-small">
+                    <canvas id="extensionChart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <!-- 설정 탭 -->
+        <div id="settings" class="tab-content">
+            <section class="section">
+                <h2>파일 필터</h2>
+                <p class="help-text">특정 확장자만 감시합니다. 비어있으면 모든 파일을 감시합니다.</p>
+                <div class="input-group">
+                    <input type="text" id="filterInput" placeholder="확장자 입력 (예: .txt)">
+                    <button id="addFilterBtn">추가</button>
+                </div>
+                <div id="filterList" class="tag-list"></div>
+            </section>
+
+            <section class="section">
+                <h2>제외 패턴</h2>
+                <p class="help-text">특정 폴더나 파일을 제외합니다.</p>
+                <div class="input-group">
+                    <input type="text" id="excludeInput" placeholder="제외 패턴 (예: node_modules)">
+                    <button id="addExcludeBtn">추가</button>
+                </div>
+                <div id="excludeList" class="tag-list"></div>
+            </section>
+
+            <section class="section">
+                <h2>알림 설정</h2>
+                <div class="setting-row">
+                    <label>
+                        <input type="checkbox" id="notifyDesktop" checked>
+                        데스크톱 알림
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>
+                        <input type="checkbox" id="notifySound" checked>
+                        소리 알림
+                    </label>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>텔레그램 알림</h2>
+                <p class="help-text">파일 변경 시 텔레그램으로 알림을 받습니다.</p>
+                <div class="setting-row">
+                    <label>
+                        <input type="checkbox" id="telegramEnabled">
+                        텔레그램 알림 사용
+                    </label>
+                </div>
+                <div class="telegram-settings" id="telegramSettings">
+                    <div class="input-group vertical">
+                        <label>Bot Token</label>
+                        <input type="text" id="telegramToken" placeholder="123456:ABC-DEF...">
+                    </div>
+                    <div class="input-group vertical">
+                        <label>Chat ID</label>
+                        <input type="text" id="telegramChatId" placeholder="123456789">
+                    </div>
+                    <div class="button-group">
+                        <button id="saveTelegramBtn" class="btn-primary">저장</button>
+                        <button id="testTelegramBtn" class="btn-secondary">테스트</button>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
+
+    <!-- 알림 소리 -->
+    <audio id="notificationSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onq+1s6mXhHVrdHmFkZuem5WKfXNtc3qDjZWXlZCHfXVxdHuEjZOUkoqBd3JwdXyFjJCRjoV8c3Byd4GJjo+MhoB3cXB0e4OKjo6KhHxzcHJ4gYiMjYqFfnZycneAh4uMiYR+d3JzdoCHi4uJhH53c3V4gIaKi4mEf3d0dXmAhouLiIR/d3V3eoCGiYqIhH94dXd5gIaJioiEf3h2d3mAhoiJiIR/eHZ4eoCGiImHg396d3h5gIWIiIeDf3p4eHqAhYiHh4N/enh5e4CFh4eGg395eXl7gISGhoaDf3p5enyCg4WFhIN/e3p6fIKDhYSEgn97ent8goOEhIKBf3t7fH2Cg4SEgoF/fHt9fYKDg4OCgX98fH19goKDg4KBf3x8fX6CgoODgoF/fXx+foGCgoOCgYB9fX5+gYKCgoKBgH5+fn+BgYKCgoGAfn5/f4GBgoKBgYB+f39/gYGBgoGBgH9/f4CBgYGBgYGAf39/gIGBgYGBgYB/f4CAgYGBgYGBgH+AgICBgYGBgYGAf4CAgIGBgYGBgYB/gICAgYGBgYGAgH+AgICBgYGBgYCAf4CAgIGBgYGBgIB/gICAgYGBgYGAgH+AgICBgYGBgYCAf4CAgICBgYGBgIB/gICAgYGBgYGAgH+AgICBgYGBgYB/f4CAgIGBgYGBgH9/gICAgYGBgYGAf3+AgICBgYGBgYB/f4CAgIGBgYGBgH9/gICA" type="audio/wav">
+    </audio>
 
     <script src="/js/common.js"></script>
 </body>

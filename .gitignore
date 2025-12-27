@@ -14,3 +14,14 @@ dist-ssr
 
 # Large AI model files
 models/*.bin
+
+# Audio files (회의 녹음)
+*.wav
+*.mp3
+*.m4a
+meetings/*.wav
+meetings/*.mp3
+meetings/*.m4a
+
+# Meeting transcripts (회의록)
+meetings/transcript_*.txt

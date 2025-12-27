@@ -1414,9 +1414,36 @@ const processingStatus = document.getElementById('processingStatus');
 const meetingList = document.getElementById('meetingList');
 const whisperStatus = document.getElementById('whisperStatus');
 
+// 처리 중 상태 관리
+let isProcessingAudio = false;
+
+function setProcessingState(processing) {
+    isProcessingAudio = processing;
+    if (uploadArea) {
+        if (processing) {
+            uploadArea.classList.add('disabled');
+            uploadArea.style.pointerEvents = 'none';
+            uploadArea.style.opacity = '0.5';
+        } else {
+            uploadArea.classList.remove('disabled');
+            uploadArea.style.pointerEvents = '';
+            uploadArea.style.opacity = '';
+        }
+    }
+    if (audioFileInput) {
+        audioFileInput.disabled = processing;
+    }
+}
+
 // 업로드 영역 이벤트
 if (uploadArea) {
-    uploadArea.addEventListener('click', () => audioFileInput.click());
+    uploadArea.addEventListener('click', () => {
+        if (isProcessingAudio) {
+            alert('현재 파일을 처리 중입니다. 완료될 때까지 기다려주세요.');
+            return;
+        }
+        audioFileInput.click();
+    });
 
     uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -1430,6 +1457,10 @@ if (uploadArea) {
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
+        if (isProcessingAudio) {
+            alert('현재 파일을 처리 중입니다. 완료될 때까지 기다려주세요.');
+            return;
+        }
         const file = e.dataTransfer.files[0];
         if (file && isAudioFile(file)) {
             handleAudioFile(file);
@@ -1443,6 +1474,11 @@ if (audioFileInput) {
     audioFileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
+            if (isProcessingAudio) {
+                alert('현재 파일을 처리 중입니다. 완료될 때까지 기다려주세요.');
+                e.target.value = '';
+                return;
+            }
             handleAudioFile(file);
         }
     });
@@ -1457,6 +1493,9 @@ function isAudioFile(file) {
 async function handleAudioFile(file) {
     console.log('오디오 파일 처리:', file.name);
 
+    // 처리 상태 설정 - 업로드 비활성화
+    setProcessingState(true);
+
     // 프로그래스 UI 표시
     if (processingCard) processingCard.style.display = 'block';
     updateProgress(0, '파일 업로드 중...');
@@ -1466,12 +1505,22 @@ async function handleAudioFile(file) {
     formData.append('audio', file);
 
     try {
-        updateProgress(10, '음성 인식 준비 중...');
+        updateProgress(10, '서버로 전송 중...');
+
+        // 진행 상태 시뮬레이션 (실제 진행률을 알 수 없으므로)
+        let progressInterval = setInterval(() => {
+            const currentWidth = parseInt(progressFill?.style.width || '10');
+            if (currentWidth < 85) {
+                updateProgress(currentWidth + 5, getProgressMessage(currentWidth + 5));
+            }
+        }, 3000);
 
         const response = await fetch('/api/meeting/transcribe', {
             method: 'POST',
             body: formData
         });
+
+        clearInterval(progressInterval);
 
         if (!response.ok) {
             throw new Error('처리 실패');
@@ -1480,21 +1529,34 @@ async function handleAudioFile(file) {
         const result = await response.json();
 
         if (result.success) {
-            updateProgress(100, '완료!');
+            updateProgress(100, '✅ 완료!');
             setTimeout(() => {
                 if (processingCard) processingCard.style.display = 'none';
+                setProcessingState(false);
                 loadMeetings();
-                alert('회의록이 생성되었습니다: ' + result.filename);
-            }, 1000);
+                alert('회의록이 생성되었습니다!');
+            }, 1500);
         } else {
             throw new Error(result.error || '알 수 없는 오류');
         }
     } catch (e) {
         console.error('회의록 생성 실패:', e);
-        updateProgress(0, '오류 발생');
+        updateProgress(0, '❌ 오류 발생');
         if (processingStatus) processingStatus.textContent = e.message;
+        setProcessingState(false);
+        setTimeout(() => {
+            if (processingCard) processingCard.style.display = 'none';
+        }, 3000);
         alert('회의록 생성에 실패했습니다: ' + e.message);
     }
+}
+
+function getProgressMessage(percent) {
+    if (percent < 20) return '📤 서버로 전송 중...';
+    if (percent < 40) return '🔄 오디오 변환 중...';
+    if (percent < 60) return '🎙️ 음성 인식 중...';
+    if (percent < 80) return '📝 텍스트 분석 중...';
+    return '⏳ 거의 완료...';
 }
 
 function updateProgress(percent, text) {

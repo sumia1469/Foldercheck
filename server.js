@@ -22,7 +22,7 @@ const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
 
 // Ollama 설정 (로컬 LLM)
 const OLLAMA_HOST = 'http://localhost:11434';
-const OLLAMA_MODEL = 'tinyllama';
+const OLLAMA_MODEL = 'qwen2:1.5b';
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -90,9 +90,19 @@ async function transcribeAudio(audioPath) {
         throw new Error('Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.');
     }
 
-    // WAV로 변환
-    const wavPath = audioPath.replace(/\.[^.]+$/, '.wav');
-    await convertToWav(audioPath, wavPath);
+    // WAV로 변환 (이미 WAV인 경우 _converted 접미사 추가)
+    const ext = path.extname(audioPath).toLowerCase();
+    let wavPath;
+
+    if (ext === '.wav') {
+        // 이미 WAV 파일인 경우: Whisper 형식(16kHz, mono)으로 변환
+        wavPath = audioPath.replace('.wav', '_converted.wav');
+        await convertToWav(audioPath, wavPath);
+    } else {
+        // 다른 형식인 경우: WAV로 변환
+        wavPath = audioPath.replace(/\.[^.]+$/, '.wav');
+        await convertToWav(audioPath, wavPath);
+    }
 
     console.log('로컬 Whisper 음성 인식 시작...');
     console.log('WAV 파일:', wavPath);
@@ -825,29 +835,56 @@ async function checkOllamaStatus() {
 
 // Ollama로 텍스트 요약
 async function summarizeWithOllama(text, type = 'meeting') {
+    // 시스템 프롬프트: 한국어 응답 강제
+    const systemPrompt = `당신은 전문 회의록 작성자입니다. 반드시 한국어로만 응답하세요. 내용을 빠짐없이 정리해주세요.`;
+
     const prompts = {
-        meeting: `다음은 회의 녹취록입니다. 한국어로 요약해주세요.
+        meeting: `[지시사항] 반드시 한국어로 상세하게 작성하세요. 한두 줄 요약이 아닌 전체 내용을 분석한 회의록을 작성하세요.
 
-요약 형식:
-1. 회의 주제 (1줄)
-2. 주요 논의 사항 (3-5개 bullet point)
-3. 결정 사항 (있다면)
-4. 액션 아이템 (담당자/기한이 있다면 포함)
+다음은 회의 녹취록입니다. 아래 형식에 맞춰 상세한 회의록을 작성해주세요.
 
+## 회의록 형식:
+
+### 📋 회의 개요
+- 회의 주제/목적을 파악하여 작성
+
+### 💬 논의 내용
+- 논의된 각 주제별로 정리
+- 누가 어떤 의견을 제시했는지 구분하여 작성
+- 중요한 논점은 모두 포함
+
+### ✅ 결정 사항
+- 회의에서 합의된 결정 사항들
+
+### 📌 액션 아이템
+- 후속 조치가 필요한 항목
+- 담당자, 기한이 언급되었다면 포함
+
+### 💡 기타 논의
+- 추가로 언급된 내용이나 참고사항
+
+---
 녹취록:
-${text.substring(0, 3000)}
+${text.substring(0, 4000)}
 
-요약:`,
-        document: `다음 문서 내용을 한국어로 간단히 요약해주세요 (3-5문장):
+[회의록 작성]:`,
+        document: `[지시사항] 반드시 한국어로 작성하세요.
 
-${text.substring(0, 3000)}
+다음 문서의 핵심 내용을 정리해주세요:
+- 문서의 목적
+- 주요 내용 (항목별로 정리)
+- 핵심 결론이나 요점
 
-요약:`,
-        document_changes: `다음은 문서의 변경사항 정보입니다. 한국어로 변경사항을 간결하게 요약해주세요 (2-3문장):
+${text.substring(0, 4000)}
+
+[문서 정리]:`,
+        document_changes: `[지시사항] 반드시 한국어로 작성하세요.
+
+다음은 문서의 변경사항입니다. 변경 내용을 정리해주세요:
 
 ${text.substring(0, 2000)}
 
-변경사항 요약:`
+[변경사항 정리]:`
     };
 
     const prompt = prompts[type] || prompts.meeting;
@@ -856,10 +893,11 @@ ${text.substring(0, 2000)}
         const postData = JSON.stringify({
             model: OLLAMA_MODEL,
             prompt: prompt,
+            system: systemPrompt,
             stream: false,
             options: {
-                temperature: 0.3,
-                num_predict: 500
+                temperature: 0.4,
+                num_predict: 1500
             }
         });
 

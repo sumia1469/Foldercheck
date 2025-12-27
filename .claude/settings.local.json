@@ -56,7 +56,10 @@
       "Bash(/bin/ps:*)",
       "Bash(/usr/bin/grep:*)",
       "Bash(/usr/bin/grep docwatch)",
-      "Bash(/usr/bin/head:*)"
+      "Bash(/usr/bin/head:*)",
+      "Bash(ollama rm:*)",
+      "Bash(ollama list:*)",
+      "Bash(ffmpeg:*)"
     ]
   }
 }

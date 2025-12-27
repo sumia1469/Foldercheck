@@ -522,28 +522,29 @@ async function loadWhisperStatus() {
         const res = await fetch('/api/whisper/status');
         const status = await res.json();
 
-        const whisperState = document.getElementById('whisperState');
-        const whisperModel = document.getElementById('whisperModel');
+        // 설정 탭의 Whisper 상태 요소들
+        const whisperStateSettings = document.getElementById('whisperStateSettings');
+        const whisperModelSettings = document.getElementById('whisperModelSettings');
 
-        if (whisperModel) {
-            whisperModel.textContent = status.model || 'ggml-small';
+        if (whisperModelSettings) {
+            whisperModelSettings.textContent = status.model || 'ggml-small';
         }
 
-        if (whisperState) {
+        if (whisperStateSettings) {
             if (status.ready) {
-                whisperState.textContent = '준비됨 ✓';
-                whisperState.className = 'status-value ready';
+                whisperStateSettings.textContent = '준비됨 ✓';
+                whisperStateSettings.className = 'status-value ready';
             } else {
-                whisperState.textContent = '모델 파일 필요';
-                whisperState.className = 'status-value error';
+                whisperStateSettings.textContent = '모델 파일 필요';
+                whisperStateSettings.className = 'status-value error';
             }
         }
     } catch (e) {
         console.error('Whisper 상태 확인 실패:', e);
-        const whisperState = document.getElementById('whisperState');
-        if (whisperState) {
-            whisperState.textContent = '확인 실패';
-            whisperState.className = 'status-value error';
+        const whisperStateSettings = document.getElementById('whisperStateSettings');
+        if (whisperStateSettings) {
+            whisperStateSettings.textContent = '확인 실패';
+            whisperStateSettings.className = 'status-value error';
         }
     }
 }
@@ -2137,3 +2138,38 @@ checkAppEnvironment();  // 앱 환경 확인 (웹 vs Electron)
 loadLicenseStatus();
 initLicenseTabs();
 initLicenseButtons();
+
+// 커스텀 타이틀바 버튼 이벤트 (Electron 환경에서만 동작)
+function initTitlebarControls() {
+    // 플랫폼 감지 및 클래스 추가
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    if (isMac) {
+        document.body.classList.add('is-mac');
+    }
+
+    if (typeof window.electronAPI === 'undefined') return;
+
+    const minimizeBtn = document.getElementById('minimizeBtn');
+    const maximizeBtn = document.getElementById('maximizeBtn');
+    const closeBtn = document.getElementById('closeBtn');
+
+    if (minimizeBtn) {
+        minimizeBtn.addEventListener('click', () => {
+            window.electronAPI.minimizeWindow();
+        });
+    }
+
+    if (maximizeBtn) {
+        maximizeBtn.addEventListener('click', () => {
+            window.electronAPI.maximizeWindow();
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            window.electronAPI.closeWindow();
+        });
+    }
+}
+
+initTitlebarControls();

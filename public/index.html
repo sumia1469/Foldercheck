@@ -8,6 +8,23 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- 커스텀 타이틀바 (macOS 스타일) -->
+    <div class="custom-titlebar">
+        <div class="titlebar-drag-region"></div>
+        <div class="titlebar-title">DocWatch</div>
+        <div class="titlebar-controls">
+            <button class="titlebar-btn minimize" id="minimizeBtn" title="최소화">
+                <svg viewBox="0 0 12 12"><rect y="5" width="12" height="2" fill="currentColor"/></svg>
+            </button>
+            <button class="titlebar-btn maximize" id="maximizeBtn" title="최대화">
+                <svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
+            <button class="titlebar-btn close" id="closeBtn" title="닫기">
+                <svg viewBox="0 0 12 12"><path d="M1 1L11 11M11 1L1 11" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- 좌측 사이드바 -->
         <aside class="sidebar">
@@ -456,86 +473,6 @@
                     </div>
                 </div>
 
-                <div class="settings-card">
-                    <h3>🎙️ 음성 인식 (로컬 Whisper)</h3>
-                    <p class="help-text">회의 녹음을 텍스트로 변환합니다. 인터넷 연결 없이 로컬에서 처리됩니다.</p>
-
-                    <div class="whisper-status" id="whisperStatus">
-                        <div class="status-row">
-                            <span class="status-label">모델:</span>
-                            <span class="status-value" id="whisperModel">ggml-small</span>
-                        </div>
-                        <div class="status-row">
-                            <span class="status-label">상태:</span>
-                            <span class="status-value" id="whisperState">확인 중...</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 라이선스 관리 -->
-                <div class="settings-card" id="licenseCard">
-                    <h3>🔐 라이선스</h3>
-                    <p class="help-text">DocWatch Pro 라이선스를 관리합니다.</p>
-
-                    <div class="license-status" id="licenseStatusContainer">
-                        <div class="status-row">
-                            <span class="status-label">상태:</span>
-                            <span class="status-value" id="licenseType">확인 중...</span>
-                        </div>
-                        <div class="status-row">
-                            <span class="status-label">만료일:</span>
-                            <span class="status-value" id="licenseExpiry">-</span>
-                        </div>
-                        <div class="status-row" id="licenseDaysRow" style="display: none;">
-                            <span class="status-label">남은 기간:</span>
-                            <span class="status-value" id="licenseDays">-</span>
-                        </div>
-                    </div>
-
-                    <!-- Trial/만료 시 활성화 UI -->
-                    <div id="licenseActivationUI" style="display: none; margin-top: 16px;">
-                        <div class="license-tabs">
-                            <button class="license-tab active" data-tab="online">온라인 활성화</button>
-                            <button class="license-tab" data-tab="offline">오프라인 활성화</button>
-                        </div>
-
-                        <!-- 온라인 활성화 -->
-                        <div class="license-tab-content" id="onlineActivation">
-                            <div class="form-group">
-                                <label>라이선스 키</label>
-                                <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX">
-                            </div>
-                            <button class="btn btn-primary" id="activateOnlineBtn">활성화</button>
-                        </div>
-
-                        <!-- 오프라인 활성화 -->
-                        <div class="license-tab-content" id="offlineActivation" style="display: none;">
-                            <div class="form-group">
-                                <label>기기 ID (복사하여 관리자에게 전달)</label>
-                                <div class="machine-id-box">
-                                    <code id="machineIdDisplay">로딩 중...</code>
-                                    <button class="btn btn-sm btn-secondary" id="copyMachineIdBtn">복사</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>오프라인 라이선스 키</label>
-                                <textarea id="offlineKeyInput" rows="3" placeholder="관리자로부터 받은 오프라인 키를 입력하세요"></textarea>
-                            </div>
-                            <button class="btn btn-primary" id="activateOfflineBtn">오프라인 활성화</button>
-                        </div>
-                    </div>
-
-                    <!-- Pro 상태일 때 -->
-                    <div id="licenseProStatus" style="display: none; margin-top: 16px;">
-                        <div class="pro-badge">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                            Pro 라이선스 활성화됨
-                        </div>
-                    </div>
-                </div>
             </section>
 
             <!-- 회의록 섹션 -->
@@ -768,6 +705,87 @@
                         <button id="addExcludeBtn" class="btn btn-primary">추가</button>
                     </div>
                     <div id="excludeList" class="tag-list"></div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>🎙️ 음성 인식 (로컬 Whisper)</h3>
+                    <p class="help-text">회의 녹음을 텍스트로 변환합니다. 인터넷 연결 없이 로컬에서 처리됩니다.</p>
+
+                    <div class="whisper-status" id="whisperStatusSettings">
+                        <div class="status-row">
+                            <span class="status-label">모델:</span>
+                            <span class="status-value" id="whisperModelSettings">ggml-small</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">상태:</span>
+                            <span class="status-value" id="whisperStateSettings">확인 중...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 라이선스 관리 -->
+                <div class="settings-card" id="licenseCard">
+                    <h3>🔐 라이선스</h3>
+                    <p class="help-text">DocWatch Pro 라이선스를 관리합니다.</p>
+
+                    <div class="license-status" id="licenseStatusContainer">
+                        <div class="status-row">
+                            <span class="status-label">상태:</span>
+                            <span class="status-value" id="licenseType">확인 중...</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">만료일:</span>
+                            <span class="status-value" id="licenseExpiry">-</span>
+                        </div>
+                        <div class="status-row" id="licenseDaysRow" style="display: none;">
+                            <span class="status-label">남은 기간:</span>
+                            <span class="status-value" id="licenseDays">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Trial/만료 시 활성화 UI -->
+                    <div id="licenseActivationUI" style="display: none; margin-top: 16px;">
+                        <div class="license-tabs">
+                            <button class="license-tab active" data-tab="online">온라인 활성화</button>
+                            <button class="license-tab" data-tab="offline">오프라인 활성화</button>
+                        </div>
+
+                        <!-- 온라인 활성화 -->
+                        <div class="license-tab-content" id="onlineActivation">
+                            <div class="form-group">
+                                <label>라이선스 키</label>
+                                <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX">
+                            </div>
+                            <button class="btn btn-primary" id="activateOnlineBtn">활성화</button>
+                        </div>
+
+                        <!-- 오프라인 활성화 -->
+                        <div class="license-tab-content" id="offlineActivation" style="display: none;">
+                            <div class="form-group">
+                                <label>기기 ID (복사하여 관리자에게 전달)</label>
+                                <div class="machine-id-box">
+                                    <code id="machineIdDisplay">로딩 중...</code>
+                                    <button class="btn btn-sm btn-secondary" id="copyMachineIdBtn">복사</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>오프라인 라이선스 키</label>
+                                <textarea id="offlineKeyInput" rows="3" placeholder="관리자로부터 받은 오프라인 키를 입력하세요"></textarea>
+                            </div>
+                            <button class="btn btn-primary" id="activateOfflineBtn">오프라인 활성화</button>
+                        </div>
+                    </div>
+
+                    <!-- Pro 상태일 때 -->
+                    <div id="licenseProStatus" style="display: none; margin-top: 16px;">
+                        <div class="pro-badge">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            Pro 라이선스 활성화됨
+                        </div>
+                    </div>
                 </div>
 
                 <div class="settings-card">

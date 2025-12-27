@@ -35,7 +35,28 @@
       "Bash(brew info:*)",
       "Bash(brew install:*)",
       "Bash(brew services:*)",
-      "Bash(ollama pull:*)"
+      "Bash(ollama pull:*)",
+      "Bash(npm ls:*)",
+      "Bash(fnm install:*)",
+      "Bash(fnm use:*)",
+      "Bash(/opt/homebrew/bin/fnm env:*)",
+      "Bash(export PATH=\"/Users/ibyeonghyeon/.local/share/fnm/node-versions/v20.19.6/installation/bin:$PATH\")",
+      "Bash(npm --version:*)",
+      "Bash(/bin/rm:*)",
+      "Bash(/Users/ibyeonghyeon/.local/share/fnm/node-versions/v20.19.6/installation/bin/npm install)",
+      "Bash(/bin/cat node_modules/electron/package.json)",
+      "Bash(/bin/cat:*)",
+      "Bash(/bin/ls:*)",
+      "Bash(/bin/mv:*)",
+      "Bash(/Users/ibyeonghyeon/.local/share/fnm/node-versions/v20.19.6/installation/bin/npx npm install electron@33.4.11 --save-dev)",
+      "Bash(/usr/bin/xattr:*)",
+      "Bash(/usr/bin/env -i HOME=\"$HOME\" USER=\"$USER\" PATH=\"/usr/bin:/bin:/usr/sbin:/sbin\" node_modules/electron/dist/Electron.app/Contents/MacOS/Electron:*)",
+      "Bash(/bin/kill:*)",
+      "Bash(/bin/sleep 2)",
+      "Bash(/bin/ps:*)",
+      "Bash(/usr/bin/grep:*)",
+      "Bash(/usr/bin/grep docwatch)",
+      "Bash(/usr/bin/head:*)"
     ]
   }
 }

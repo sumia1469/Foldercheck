@@ -22,6 +22,11 @@
     --danger: #f85149;
     --info: #58a6ff;
     --sidebar-width: 260px;
+    --titlebar-height: 38px;
+}
+
+html {
+    background: transparent;
 }
 
 body {
@@ -30,12 +35,103 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     line-height: 1.5;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* 커스텀 타이틀바 */
+.custom-titlebar {
+    height: var(--titlebar-height);
+    background: linear-gradient(180deg, #1e2530 0%, var(--bg-secondary) 100%);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    -webkit-app-region: drag;
+    user-select: none;
+    border-radius: 10px 10px 0 0;
+}
+
+.titlebar-drag-region {
+    position: absolute;
+    top: 0;
+    left: 80px;
+    right: 140px;
+    height: 100%;
+    -webkit-app-region: drag;
+}
+
+.titlebar-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.3px;
+}
+
+.titlebar-controls {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    display: flex;
+    -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+    width: 46px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.titlebar-btn svg {
+    width: 10px;
+    height: 10px;
+}
+
+.titlebar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.titlebar-btn.close:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.titlebar-btn.minimize:hover {
+    background: var(--warning);
+    color: white;
+}
+
+.titlebar-btn.maximize:hover {
+    background: var(--success);
+    color: white;
+}
+
+/* macOS에서는 타이틀바 컨트롤 숨기기 (네이티브 트래픽 라이트 사용) */
+@supports (-webkit-app-region: drag) {
+    .is-mac .titlebar-controls {
+        display: none;
+    }
+
+    .is-mac .custom-titlebar {
+        padding-left: 80px;
+    }
 }
 
 /* App Container */
 .app-container {
     display: flex;
-    min-height: 100vh;
+    min-height: calc(100vh - var(--titlebar-height));
+    height: calc(100vh - var(--titlebar-height));
 }
 
 /* Sidebar */
@@ -46,8 +142,10 @@ body {
     display: flex;
     flex-direction: column;
     position: fixed;
-    height: 100vh;
+    top: var(--titlebar-height);
+    height: calc(100vh - var(--titlebar-height));
     z-index: 100;
+    border-radius: 0 0 0 10px;
 }
 
 .sidebar-header {

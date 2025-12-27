@@ -63,6 +63,12 @@ function createWindow() {
         minHeight: 400,
         title: 'DocWatch',
         center: true,
+        frame: false,
+        titleBarStyle: 'hidden',
+        trafficLightPosition: { x: 12, y: 12 },
+        transparent: true,
+        backgroundColor: '#00000000',
+        vibrancy: 'under-window',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -210,4 +216,23 @@ ipcMain.handle('select-multiple', async (event, type) => {
     });
     if (result.canceled) return [];
     return result.filePaths;
+});
+
+// IPC 핸들러: 윈도우 컨트롤
+ipcMain.handle('window-minimize', () => {
+    if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.handle('window-maximize', () => {
+    if (mainWindow) {
+        if (mainWindow.isMaximized()) {
+            mainWindow.unmaximize();
+        } else {
+            mainWindow.maximize();
+        }
+    }
+});
+
+ipcMain.handle('window-close', () => {
+    if (mainWindow) mainWindow.close();
 });

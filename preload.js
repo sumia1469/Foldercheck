@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 여러 항목 선택 (폴더 또는 파일)
     selectMultiple: (type) => ipcRenderer.invoke('select-multiple', type),
 
+    // 윈도우 컨트롤
+    minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
+    maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
+    closeWindow: () => ipcRenderer.invoke('window-close'),
+
     // Electron 환경 확인
     isElectron: true
 });

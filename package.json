@@ -48,5 +48,11 @@
       "templates/**/*",
       "resources/**/*"
     ]
+  },
+  "dependencies": {
+    "mammoth": "^1.11.0",
+    "unzipper": "^0.12.3",
+    "xlsx": "^0.18.5",
+    "xml2js": "^0.6.2"
   }
 }

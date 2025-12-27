@@ -6,6 +6,12 @@ const mammoth = require('mammoth');
 const XLSX = require('xlsx');
 const unzipper = require('unzipper');
 const xml2js = require('xml2js');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('ffmpeg-static');
+const OpenAI = require('openai');
+
+// FFmpeg 경로 설정
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -25,8 +31,69 @@ if (!fs.existsSync(TEMPLATES_DIR)) {
 // 회의록 저장소
 let meetings = [];
 
-// Whisper 상태 (실제 구현 시 whisper.cpp 연동)
-let whisperReady = false;
+// OpenAI API 설정
+let openaiApiKey = '';
+const OPENAI_KEY_FILE = path.join(__dirname, '.openai_key');
+if (fs.existsSync(OPENAI_KEY_FILE)) {
+    openaiApiKey = fs.readFileSync(OPENAI_KEY_FILE, 'utf8').trim();
+}
+
+// Whisper 상태
+let whisperReady = !!openaiApiKey;
+
+// WebM을 WAV로 변환
+function convertToWav(inputPath, outputPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .audioFrequency(16000)
+            .audioChannels(1)
+            .audioCodec('pcm_s16le')
+            .format('wav')
+            .on('end', () => resolve(outputPath))
+            .on('error', (err) => reject(err))
+            .save(outputPath);
+    });
+}
+
+// OpenAI Whisper API로 음성을 텍스트로 변환
+async function transcribeAudio(audioPath) {
+    if (!openaiApiKey) {
+        throw new Error('OpenAI API 키가 설정되지 않았습니다. 설정에서 API 키를 입력해주세요.');
+    }
+
+    const openai = new OpenAI({ apiKey: openaiApiKey });
+
+    // WAV로 변환
+    const wavPath = audioPath.replace(/\.[^.]+$/, '.wav');
+    await convertToWav(audioPath, wavPath);
+
+    // Whisper API 호출
+    const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(wavPath),
+        model: 'whisper-1',
+        language: 'ko',
+        response_format: 'verbose_json',
+        timestamp_granularities: ['segment']
+    });
+
+    // 타임스탬프 포함 텍스트 생성
+    let result = '';
+    if (transcription.segments) {
+        for (const seg of transcription.segments) {
+            const minutes = Math.floor(seg.start / 60);
+            const seconds = Math.floor(seg.start % 60);
+            const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
+            result += `${timestamp} ${seg.text.trim()}\n`;
+        }
+    } else {
+        result = transcription.text;
+    }
+
+    // WAV 파일 정리 (원본 보존)
+    // fs.unlinkSync(wavPath);
+
+    return { text: result, wavPath };
+}
 
 let watchedFolders = [];
 let changeLog = [];

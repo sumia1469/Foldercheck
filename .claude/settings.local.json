@@ -28,7 +28,8 @@
       "Bash(npm cache clean:*)",
       "Bash(node --version:*)",
       "Bash(export PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\")",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run build:mac:*)"
     ]
   }
 }

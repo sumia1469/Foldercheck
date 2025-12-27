@@ -8,10 +8,18 @@ const unzipper = require('unzipper');
 const xml2js = require('xml2js');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
-const OpenAI = require('openai');
+let whisper;
+try {
+    whisper = require('whisper-node').whisper;
+} catch (e) {
+    console.log('whisper-node 로드 실패, 대체 방식 사용');
+}
 
 // FFmpeg 경로 설정
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+// Whisper 모델 경로
+const WHISPER_MODEL_PATH = path.join(__dirname, 'models', 'ggml-small.bin');
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -31,15 +39,15 @@ if (!fs.existsSync(TEMPLATES_DIR)) {
 // 회의록 저장소
 let meetings = [];
 
-// OpenAI API 설정
-let openaiApiKey = '';
-const OPENAI_KEY_FILE = path.join(__dirname, '.openai_key');
-if (fs.existsSync(OPENAI_KEY_FILE)) {
-    openaiApiKey = fs.readFileSync(OPENAI_KEY_FILE, 'utf8').trim();
-}
-
 // Whisper 상태
-let whisperReady = !!openaiApiKey;
+let whisperReady = false;
+
+// 모델 존재 여부 확인
+function checkWhisperModel() {
+    const exists = fs.existsSync(WHISPER_MODEL_PATH);
+    whisperReady = exists;
+    return exists;
+}
 
 // WebM을 WAV로 변환
 function convertToWav(inputPath, outputPath) {
@@ -55,44 +63,45 @@ function convertToWav(inputPath, outputPath) {
     });
 }
 
-// OpenAI Whisper API로 음성을 텍스트로 변환
+// 로컬 Whisper로 음성을 텍스트로 변환
 async function transcribeAudio(audioPath) {
-    if (!openaiApiKey) {
-        throw new Error('OpenAI API 키가 설정되지 않았습니다. 설정에서 API 키를 입력해주세요.');
+    if (!checkWhisperModel()) {
+        throw new Error('Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.');
     }
-
-    const openai = new OpenAI({ apiKey: openaiApiKey });
 
     // WAV로 변환
     const wavPath = audioPath.replace(/\.[^.]+$/, '.wav');
     await convertToWav(audioPath, wavPath);
 
-    // Whisper API 호출
-    const transcription = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(wavPath),
-        model: 'whisper-1',
+    console.log('로컬 Whisper 음성 인식 시작...');
+    console.log('WAV 파일:', wavPath);
+
+    // whisper-node로 음성 인식
+    const transcript = await whisper(wavPath, {
+        modelPath: WHISPER_MODEL_PATH,
         language: 'ko',
-        response_format: 'verbose_json',
-        timestamp_granularities: ['segment']
+        word_timestamps: true
     });
 
-    // 타임스탬프 포함 텍스트 생성
+    console.log('음성 인식 완료:', transcript);
+
+    // 결과 포맷팅
     let result = '';
-    if (transcription.segments) {
-        for (const seg of transcription.segments) {
-            const minutes = Math.floor(seg.start / 60);
-            const seconds = Math.floor(seg.start % 60);
+    if (Array.isArray(transcript)) {
+        for (const seg of transcript) {
+            const start = seg.start || 0;
+            const minutes = Math.floor(start / 60);
+            const seconds = Math.floor(start % 60);
             const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
-            result += `${timestamp} ${seg.text.trim()}\n`;
+            result += `${timestamp} ${(seg.speech || seg.text || '').trim()}\n`;
         }
-    } else {
-        result = transcription.text;
+    } else if (typeof transcript === 'string') {
+        result = transcript;
+    } else if (transcript && transcript.text) {
+        result = transcript.text;
     }
 
-    // WAV 파일 정리 (원본 보존)
-    // fs.unlinkSync(wavPath);
-
-    return { text: result, wavPath };
+    return { text: result.trim(), wavPath };
 }
 
 let watchedFolders = [];
@@ -1130,12 +1139,15 @@ const server = http.createServer(async (req, res) => {
 
         // API: Whisper 상태
         if (pathname === '/api/whisper/status' && req.method === 'GET') {
+            checkWhisperModel();
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 ready: whisperReady,
-                status: whisperReady ? '준비됨' : '준비 중',
-                model: 'small',
-                local: true
+                status: whisperReady ? '준비됨 (로컬 Whisper)' : '모델 파일 필요',
+                model: 'ggml-small',
+                local: true,
+                modelPath: WHISPER_MODEL_PATH,
+                modelExists: whisperReady
             }));
             return;
         }
@@ -1150,33 +1162,39 @@ const server = http.createServer(async (req, res) => {
         // API: 회의록 생성 (음성 파일 업로드)
         if (pathname === '/api/meeting/transcribe' && req.method === 'POST') {
             try {
+                if (!checkWhisperModel()) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.'
+                    }));
+                    return;
+                }
+
                 const fileData = await parseMultipart(req);
-                const audioPath = path.join(MEETINGS_DIR, `audio_${generateId()}_${fileData.filename}`);
+                const audioId = generateId();
+                const audioPath = path.join(MEETINGS_DIR, `audio_${audioId}_${fileData.filename}`);
                 fs.writeFileSync(audioPath, fileData.content);
 
-                // TODO: 실제 whisper.cpp 호출
-                // 현재는 시뮬레이션 - 데모용 텍스트 생성
-                const simulatedTranscript = `
-[00:00] 안녕하세요, 오늘 회의를 시작하겠습니다.
-[00:15] 이번 프로젝트 일정에 대해 논의하겠습니다.
-[00:32] 우선 마감일까지 남은 시간이 2주입니다.
-[00:45] 디자인 작업은 다음 주 수요일까지 완료하기로 결정했습니다.
-[01:02] 개발팀은 목요일부터 구현을 시작합니다.
-[01:18] QA 일정은 확인이 필요합니다. 이 부분은 이슈입니다.
-[01:35] 김팀장님이 테스트 계획서를 금요일까지 준비해 주세요.
-[01:50] 다음 회의는 월요일 오전 10시로 하겠습니다.
-[02:05] 회의를 마치겠습니다. 감사합니다.
-                `.trim();
+                console.log('음성 파일 저장됨:', audioPath);
+                console.log('로컬 Whisper 처리 중...');
+
+                // 로컬 Whisper로 음성 인식
+                const transcribeResult = await transcribeAudio(audioPath);
+                const transcript = transcribeResult.text;
+
+                console.log('음성 인식 완료');
 
                 // 규칙 기반 분석
-                const analysis = analyzeTranscript(simulatedTranscript);
+                const analysis = analyzeTranscript(transcript);
 
                 // 회의록 객체 생성
                 const meeting = {
-                    id: generateId(),
+                    id: audioId,
                     title: `회의록_${new Date().toISOString().split('T')[0]}`,
                     audioFile: fileData.filename,
-                    transcript: simulatedTranscript,
+                    wavFile: transcribeResult.wavPath ? path.basename(transcribeResult.wavPath) : null,
+                    transcript,
                     analysis,
                     createdAt: new Date().toISOString()
                 };

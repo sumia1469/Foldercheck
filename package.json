@@ -55,6 +55,7 @@
     "mammoth": "^1.11.0",
     "openai": "^6.15.0",
     "unzipper": "^0.12.3",
+    "whisper-node": "^1.1.1",
     "xlsx": "^0.18.5",
     "xml2js": "^0.6.2"
   }

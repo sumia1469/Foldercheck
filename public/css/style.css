@@ -1567,6 +1567,47 @@ body {
 }
 
 /* ========================================
+   Whisper 상태 스타일
+   ======================================== */
+
+.whisper-status {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 12px;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.status-row:last-child {
+    border-bottom: none;
+}
+
+.status-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.status-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.status-value.ready {
+    color: var(--success);
+}
+
+.status-value.error {
+    color: var(--danger);
+}
+
+/* ========================================
    문서 분석 모달 스타일
    ======================================== */
 

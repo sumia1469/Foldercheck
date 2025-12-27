@@ -29,7 +29,9 @@
       "Bash(node --version:*)",
       "Bash(export PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\")",
       "Bash(npm install:*)",
-      "Bash(npm run build:mac:*)"
+      "Bash(npm run build:mac:*)",
+      "Bash(pkill:*)",
+      "Bash(cmake:*)"
     ]
   }
 }

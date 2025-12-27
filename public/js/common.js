@@ -508,8 +508,43 @@ async function loadSettings() {
         if (telegramEnabled) telegramEnabled.checked = settings.telegram?.enabled ?? false;
         if (telegramToken) telegramToken.value = settings.telegram?.botToken ?? '';
         if (telegramChatId) telegramChatId.value = settings.telegram?.chatId ?? '';
+
+        // Whisper 상태 확인
+        loadWhisperStatus();
     } catch (e) {
         console.error('설정 로드 실패:', e);
+    }
+}
+
+// Whisper 상태 로드
+async function loadWhisperStatus() {
+    try {
+        const res = await fetch('/api/whisper/status');
+        const status = await res.json();
+
+        const whisperState = document.getElementById('whisperState');
+        const whisperModel = document.getElementById('whisperModel');
+
+        if (whisperModel) {
+            whisperModel.textContent = status.model || 'ggml-small';
+        }
+
+        if (whisperState) {
+            if (status.ready) {
+                whisperState.textContent = '준비됨 ✓';
+                whisperState.className = 'status-value ready';
+            } else {
+                whisperState.textContent = '모델 파일 필요';
+                whisperState.className = 'status-value error';
+            }
+        }
+    } catch (e) {
+        console.error('Whisper 상태 확인 실패:', e);
+        const whisperState = document.getElementById('whisperState');
+        if (whisperState) {
+            whisperState.textContent = '확인 실패';
+            whisperState.className = 'status-value error';
+        }
     }
 }
 
@@ -1187,22 +1222,110 @@ function resetRecording() {
     updateRecordingUI('ready');
 }
 
-// 녹음 파일 다운로드
-function downloadRecording() {
+// 녹음 파일 다운로드 (WAV로 변환)
+async function downloadRecording() {
     if (!recordedBlob) return;
 
     const title = meetingTitleInput?.value || '회의녹음';
     const date = new Date().toISOString().slice(0, 10);
-    const filename = `${title}_${date}.webm`;
 
-    const url = URL.createObjectURL(recordedBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // WebM을 WAV로 변환
+    try {
+        const wavBlob = await convertWebmToWav(recordedBlob);
+        const filename = `${title}_${date}.wav`;
+        const url = URL.createObjectURL(wavBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('WAV 변환 실패, WebM으로 다운로드:', error);
+        // 변환 실패 시 원본 WebM 다운로드
+        const filename = `${title}_${date}.webm`;
+        const url = URL.createObjectURL(recordedBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+// WebM을 WAV로 변환 (브라우저에서)
+async function convertWebmToWav(webmBlob) {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // WAV 파일 생성
+    const numberOfChannels = 1; // 모노
+    const sampleRate = 16000; // 16kHz (Whisper 권장)
+    const length = audioBuffer.duration * sampleRate;
+    const offlineContext = new OfflineAudioContext(numberOfChannels, length, sampleRate);
+
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineContext.destination);
+    source.start();
+
+    const renderedBuffer = await offlineContext.startRendering();
+    const wavBlob = audioBufferToWav(renderedBuffer);
+
+    await audioContext.close();
+    return wavBlob;
+}
+
+// AudioBuffer를 WAV Blob으로 변환
+function audioBufferToWav(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    const dataLength = buffer.length * blockAlign;
+    const bufferLength = 44 + dataLength;
+
+    const arrayBuffer = new ArrayBuffer(bufferLength);
+    const view = new DataView(arrayBuffer);
+
+    // WAV 헤더 작성
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    // 오디오 데이터 작성
+    const channelData = buffer.getChannelData(0);
+    let offset = 44;
+    for (let i = 0; i < buffer.length; i++) {
+        const sample = Math.max(-1, Math.min(1, channelData[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+    }
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+    }
 }
 
 // 녹음 파일로 회의록 생성

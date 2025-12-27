@@ -659,23 +659,14 @@
                 </div>
 
                 <div class="settings-card">
-                    <h3>STT 엔진 정보</h3>
+                    <h3>음성 인식 정보</h3>
                     <div class="info-list">
-                        <div class="info-item">
-                            <span class="info-label">엔진</span>
-                            <span class="info-value">음성 인식 (로컬)</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">모델</span>
-                            <span class="info-value" id="whisperModel">small</span>
-                        </div>
                         <div class="info-item">
                             <span class="info-label">상태</span>
                             <span class="info-value" id="whisperStatus" style="color: var(--warning);">준비 중</span>
                         </div>
                     </div>
                     <p class="help-text" style="margin-top: 15px; font-size: 11px;">
-                        MIT 라이선스 기반 음성 인식 엔진을 사용합니다.<br>
                         음성 데이터는 외부로 전송되지 않습니다.
                     </p>
                 </div>
@@ -708,17 +699,25 @@
                 </div>
 
                 <div class="settings-card">
-                    <h3>🎙️ 음성 인식 (로컬)</h3>
+                    <h3>🎙️ 음성 인식</h3>
                     <p class="help-text">회의 녹음을 텍스트로 변환합니다. 인터넷 연결 없이 로컬에서 처리됩니다.</p>
 
                     <div class="whisper-status" id="whisperStatusSettings">
                         <div class="status-row">
-                            <span class="status-label">모델:</span>
-                            <span class="status-value" id="whisperModelSettings">ggml-small</span>
-                        </div>
-                        <div class="status-row">
                             <span class="status-label">상태:</span>
                             <span class="status-value" id="whisperStateSettings">확인 중...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>🤖 AI 요약</h3>
+                    <p class="help-text">회의록 요약에 사용되는 AI 상태입니다.</p>
+
+                    <div class="ai-model-status" id="aiModelStatusSettings">
+                        <div class="status-row">
+                            <span class="status-label">AI 상태:</span>
+                            <span class="status-value" id="ollamaStatus">확인 중...</span>
                         </div>
                     </div>
                 </div>

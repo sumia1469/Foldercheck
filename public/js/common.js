@@ -136,9 +136,54 @@ function renderFolders(folders) {
     folderList.innerHTML = folders.map(folder => `
         <li>
             <span class="folder-path">${escapeHtml(folder)}</span>
-            <button class="btn btn-danger" onclick="removeFolder('${escapeHtml(folder.replace(/\\/g, '\\\\'))}')">삭제</button>
+            <div class="folder-actions">
+                <button class="btn btn-icon" onclick="openFolder('${escapeHtml(folder.replace(/\\/g, '\\\\').replace(/'/g, "\\'"))}')" title="폴더 열기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                </button>
+                <button class="btn btn-danger" onclick="removeFolder('${escapeHtml(folder.replace(/\\/g, '\\\\'))}')">삭제</button>
+            </div>
         </li>
     `).join('');
+}
+
+// 폴더 열기 (Finder/탐색기)
+async function openFolder(folderPath) {
+    try {
+        const res = await fetch('/api/folder/open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: folderPath })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.error || '폴더를 열 수 없습니다.');
+        }
+    } catch (e) {
+        console.error('폴더 열기 실패:', e);
+        alert('폴더를 열 수 없습니다.');
+    }
+}
+
+// 파일 위치 열기 (Finder/탐색기에서 파일 선택)
+async function openFile(filePath) {
+    try {
+        const res = await fetch('/api/file/open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: filePath })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.error || '파일을 열 수 없습니다.');
+        }
+    } catch (e) {
+        console.error('파일 열기 실패:', e);
+        alert('파일을 열 수 없습니다.');
+    }
 }
 
 // 폴더 추가
@@ -287,8 +332,11 @@ function renderLogs() {
         const time = new Date(log.timestamp).toLocaleString('ko-KR');
         const actionClass = getActionClass(log.action);
         const isDocumentFile = isAnalyzableDocument(log.extension);
+        const escapedFullPath = escapeHtml(log.fullPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+        const escapedFolder = escapeHtml(log.folder.replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+
         const analyzeBtn = isDocumentFile ? `
-            <button class="btn btn-analyze" onclick="analyzeDocument('${escapeHtml(log.fullPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'"))}')">
+            <button class="btn btn-analyze" onclick="analyzeDocument('${escapedFullPath}')" title="AI 요약">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
                     <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
@@ -296,15 +344,40 @@ function renderLogs() {
                 요약
             </button>
         ` : '';
+
+        // 변경 요약 표시
+        let changeSummaryHtml = '';
+        if (log.changeSummary && log.changeSummary.summary) {
+            const summaryClass = log.changeSummary.type === 'new' ? 'summary-new' :
+                                log.changeSummary.type === 'deleted' ? 'summary-deleted' : 'summary-modified';
+            changeSummaryHtml = `<span class="change-summary ${summaryClass}">${escapeHtml(log.changeSummary.summary)}</span>`;
+        }
+
         return `
             <div class="log-entry">
                 <span class="log-time">${time}</span>
                 <span class="log-action ${actionClass}">${log.action}</span>
                 <div class="log-file">
-                    ${escapeHtml(log.file)}
+                    <div class="log-file-name">
+                        ${escapeHtml(log.file)}
+                        ${changeSummaryHtml}
+                    </div>
                     <div class="log-folder">${escapeHtml(log.folder)}</div>
                 </div>
-                ${analyzeBtn}
+                <div class="log-actions">
+                    <button class="btn btn-icon" onclick="openFile('${escapedFullPath}')" title="파일 위치 열기">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-icon" onclick="openFolder('${escapedFolder}')" title="폴더 열기">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        </svg>
+                    </button>
+                    ${analyzeBtn}
+                </div>
             </div>
         `;
     }).join('');
@@ -328,8 +401,15 @@ function updateHeaderStats() {
 // 알림 표시
 function showNotification(log) {
     if (settings.notifications?.desktop && Notification.permission === 'granted') {
+        // 변경 요약이 있으면 알림에 포함
+        let body = log.file;
+        if (log.changeSummary && log.changeSummary.summary) {
+            body += `\n📊 ${log.changeSummary.summary}`;
+        }
+        body += `\n📂 ${log.folder}`;
+
         new Notification(`파일 ${log.action}`, {
-            body: log.file,
+            body: body,
             icon: '/icon.png'
         });
     }
@@ -511,31 +591,28 @@ async function loadSettings() {
 
         // Whisper 상태 확인
         loadWhisperStatus();
+
+        // AI 모델 상태 확인
+        loadAiModelStatus();
     } catch (e) {
         console.error('설정 로드 실패:', e);
     }
 }
 
-// Whisper 상태 로드
+// 음성 인식 상태 로드
 async function loadWhisperStatus() {
     try {
         const res = await fetch('/api/whisper/status');
         const status = await res.json();
 
-        // 설정 탭의 Whisper 상태 요소들
         const whisperStateSettings = document.getElementById('whisperStateSettings');
-        const whisperModelSettings = document.getElementById('whisperModelSettings');
-
-        if (whisperModelSettings) {
-            whisperModelSettings.textContent = status.model || 'ggml-small';
-        }
 
         if (whisperStateSettings) {
             if (status.ready) {
-                whisperStateSettings.textContent = '준비됨 ✓';
+                whisperStateSettings.textContent = '정상 동작 중 ✓';
                 whisperStateSettings.className = 'status-value ready';
             } else {
-                whisperStateSettings.textContent = '모델 파일 필요';
+                whisperStateSettings.textContent = '준비 필요';
                 whisperStateSettings.className = 'status-value error';
             }
         }
@@ -545,6 +622,33 @@ async function loadWhisperStatus() {
         if (whisperStateSettings) {
             whisperStateSettings.textContent = '확인 실패';
             whisperStateSettings.className = 'status-value error';
+        }
+    }
+}
+
+// AI 상태 로드
+async function loadAiModelStatus() {
+    try {
+        const res = await fetch('/api/ollama/status');
+        const status = await res.json();
+
+        const ollamaStatus = document.getElementById('ollamaStatus');
+
+        if (ollamaStatus) {
+            if (status.ready) {
+                ollamaStatus.textContent = '정상 동작 중 ✓';
+                ollamaStatus.style.color = 'var(--success)';
+            } else {
+                ollamaStatus.textContent = status.error || '연결 실패';
+                ollamaStatus.style.color = 'var(--danger)';
+            }
+        }
+    } catch (e) {
+        console.error('AI 상태 확인 실패:', e);
+        const ollamaStatus = document.getElementById('ollamaStatus');
+        if (ollamaStatus) {
+            ollamaStatus.textContent = '확인 실패';
+            ollamaStatus.style.color = 'var(--danger)';
         }
     }
 }
@@ -669,7 +773,17 @@ function escapeHtml(text) {
 
 // 분석 가능한 문서 확장자 체크
 function isAnalyzableDocument(extension) {
-    const analyzable = ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt'];
+    const analyzable = [
+        // Office 문서
+        '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+        // 텍스트 파일
+        '.txt', '.md', '.markdown', '.rtf',
+        // PDF
+        '.pdf',
+        // 코드 파일
+        '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.h',
+        '.css', '.scss', '.less', '.html', '.xml', '.json', '.yaml', '.yml'
+    ];
     return analyzable.includes(extension?.toLowerCase());
 }
 
@@ -1565,11 +1679,15 @@ function updateProgressUI(percent, text) {
     if (progressText) progressText.textContent = text;
 }
 
+// 전역 회의록 데이터 저장
+let meetingsData = [];
+
 async function loadMeetings() {
     try {
         const res = await fetch('/api/meetings');
         const data = await res.json();
-        renderMeetings(data.meetings || []);
+        meetingsData = data.meetings || [];
+        renderMeetings(meetingsData);
     } catch (e) {
         console.error('회의록 목록 로드 실패:', e);
     }
@@ -1591,7 +1709,11 @@ function renderMeetings(meetings) {
         return;
     }
 
-    meetingList.innerHTML = meetings.map(meeting => `
+    meetingList.innerHTML = meetings.map(meeting => {
+        const historyLen = meeting.summaryHistory?.length || (meeting.aiSummary ? 1 : 0);
+        const currentIdx = meeting.currentSummaryIndex ?? (historyLen - 1);
+
+        return `
         <div class="meeting-item" id="meeting-${meeting.id}">
             <div class="meeting-info">
                 <div class="meeting-title">${escapeHtml(meeting.title)}</div>
@@ -1606,16 +1728,94 @@ function renderMeetings(meetings) {
                 <button class="btn btn-danger" onclick="deleteMeeting('${meeting.id}')">삭제</button>
             </div>
             ${meeting.aiSummary ? `
-                <div class="meeting-summary-content">
+                <div class="meeting-summary-content" data-meeting-id="${meeting.id}">
                     <div class="summary-header">
-                        <strong>📝 AI 요약</strong>
-                        <span class="summary-date">${meeting.summarizedAt ? new Date(meeting.summarizedAt).toLocaleString('ko-KR') : ''}</span>
+                        <div class="summary-header-left">
+                            <strong>📝 AI 요약</strong>
+                            <span class="summary-date" id="summaryDate-${meeting.id}">${meeting.summarizedAt ? new Date(meeting.summarizedAt).toLocaleString('ko-KR') : ''}</span>
+                        </div>
+                        <div class="summary-header-right">
+                            ${historyLen > 1 ? `
+                                <div class="summary-nav">
+                                    <button class="nav-btn" onclick="navigateSummary('${meeting.id}', -1)" ${currentIdx <= 0 ? 'disabled' : ''}>‹</button>
+                                    <span class="nav-indicator" id="navIndicator-${meeting.id}">${currentIdx + 1}/${historyLen}</span>
+                                    <button class="nav-btn" onclick="navigateSummary('${meeting.id}', 1)" ${currentIdx >= historyLen - 1 ? 'disabled' : ''}>›</button>
+                                </div>
+                            ` : ''}
+                            <button class="copy-btn" onclick="copySummary('${meeting.id}')" title="복사">
+                                <span class="copy-icon">📋</span>
+                            </button>
+                        </div>
                     </div>
-                    <pre class="summary-text">${escapeHtml(meeting.aiSummary)}</pre>
+                    <pre class="summary-text" id="summaryText-${meeting.id}">${escapeHtml(meeting.aiSummary)}</pre>
                 </div>
             ` : ''}
         </div>
-    `).join('');
+    `}).join('');
+}
+
+// 요약 복사 함수
+async function copySummary(meetingId) {
+    const summaryText = document.getElementById(`summaryText-${meetingId}`);
+    if (!summaryText) return;
+
+    try {
+        await navigator.clipboard.writeText(summaryText.textContent);
+
+        // 복사 완료 피드백
+        const copyBtn = document.querySelector(`[data-meeting-id="${meetingId}"] .copy-btn`);
+        if (copyBtn) {
+            const originalIcon = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<span class="copy-icon">✓</span>';
+            copyBtn.classList.add('copied');
+            setTimeout(() => {
+                copyBtn.innerHTML = originalIcon;
+                copyBtn.classList.remove('copied');
+            }, 2000);
+        }
+    } catch (e) {
+        console.error('복사 실패:', e);
+        alert('복사에 실패했습니다.');
+    }
+}
+
+// 요약 버전 네비게이션
+async function navigateSummary(meetingId, direction) {
+    const meeting = meetingsData.find(m => m.id === meetingId);
+    if (!meeting || !meeting.summaryHistory || meeting.summaryHistory.length <= 1) return;
+
+    const currentIdx = meeting.currentSummaryIndex ?? (meeting.summaryHistory.length - 1);
+    const newIdx = currentIdx + direction;
+
+    if (newIdx < 0 || newIdx >= meeting.summaryHistory.length) return;
+
+    // 로컬 상태 업데이트
+    meeting.currentSummaryIndex = newIdx;
+    const selectedSummary = meeting.summaryHistory[newIdx];
+
+    // UI 업데이트
+    const summaryText = document.getElementById(`summaryText-${meetingId}`);
+    const summaryDate = document.getElementById(`summaryDate-${meetingId}`);
+    const navIndicator = document.getElementById(`navIndicator-${meetingId}`);
+
+    if (summaryText) {
+        summaryText.textContent = selectedSummary.summary;
+    }
+    if (summaryDate) {
+        summaryDate.textContent = new Date(selectedSummary.createdAt).toLocaleString('ko-KR');
+    }
+    if (navIndicator) {
+        navIndicator.textContent = `${newIdx + 1}/${meeting.summaryHistory.length}`;
+    }
+
+    // 버튼 상태 업데이트
+    const container = document.querySelector(`[data-meeting-id="${meetingId}"]`);
+    if (container) {
+        const prevBtn = container.querySelector('.summary-nav .nav-btn:first-child');
+        const nextBtn = container.querySelector('.summary-nav .nav-btn:last-child');
+        if (prevBtn) prevBtn.disabled = newIdx <= 0;
+        if (nextBtn) nextBtn.disabled = newIdx >= meeting.summaryHistory.length - 1;
+    }
 }
 
 async function downloadMeeting(id) {
@@ -1665,6 +1865,40 @@ async function deleteMeeting(id) {
     }
 }
 
+// 요약 중 로딩 오버레이 표시
+function showSummarizingOverlay() {
+    // 기존 오버레이 제거
+    hideSummarizingOverlay();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'summarizing-overlay';
+    overlay.id = 'summarizingOverlay';
+    overlay.innerHTML = `
+        <div class="summarizing-spinner"></div>
+        <div class="summarizing-text">✨ AI 요약 생성 중...</div>
+        <div class="summarizing-detail" id="summarizingDetail">회의 내용을 분석하고 있습니다</div>
+        <div class="summarizing-percent" id="summarizingPercent">0%</div>
+        <div class="summarizing-progress">
+            <div class="summarizing-progress-bar" id="summarizingProgressBar"></div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function updateSummarizingOverlay(text, percent) {
+    const detail = document.getElementById('summarizingDetail');
+    const progressBar = document.getElementById('summarizingProgressBar');
+    const percentText = document.getElementById('summarizingPercent');
+    if (detail) detail.textContent = text;
+    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (percentText) percentText.textContent = `${Math.round(percent)}%`;
+}
+
+function hideSummarizingOverlay() {
+    const overlay = document.getElementById('summarizingOverlay');
+    if (overlay) overlay.remove();
+}
+
 // AI 요약 생성
 async function summarizeMeeting(meetingId) {
     const meetingEl = document.getElementById(`meeting-${meetingId}`);
@@ -1674,6 +1908,25 @@ async function summarizeMeeting(meetingId) {
         btn.disabled = true;
         btn.innerHTML = '⏳ 요약 중...';
     }
+
+    // 로딩 오버레이 표시
+    showSummarizingOverlay();
+
+    // 진행 상황 폴링
+    let progressInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/processing/progress');
+            const progress = await res.json();
+            if (progress.active) {
+                const text = progress.detail
+                    ? `${progress.stage} - ${progress.detail}`
+                    : progress.stage;
+                updateSummarizingOverlay(text, progress.percent);
+            }
+        } catch (e) {
+            // 폴링 실패는 무시
+        }
+    }, 1000);
 
     try {
         const res = await fetch('/api/meeting/summarize', {
@@ -1707,6 +1960,9 @@ async function summarizeMeeting(meetingId) {
             btn.disabled = false;
             btn.innerHTML = '✨ AI 요약';
         }
+    } finally {
+        clearInterval(progressInterval);
+        hideSummarizingOverlay();
     }
 }
 

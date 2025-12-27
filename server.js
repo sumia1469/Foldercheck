@@ -22,7 +22,14 @@ const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
 
 // Ollama 설정 (로컬 LLM)
 const OLLAMA_HOST = 'http://localhost:11434';
-const OLLAMA_MODEL = 'qwen2:1.5b';
+
+// 사용 가능한 AI 모델 목록
+const AVAILABLE_MODELS = {
+    'qwen2.5:3b': { name: 'Qwen 2.5 (3B)', description: '알리바바 Qwen2.5 - 한국어 고품질 요약 (1.9GB)' }
+};
+
+// 기본 AI 모델 (품질 개선된 Qwen2.5로 변경)
+let CURRENT_AI_MODEL = 'qwen2.5:3b';
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -374,8 +381,16 @@ function startWatching(targetPath) {
                     action,
                     fullPath: targetPath,
                     extension: path.extname(targetFilename).toLowerCase(),
-                    isFile: true
+                    isFile: true,
+                    changeSummary: null
                 };
+
+                // 빠른 변경 분석 수행 (비동기)
+                quickChangeAnalysis(targetPath, action).then(analysis => {
+                    if (analysis) {
+                        logEntry.changeSummary = analysis;
+                    }
+                }).catch(e => console.error('변경 분석 오류:', e.message));
 
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
@@ -418,8 +433,16 @@ function startWatching(targetPath) {
                     action,
                     fullPath,
                     extension: path.extname(filename).toLowerCase(),
-                    isFile: false
+                    isFile: false,
+                    changeSummary: null
                 };
+
+                // 빠른 변경 분석 수행 (비동기)
+                quickChangeAnalysis(fullPath, action).then(analysis => {
+                    if (analysis) {
+                        logEntry.changeSummary = analysis;
+                    }
+                }).catch(e => console.error('변경 분석 오류:', e.message));
 
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
@@ -437,6 +460,121 @@ function startWatching(targetPath) {
         }
     } catch (e) {
         console.error(`감시 실패: ${targetPath} - ${e.message}`);
+    }
+}
+
+// 빠른 변경 분석 (로그용 - AI 없이 간단 분석)
+async function quickChangeAnalysis(filePath, action) {
+    try {
+        const ext = path.extname(filePath).toLowerCase();
+        const analyzableExts = [
+            '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+            '.txt', '.md', '.markdown', '.pdf',
+            '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.h',
+            '.css', '.scss', '.less', '.html', '.xml', '.json', '.yaml', '.yml'
+        ];
+
+        if (!analyzableExts.includes(ext)) {
+            return null;
+        }
+
+        const fileKey = filePath.replace(/[^a-zA-Z0-9]/g, '_');
+        const previousVersion = documentHistory[fileKey];
+
+        // 빠른 텍스트 추출 (텍스트 기반 파일만)
+        const textExts = ['.txt', '.md', '.markdown', '.js', '.ts', '.jsx', '.tsx', '.py',
+                        '.java', '.c', '.cpp', '.h', '.css', '.scss', '.less', '.html',
+                        '.xml', '.json', '.yaml', '.yml'];
+
+        // 새 파일 생성 시 - 초기 이력 저장
+        if (action === '생성') {
+            if (textExts.includes(ext) && fs.existsSync(filePath)) {
+                const currentContent = extractTextContent(filePath);
+                if (currentContent && currentContent.text) {
+                    documentHistory[fileKey] = {
+                        content: currentContent,
+                        analyzedAt: new Date().toISOString(),
+                        fileName: path.basename(filePath)
+                    };
+                    saveDocHistory();
+                    return {
+                        type: 'new',
+                        summary: `새 파일 (${currentContent.lineCount}줄)`
+                    };
+                }
+            }
+            return { type: 'new', summary: '새 파일 생성됨' };
+        }
+        if (action === '삭제') {
+            // 삭제된 파일 이력 제거
+            if (documentHistory[fileKey]) {
+                delete documentHistory[fileKey];
+                saveDocHistory();
+            }
+            return { type: 'deleted', summary: '파일 삭제됨' };
+        }
+
+        // 수정된 경우 - 이전 버전과 비교
+        if (action === '수정') {
+            let currentContent = null;
+
+            if (textExts.includes(ext)) {
+                currentContent = extractTextContent(filePath);
+            }
+
+            // 이전 버전이 없으면 현재 버전 저장 후 종료
+            if (!previousVersion) {
+                if (currentContent && currentContent.text) {
+                    documentHistory[fileKey] = {
+                        content: currentContent,
+                        analyzedAt: new Date().toISOString(),
+                        fileName: path.basename(filePath)
+                    };
+                    saveDocHistory();
+                }
+                return { type: 'modified', summary: '파일 수정됨' };
+            }
+
+            if (currentContent && currentContent.text && previousVersion.content && previousVersion.content.text) {
+                const prevText = previousVersion.content.text;
+                const currText = currentContent.text;
+
+                const lengthDiff = currText.length - prevText.length;
+                const prevLines = prevText.split('\n').length;
+                const currLines = currText.split('\n').length;
+                const lineDiff = currLines - prevLines;
+
+                let summaryParts = [];
+
+                if (Math.abs(lengthDiff) > 10) {
+                    summaryParts.push(`${lengthDiff > 0 ? '+' : ''}${lengthDiff}자`);
+                }
+                if (lineDiff !== 0) {
+                    summaryParts.push(`${lineDiff > 0 ? '+' : ''}${lineDiff}줄`);
+                }
+
+                // 현재 버전 저장 (다음 비교를 위해)
+                documentHistory[fileKey] = {
+                    content: currentContent,
+                    analyzedAt: new Date().toISOString(),
+                    fileName: path.basename(filePath)
+                };
+                saveDocHistory();
+
+                if (summaryParts.length > 0) {
+                    return {
+                        type: 'modified',
+                        summary: summaryParts.join(', '),
+                        details: { lengthDiff, lineDiff }
+                    };
+                }
+            }
+        }
+
+        return null;
+    } catch (e) {
+        console.error('빠른 변경 분석 오류:', e.message);
+        return null;
     }
 }
 
@@ -613,6 +751,76 @@ function extractTextFromPptxXml(obj, texts = []) {
     return texts.join(' ').trim();
 }
 
+// 텍스트 파일 내용 추출 (.txt, .md, .markdown, 코드 파일 등)
+function extractTextContent(filePath) {
+    try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const ext = path.extname(filePath).toLowerCase();
+
+        // 코드 파일인 경우 언어 정보 추가
+        const codeExtensions = {
+            '.js': 'JavaScript',
+            '.ts': 'TypeScript',
+            '.jsx': 'React JSX',
+            '.tsx': 'React TSX',
+            '.py': 'Python',
+            '.java': 'Java',
+            '.c': 'C',
+            '.cpp': 'C++',
+            '.h': 'C Header',
+            '.css': 'CSS',
+            '.scss': 'SCSS',
+            '.less': 'Less',
+            '.html': 'HTML',
+            '.xml': 'XML',
+            '.json': 'JSON',
+            '.yaml': 'YAML',
+            '.yml': 'YAML'
+        };
+
+        return {
+            text: content,
+            lineCount: content.split('\n').length,
+            charCount: content.length,
+            language: codeExtensions[ext] || null,
+            isCode: !!codeExtensions[ext]
+        };
+    } catch (e) {
+        console.error('텍스트 추출 오류:', e.message);
+        return { text: '', error: e.message };
+    }
+}
+
+// PDF 파일 내용 추출 (기본 텍스트 추출)
+async function extractPdfContent(filePath) {
+    try {
+        // pdf-parse 동적 로딩 시도
+        let pdfParse;
+        try {
+            pdfParse = require('pdf-parse');
+        } catch (e) {
+            // pdf-parse가 설치되지 않은 경우 안내 메시지 반환
+            return {
+                text: '',
+                error: 'PDF 분석을 위해 pdf-parse 모듈이 필요합니다. npm install pdf-parse 명령으로 설치해주세요.',
+                needsInstall: true
+            };
+        }
+
+        const dataBuffer = fs.readFileSync(filePath);
+        const data = await pdfParse(dataBuffer);
+
+        return {
+            text: data.text,
+            pageCount: data.numpages,
+            info: data.info
+        };
+    } catch (e) {
+        console.error('PDF 추출 오류:', e.message);
+        return { text: '', error: e.message };
+    }
+}
+
 // 문서 분석 및 요약 생성
 async function analyzeDocument(filePath) {
     const ext = path.extname(filePath).toLowerCase();
@@ -625,6 +833,7 @@ async function analyzeDocument(filePath) {
     // 파일 타입별 내용 추출
     switch (ext) {
         case '.docx':
+        case '.doc':
             currentContent = await extractDocxContent(filePath);
             documentType = 'Word 문서';
             break;
@@ -637,6 +846,43 @@ async function analyzeDocument(filePath) {
         case '.ppt':
             currentContent = await extractPptxContent(filePath);
             documentType = 'PowerPoint 프레젠테이션';
+            break;
+        case '.pdf':
+            currentContent = await extractPdfContent(filePath);
+            documentType = 'PDF 문서';
+            break;
+        case '.txt':
+            currentContent = extractTextContent(filePath);
+            documentType = '텍스트 파일';
+            break;
+        case '.md':
+        case '.markdown':
+            currentContent = extractTextContent(filePath);
+            documentType = 'Markdown 문서';
+            break;
+        case '.rtf':
+            currentContent = extractTextContent(filePath);
+            documentType = 'RTF 문서';
+            break;
+        case '.js':
+        case '.ts':
+        case '.jsx':
+        case '.tsx':
+        case '.py':
+        case '.java':
+        case '.c':
+        case '.cpp':
+        case '.h':
+        case '.css':
+        case '.scss':
+        case '.less':
+        case '.html':
+        case '.xml':
+        case '.json':
+        case '.yaml':
+        case '.yml':
+            currentContent = extractTextContent(filePath);
+            documentType = currentContent.language ? `${currentContent.language} 코드` : '코드 파일';
             break;
         default:
             return { error: '지원하지 않는 파일 형식입니다.' };
@@ -836,8 +1082,8 @@ async function checkOllamaStatus() {
             res.on('end', () => {
                 try {
                     const result = JSON.parse(data);
-                    const hasModel = result.models?.some(m => m.name.startsWith(OLLAMA_MODEL));
-                    resolve({ ready: true, hasModel, models: result.models || [] });
+                    const hasModel = result.models?.some(m => m.name.startsWith(CURRENT_AI_MODEL));
+                    resolve({ ready: true, hasModel, models: result.models || [], currentModel: CURRENT_AI_MODEL });
                 } catch (e) {
                     resolve({ ready: false, error: 'JSON 파싱 오류' });
                 }
@@ -900,61 +1146,159 @@ async function summarizeLongMeeting(text, chunkSize) {
 
 // 단일 청크 요약
 async function summarizeChunk(text, type, chunkNum = 0, totalChunks = 0) {
-    const systemPrompt = `당신은 전문 회의록 작성자입니다. 반드시 한국어로만 응답하세요.`;
+    const systemPrompt = `당신은 10년 경력의 전문 회의록 작성자입니다.
+
+[작성 규칙 - 출력에 포함하지 마세요]
+1. 반드시 한국어로만 응답
+2. 숫자/금액/수량/비율/날짜/기간은 정확히 기재 (예: 70%, 5,000원, 31편성, 2027년)
+3. 각 안건의 주제를 명확하고 구체적으로 작성
+4. 발언 내용 중 핵심 사실과 의견을 구분하여 상세히 기록
+5. 문제점과 원인을 구체적으로 명시
+6. 복사해서 바로 사용할 수 있는 공식 문서 형식
+7. 이 규칙들은 출력에 절대 포함하지 않고 회의록 내용만 출력`;
 
     const prompts = {
-        meeting: `[지시사항] 반드시 한국어로 상세하게 작성하세요.
+        meeting: `다음 녹취록을 바탕으로 상세한 회의록을 작성해주세요.
 
-다음은 회의 녹취록입니다. 상세한 회의록을 작성해주세요.
+========================================
+                 회 의 록
+========================================
 
-### 📋 회의 개요
-- 회의 주제/목적
+1. 회의 개요
+   - 회의명: (녹취 내용에서 추론)
+   - 일시: (녹취 내용에서 추론 또는 "기록 필요")
+   - 참석자: (언급된 직책/이름 기재)
+   - 회의 목적: (구체적으로 작성)
 
-### 💬 논의 내용
-- 주제별로 정리
-- 발언자와 의견 구분
+2. 안건 및 논의 내용
 
-### ✅ 결정 사항
-- 합의된 내용
+   [안건 1] (구체적인 안건명 - 예: "철도 차량 수급 문제")
+   ▶ 현황
+     - (현재 상황을 구체적 수치와 함께 기술)
+   ▶ 문제점 및 원인
+     - (문제점을 명확히 기술)
+     - (원인 분석)
+   ▶ 논의 내용
+     - (발언자): (발언 내용 - 숫자/금액 포함)
+     - (발언자): (발언 내용)
+   ▶ 제안/대안
+     - (제시된 해결방안)
 
-### 📌 액션 아이템
-- 후속 조치 (담당자/기한 포함)
+   [안건 2] ...
 
----
+3. 주요 수치 및 데이터
+   - (회의에서 언급된 모든 숫자, 금액, 비율, 날짜 등 정리)
+
+4. 결정 사항
+   (1) (구체적인 결정 내용)
+   (2) (구체적인 결정 내용)
+
+5. 향후 계획 (Action Items)
+   | 항목 | 담당 | 기한 | 비고 |
+   |------|------|------|------|
+   | (구체적 업무) | (담당자) | (기한) | (추가사항) |
+
+6. 특이사항 및 후속조치
+   - (추가 조사/확인 필요 사항)
+   - (주의 필요 사항)
+
+========================================
+
 녹취록:
 ${text}
 
 [회의록]:`,
-        meeting_chunk: `[지시사항] 반드시 한국어로 작성하세요.
+        meeting_chunk: `[핵심 지시사항 - 반드시 준수]
+★ 모든 숫자, 금액, 날짜, 비율, 수량을 빠짐없이 기재할 것
+★ 언급된 연도(예: 2027년), 금액(예: 5,000원, 70%), 수량(예: 31편성, 4년)은 절대 생략 금지
 
-다음은 회의 녹취록의 ${chunkNum}/${totalChunks} 부분입니다. 이 부분의 내용을 정리해주세요.
+다음은 회의 녹취록 파트 ${chunkNum}/${totalChunks}입니다. 상세하게 정리하세요.
 
-- 논의된 주제와 내용
-- 발언자별 의견
-- 결정사항이나 액션아이템
+■ 이 파트의 논의 안건
+  - 안건명: (구체적 주제)
 
-녹취록 (파트 ${chunkNum}):
+■ 상세 논의 내용
+  - 현황 및 배경: (수치 포함)
+  - 문제점/이슈:
+  - 주요 발언:
+    · (발언자): (내용)
+  - 제안/대안:
+
+■ 이 파트에서 언급된 모든 수치 (★필수)
+  - 금액:
+  - 비율(%):
+  - 수량/편성:
+  - 연도/날짜:
+  - 기간:
+  - 기타 숫자:
+
+■ 결정사항/합의내용
+  -
+
+녹취록 (파트 ${chunkNum}/${totalChunks}):
 ${text}
 
-[파트 ${chunkNum} 정리]:`,
-        meeting_final: `[지시사항] 반드시 한국어로 상세하게 작성하세요.
+[파트 ${chunkNum} 상세 정리]:`,
+        meeting_final: `[최우선 지시사항 - 반드시 준수]
+★★★ 각 파트에서 추출된 모든 숫자/금액/비율/연도/수량을 빠짐없이 통합할 것 ★★★
+★★★ 숫자 데이터가 누락되면 회의록으로서 가치가 없음 ★★★
 
-다음은 긴 회의를 파트별로 정리한 내용입니다. 전체를 통합하여 완성된 회의록을 작성해주세요.
+다음은 긴 회의를 파트별로 정리한 내용입니다. 모든 파트의 내용을 빠짐없이 통합하여 완성된 회의록을 작성하세요.
 
-### 📋 회의 개요
-- 전체 회의 주제/목적
+========================================
+                 회 의 록
+========================================
 
-### 💬 논의 내용
-- 모든 파트의 논의 내용을 주제별로 통합 정리
+1. 회의 개요
+   - 회의명: (전체 내용 기반 구체적 회의명)
+   - 일시:
+   - 참석자: (언급된 모든 직책/이름)
+   - 회의 목적:
 
-### ✅ 결정 사항
-- 전체 회의에서 합의된 모든 결정사항
+2. 안건 및 논의 내용
 
-### 📌 액션 아이템
-- 모든 후속 조치 항목
+   [안건 1] (구체적인 안건명)
+   ▶ 현황/배경: (관련 수치 모두 포함)
+   ▶ 문제점 및 원인: (구체적으로)
+   ▶ 논의 내용:
+     - (발언자): (내용 - 숫자 포함)
+   ▶ 제안/대안:
 
----
-파트별 정리:
+   [안건 2] ...
+   [안건 3] ...
+
+3. ★ 주요 수치 및 데이터 총정리 ★
+   (모든 파트에서 언급된 숫자를 빠짐없이 기재)
+
+   □ 금액 관련
+     -
+   □ 비율(%) 관련
+     -
+   □ 수량/편성/인원
+     -
+   □ 연도/날짜/기간
+     -
+   □ 기타 수치
+     -
+
+4. 결정 사항
+   (1)
+   (2)
+   (3)
+
+5. 향후 계획 (Action Items)
+   | 항목 | 담당 | 기한 | 비고 |
+   |------|------|------|------|
+   |      |      |      |      |
+
+6. 특이사항 및 후속조치
+   - 추가 조사/확인 필요:
+   - 주의사항:
+   - 기타:
+
+========================================
+
+[파트별 정리 내용 - 모든 수치를 통합에 반영할 것]:
 ${text}
 
 [통합 회의록]:`,
@@ -979,15 +1323,28 @@ ${text}
 
     const prompt = prompts[type] || prompts.meeting;
 
+    // 타입별 출력 토큰 수 설정
+    const tokenLimits = {
+        meeting: 3000,           // 단일 회의록: 충분한 상세 내용
+        meeting_chunk: 2000,     // 청크별 요약: 핵심 내용 + 수치
+        meeting_final: 4000,     // 최종 통합: 모든 내용 포함
+        document: 1500,
+        document_changes: 1000
+    };
+    const numPredict = tokenLimits[type] || 2000;
+
     return new Promise((resolve, reject) => {
         const postData = JSON.stringify({
-            model: OLLAMA_MODEL,
+            model: CURRENT_AI_MODEL,
             prompt: prompt,
             system: systemPrompt,
             stream: false,
             options: {
-                temperature: 0.4,
-                num_predict: 1500
+                temperature: 0.3,      // 더 일관된 출력
+                num_predict: numPredict,
+                num_ctx: 4096,         // 컨텍스트 크기 축소 (CPU 부하 감소)
+                num_thread: 4,         // CPU 스레드 수 제한 (과부하 방지)
+                num_batch: 256         // 배치 크기 축소 (메모리/CPU 부하 감소)
             }
         });
 
@@ -1333,6 +1690,91 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // API: 폴더 열기 (Finder/탐색기)
+        if (pathname === '/api/folder/open' && req.method === 'POST') {
+            const { folder } = await parseBody(req);
+            if (!folder) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '폴더 경로가 필요합니다' }));
+                return;
+            }
+
+            try {
+                const { exec } = require('child_process');
+                const platform = process.platform;
+                let command;
+
+                if (platform === 'darwin') {
+                    // macOS
+                    command = `open "${folder}"`;
+                } else if (platform === 'win32') {
+                    // Windows
+                    command = `explorer "${folder}"`;
+                } else {
+                    // Linux
+                    command = `xdg-open "${folder}"`;
+                }
+
+                exec(command, (error) => {
+                    if (error) {
+                        console.error('폴더 열기 실패:', error);
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: '폴더를 열 수 없습니다' }));
+                    } else {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true }));
+                    }
+                });
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+            return;
+        }
+
+        // API: 파일 위치 열기 (Finder/탐색기에서 파일 선택)
+        if (pathname === '/api/file/open' && req.method === 'POST') {
+            const { file } = await parseBody(req);
+            if (!file) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '파일 경로가 필요합니다' }));
+                return;
+            }
+
+            try {
+                const { exec } = require('child_process');
+                const platform = process.platform;
+                let command;
+
+                if (platform === 'darwin') {
+                    // macOS: Finder에서 파일 선택 상태로 열기
+                    command = `open -R "${file}"`;
+                } else if (platform === 'win32') {
+                    // Windows: 탐색기에서 파일 선택 상태로 열기
+                    command = `explorer /select,"${file}"`;
+                } else {
+                    // Linux: 파일이 있는 폴더 열기
+                    const folderPath = path.dirname(file);
+                    command = `xdg-open "${folderPath}"`;
+                }
+
+                exec(command, (error) => {
+                    if (error) {
+                        console.error('파일 열기 실패:', error);
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: '파일을 열 수 없습니다' }));
+                    } else {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true }));
+                    }
+                });
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+            return;
+        }
+
         // API: 로그
         if (pathname === '/api/logs' && req.method === 'GET') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1625,8 +2067,43 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 ...status,
-                model: OLLAMA_MODEL,
-                host: OLLAMA_HOST
+                model: CURRENT_AI_MODEL,
+                host: OLLAMA_HOST,
+                availableModels: AVAILABLE_MODELS
+            }));
+            return;
+        }
+
+        // API: AI 모델 변경
+        if (pathname === '/api/ollama/model' && req.method === 'POST') {
+            try {
+                const { model } = await parseBody(req);
+                if (!AVAILABLE_MODELS[model]) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '지원하지 않는 모델입니다' }));
+                    return;
+                }
+                CURRENT_AI_MODEL = model;
+                console.log(`AI 모델 변경: ${model}`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    model: CURRENT_AI_MODEL,
+                    modelInfo: AVAILABLE_MODELS[model]
+                }));
+            } catch (error) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: error.message }));
+            }
+            return;
+        }
+
+        // API: 사용 가능한 AI 모델 목록
+        if (pathname === '/api/ollama/models' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                currentModel: CURRENT_AI_MODEL,
+                availableModels: AVAILABLE_MODELS
             }));
             return;
         }
@@ -1655,8 +2132,10 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 // Ollama 상태 확인
+                updateProgress('🔍 AI 준비', 10, 'Ollama 상태 확인 중...');
                 const ollamaStatus = await checkOllamaStatus();
                 if (!ollamaStatus.ready) {
+                    clearProgress();
                     res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         error: 'Ollama 서버가 실행 중이 아닙니다. brew services start ollama를 실행해주세요.',
@@ -1666,27 +2145,51 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 console.log('AI 요약 생성 중...');
+                updateProgress('📝 AI 요약', 20, '회의록 분석 중...');
                 const summary = await summarizeWithOllama(transcriptText, 'meeting');
                 console.log('AI 요약 완료');
+                updateProgress('✅ 완료', 95, '저장 중...');
 
-                // 회의록에 요약 저장
+                // 회의록에 요약 저장 (히스토리 방식)
                 if (meetingId) {
                     const meeting = meetings.find(m => m.id === meetingId);
                     if (meeting) {
+                        // 히스토리 배열 초기화
+                        if (!meeting.summaryHistory) {
+                            meeting.summaryHistory = [];
+                            // 기존 요약이 있으면 히스토리에 추가
+                            if (meeting.aiSummary) {
+                                meeting.summaryHistory.push({
+                                    summary: meeting.aiSummary,
+                                    createdAt: meeting.summarizedAt || new Date().toISOString()
+                                });
+                            }
+                        }
+                        // 새 요약 추가
+                        meeting.summaryHistory.push({
+                            summary: summary,
+                            createdAt: new Date().toISOString()
+                        });
+                        // 현재 요약 업데이트 (최신 버전)
                         meeting.aiSummary = summary;
                         meeting.summarizedAt = new Date().toISOString();
+                        meeting.currentSummaryIndex = meeting.summaryHistory.length - 1;
                         saveMeetings();
                     }
                 }
+
+                updateProgress('✅ 완료', 100, '요약 완료!');
+                setTimeout(clearProgress, 2000);
 
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({
                     success: true,
                     summary,
-                    model: OLLAMA_MODEL
+                    model: CURRENT_AI_MODEL
                 }));
             } catch (e) {
                 console.error('AI 요약 오류:', e);
+                clearProgress();
                 res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: e.message }));
             }
@@ -1790,15 +2293,33 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 console.log('녹음 파일에서 회의록 생성:', audioPath);
+                updateProgress('🎙️ 음성 인식', 15, '처리 중...');
 
                 // 로컬 Whisper로 음성 인식
                 const transcribeResult = await transcribeAudio(audioPath);
                 const transcript = transcribeResult.text;
 
                 console.log('음성 인식 완료');
+                updateProgress('🎙️ 음성 인식', 45, '완료');
 
-                // 규칙 기반 분석
+                // 규칙 기반 분석 (키워드 추출 등)
                 const analysis = analyzeTranscript(transcript);
+
+                // AI 요약 자동 생성
+                let aiSummary = null;
+                try {
+                    const ollamaStatus = await checkOllamaStatus();
+                    if (ollamaStatus.ready && transcript && transcript.length > 50) {
+                        console.log('AI 요약 생성 시작...');
+                        updateProgress('🤖 AI 분석', 50, '회의 내용 분석 중...');
+                        aiSummary = await summarizeWithOllama(transcript, 'meeting');
+                        console.log('AI 요약 생성 완료');
+                    }
+                } catch (e) {
+                    console.error('AI 요약 생성 실패 (선택적 기능):', e.message);
+                }
+
+                updateProgress('📄 문서 생성', 92, '회의록 저장 중...');
 
                 // 회의록 메타데이터 생성
                 const meetingId = generateId();
@@ -1810,6 +2331,8 @@ const server = http.createServer(async (req, res) => {
                     createdAt: new Date().toISOString(),
                     transcript,
                     analysis,
+                    aiSummary,
+                    summarizedAt: aiSummary ? new Date().toISOString() : null,
                     audioFile: filename
                 };
 
@@ -1823,10 +2346,14 @@ const server = http.createServer(async (req, res) => {
                 meetings.push(meeting);
                 saveMeetings();
 
+                updateProgress('✅ 완료', 100, '회의록 생성 완료!');
+                setTimeout(clearProgress, 3000);
+
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({
                     success: true,
                     meetingId,
+                    hasAiSummary: !!aiSummary,
                     filename: transcriptFilename
                 }));
             } catch (e) {
@@ -1871,10 +2398,26 @@ const server = http.createServer(async (req, res) => {
                 const transcript = transcribeResult.text;
 
                 console.log('음성 인식 완료');
-                updateProgress('🎙️ 음성 인식', 50, '완료');
+                updateProgress('🎙️ 음성 인식', 45, '완료');
 
-                // 규칙 기반 분석
+                // 규칙 기반 분석 (키워드 추출 등)
                 const analysis = analyzeTranscript(transcript);
+
+                // AI 요약 자동 생성
+                let aiSummary = null;
+                try {
+                    const ollamaStatus = await checkOllamaStatus();
+                    if (ollamaStatus.ready && transcript && transcript.length > 50) {
+                        console.log('AI 요약 생성 시작...');
+                        updateProgress('🤖 AI 분석', 50, '회의 내용 분석 중...');
+                        aiSummary = await summarizeWithOllama(transcript, 'meeting');
+                        console.log('AI 요약 생성 완료');
+                    }
+                } catch (e) {
+                    console.error('AI 요약 생성 실패 (선택적 기능):', e.message);
+                }
+
+                updateProgress('📄 문서 생성', 92, '회의록 저장 중...');
 
                 // 회의록 객체 생성
                 const meeting = {
@@ -1884,6 +2427,8 @@ const server = http.createServer(async (req, res) => {
                     wavFile: transcribeResult.wavPath ? path.basename(transcribeResult.wavPath) : null,
                     transcript,
                     analysis,
+                    aiSummary,
+                    summarizedAt: aiSummary ? new Date().toISOString() : null,
                     createdAt: new Date().toISOString()
                 };
 
@@ -1905,7 +2450,8 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({
                     success: true,
                     meeting,
-                    filename: docFilename
+                    hasAiSummary: !!aiSummary,
+                    filename: transcriptFilename
                 }));
             } catch (e) {
                 console.error('회의록 생성 오류:', e);
@@ -1921,7 +2467,14 @@ const server = http.createServer(async (req, res) => {
             const id = pathname.split('/').pop();
             const meeting = meetings.find(m => m.id === id);
 
-            if (meeting && meeting.docFile) {
+            if (!meeting) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '회의록을 찾을 수 없습니다' }));
+                return;
+            }
+
+            // docFile이 있으면 파일에서 읽기
+            if (meeting.docFile) {
                 const docPath = path.join(MEETINGS_DIR, meeting.docFile);
                 if (fs.existsSync(docPath)) {
                     const content = fs.readFileSync(docPath, 'utf8');
@@ -1934,8 +2487,29 @@ const server = http.createServer(async (req, res) => {
                 }
             }
 
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: '회의록을 찾을 수 없습니다' }));
+            // docFile이 없으면 transcript와 aiSummary로 생성
+            let content = `# ${meeting.title}\n`;
+            content += `생성일: ${new Date(meeting.createdAt).toLocaleString('ko-KR')}\n\n`;
+
+            if (meeting.aiSummary) {
+                content += `## AI 요약\n${meeting.aiSummary}\n\n`;
+            }
+
+            if (meeting.transcript) {
+                content += `## 녹취록\n${meeting.transcript}\n`;
+            }
+
+            if (!meeting.transcript && !meeting.aiSummary) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '회의록 내용이 없습니다' }));
+                return;
+            }
+
+            res.writeHead(200, {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'Content-Disposition': `attachment; filename="${encodeURIComponent(meeting.title)}.txt"`
+            });
+            res.end(content);
             return;
         }
 

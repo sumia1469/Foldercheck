@@ -984,29 +984,39 @@ async function extractPptxContent(filePath) {
     }
 }
 
-// PPTX XML에서 텍스트 추출 헬퍼
-function extractTextFromPptxXml(obj, texts = []) {
-    if (typeof obj === 'string') {
-        texts.push(obj);
-    } else if (Array.isArray(obj)) {
+// PPTX XML에서 텍스트 추출 헬퍼 (a:t 요소만 추출)
+function extractTextFromPptxXml(obj, texts) {
+    if (!texts) texts = [];
+
+    if (Array.isArray(obj)) {
         obj.forEach(item => extractTextFromPptxXml(item, texts));
     } else if (typeof obj === 'object' && obj !== null) {
-        // a:t 요소에서 텍스트 추출
+        // a:t 요소에서 텍스트만 추출
         if (obj['a:t']) {
             const t = obj['a:t'];
             if (Array.isArray(t)) {
                 t.forEach(item => {
-                    if (typeof item === 'string') texts.push(item);
-                    else if (item._) texts.push(item._);
+                    if (typeof item === 'string' && item.trim()) {
+                        texts.push(item.trim());
+                    } else if (item && item._ && item._.trim()) {
+                        texts.push(item._.trim());
+                    }
                 });
-            } else if (typeof t === 'string') {
-                texts.push(t);
+            } else if (typeof t === 'string' && t.trim()) {
+                texts.push(t.trim());
             }
         }
 
-        Object.values(obj).forEach(value => extractTextFromPptxXml(value, texts));
+        // 재귀적으로 하위 객체 탐색 (문자열은 제외하고 객체만)
+        for (const key of Object.keys(obj)) {
+            if (typeof obj[key] === 'object') {
+                extractTextFromPptxXml(obj[key], texts);
+            }
+        }
     }
-    return texts.join(' ').trim();
+    // 중복 제거 및 공백만 있는 항목 필터링
+    const uniqueTexts = [...new Set(texts)].filter(t => t && t.trim().length > 0);
+    return uniqueTexts.join(' ');
 }
 
 // 텍스트 파일 내용 추출 (.txt, .md, .markdown, 코드 파일 등)

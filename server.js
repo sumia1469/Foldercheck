@@ -10,12 +10,19 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
 const { execSync, spawn } = require('child_process');
 
+// 라이선스 모듈
+const license = require('./license');
+
 // FFmpeg 경로 설정
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Whisper 설정
 const WHISPER_MODEL_PATH = path.join(__dirname, 'models', 'ggml-small.bin');
 const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
+
+// Ollama 설정 (로컬 LLM)
+const OLLAMA_HOST = 'http://localhost:11434';
+const OLLAMA_MODEL = 'tinyllama';
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -626,9 +633,41 @@ async function analyzeDocument(filePath) {
         // 변경 사항 분석
         summary.changes = compareDocuments(previousVersion, currentContent, ext);
         summary.previousAnalyzedAt = previousVersion.analyzedAt;
+
+        // AI로 변경사항 요약 생성 (Ollama 사용)
+        try {
+            const ollamaStatus = await checkOllamaStatus();
+            if (ollamaStatus.ready && summary.changes.length > 0) {
+                const changesText = summary.changes.map(c => {
+                    let text = c.type;
+                    if (c.description) text += `: ${c.description}`;
+                    if (c.keywords) text += ` - ${c.keywords.join(', ')}`;
+                    return text;
+                }).join('\n');
+
+                const aiSummary = await summarizeWithOllama(
+                    `문서: ${fileName}\n변경사항:\n${changesText}`,
+                    'document_changes'
+                );
+                summary.aiSummary = aiSummary;
+            }
+        } catch (e) {
+            console.log('AI 요약 생성 실패 (선택적 기능):', e.message);
+        }
     } else {
         // 새 문서 요약
         summary.overview = generateDocumentOverview(currentContent, ext);
+
+        // AI로 새 문서 요약 생성 (Ollama 사용)
+        try {
+            const ollamaStatus = await checkOllamaStatus();
+            if (ollamaStatus.ready && currentContent.text) {
+                const aiSummary = await summarizeWithOllama(currentContent.text, 'document');
+                summary.aiSummary = aiSummary;
+            }
+        } catch (e) {
+            console.log('AI 요약 생성 실패 (선택적 기능):', e.message);
+        }
     }
 
     // 현재 버전 저장
@@ -757,6 +796,109 @@ function generateDocumentOverview(content, ext) {
 }
 
 // ========================================
+// Ollama (로컬 LLM) 관련 함수
+// ========================================
+
+// Ollama 상태 확인
+async function checkOllamaStatus() {
+    return new Promise((resolve) => {
+        const req = http.get(`${OLLAMA_HOST}/api/tags`, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    const hasModel = result.models?.some(m => m.name.startsWith(OLLAMA_MODEL));
+                    resolve({ ready: true, hasModel, models: result.models || [] });
+                } catch (e) {
+                    resolve({ ready: false, error: 'JSON 파싱 오류' });
+                }
+            });
+        });
+        req.on('error', () => resolve({ ready: false, error: 'Ollama 서버 연결 실패' }));
+        req.setTimeout(3000, () => {
+            req.destroy();
+            resolve({ ready: false, error: '타임아웃' });
+        });
+    });
+}
+
+// Ollama로 텍스트 요약
+async function summarizeWithOllama(text, type = 'meeting') {
+    const prompts = {
+        meeting: `다음은 회의 녹취록입니다. 한국어로 요약해주세요.
+
+요약 형식:
+1. 회의 주제 (1줄)
+2. 주요 논의 사항 (3-5개 bullet point)
+3. 결정 사항 (있다면)
+4. 액션 아이템 (담당자/기한이 있다면 포함)
+
+녹취록:
+${text.substring(0, 3000)}
+
+요약:`,
+        document: `다음 문서 내용을 한국어로 간단히 요약해주세요 (3-5문장):
+
+${text.substring(0, 3000)}
+
+요약:`,
+        document_changes: `다음은 문서의 변경사항 정보입니다. 한국어로 변경사항을 간결하게 요약해주세요 (2-3문장):
+
+${text.substring(0, 2000)}
+
+변경사항 요약:`
+    };
+
+    const prompt = prompts[type] || prompts.meeting;
+
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
+            model: OLLAMA_MODEL,
+            prompt: prompt,
+            stream: false,
+            options: {
+                temperature: 0.3,
+                num_predict: 500
+            }
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    resolve(result.response || '요약 생성 실패');
+                } catch (e) {
+                    reject(new Error('응답 파싱 오류'));
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.setTimeout(60000, () => {
+            req.destroy();
+            reject(new Error('요약 생성 타임아웃 (60초)'));
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
+// ========================================
 // 회의록 관련 함수
 // ========================================
 
@@ -870,36 +1012,18 @@ function analyzeTranscript(text) {
     };
 }
 
-// 회의록 DOCX 생성 (간단 텍스트 버전 - 실제는 docxtemplater 사용)
-function generateMeetingDoc(meeting, analysis) {
-    const docContent = `
-========================================
-            회의록
+// 원본 녹취록 생성
+function generateTranscriptDoc(meeting) {
+    return `========================================
+        회의 녹취록 (원본)
 ========================================
 
 ■ 기본 정보
 ────────────────────────────────────────
+회의 제목: ${meeting.title}
 회의 일시: ${new Date(meeting.createdAt).toLocaleString('ko-KR')}
 녹음 파일: ${meeting.audioFile}
 생성 일시: ${new Date().toLocaleString('ko-KR')}
-
-■ 회의 내용 요약
-────────────────────────────────────────
-${analysis.summary}
-
-주요 키워드: ${analysis.keywords.join(', ')}
-
-■ 결정 사항
-────────────────────────────────────────
-${analysis.decisions.length > 0 ? analysis.decisions.map((d, i) => `${i + 1}. ${d}`).join('\n') : '(추출된 결정 사항 없음)'}
-
-■ 이슈 / 논의 필요
-────────────────────────────────────────
-${analysis.issues.length > 0 ? analysis.issues.map((d, i) => `${i + 1}. ${d}`).join('\n') : '(추출된 이슈 없음)'}
-
-■ 액션 아이템
-────────────────────────────────────────
-${analysis.actions.length > 0 ? analysis.actions.map((d, i) => `${i + 1}. ${d}`).join('\n') : '(추출된 액션 아이템 없음)'}
 
 ■ 전체 녹취록
 ────────────────────────────────────────
@@ -907,10 +1031,32 @@ ${meeting.transcript}
 
 ========================================
 DocWatch로 자동 생성됨
-본 회의록은 초안이며 검토가 필요합니다
 ========================================
 `;
-    return docContent;
+}
+
+// AI 요약본 생성
+function generateSummaryDoc(meeting, aiSummary) {
+    return `========================================
+        회의록 요약본
+========================================
+
+■ 기본 정보
+────────────────────────────────────────
+회의 제목: ${meeting.title}
+회의 일시: ${new Date(meeting.createdAt).toLocaleString('ko-KR')}
+요약 생성: ${new Date().toLocaleString('ko-KR')}
+AI 모델: TinyLlama (로컬)
+
+■ AI 요약
+────────────────────────────────────────
+${aiSummary}
+
+========================================
+DocWatch AI로 자동 요약됨
+본 요약은 참고용이며 검토가 필요합니다
+========================================
+`;
 }
 
 // Multipart 파싱 (간단 버전)
@@ -1191,6 +1337,135 @@ const server = http.createServer(async (req, res) => {
         }
 
         // ========================================
+        // 라이선스 API
+        // ========================================
+
+        // API: 앱 환경 확인 (Electron 앱 vs 웹 브라우저)
+        if (pathname === '/api/app/environment' && req.method === 'GET') {
+            // Electron에서 실행 중인지 확인
+            const isElectron = process.versions && process.versions.electron;
+            const userAgent = req.headers['user-agent'] || '';
+            const isElectronUA = userAgent.includes('Electron');
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                isApp: isElectron || isElectronUA,
+                isWeb: !isElectron && !isElectronUA,
+                environment: isElectron || isElectronUA ? 'electron' : 'web',
+                features: {
+                    // 웹에서는 녹음, 파일 감시 등 제한
+                    recording: isElectron || isElectronUA,
+                    fileWatching: isElectron || isElectronUA,
+                    documentAnalysis: true,  // 웹에서도 허용
+                    meetingView: true        // 웹에서도 허용
+                }
+            }));
+            return;
+        }
+
+        // API: 라이선스 상태 조회
+        if (pathname === '/api/license/status' && req.method === 'GET') {
+            const status = license.getLicenseStatus();
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(status));
+            return;
+        }
+
+        // API: 기기 ID 조회 (오프라인 활성화용)
+        if (pathname === '/api/license/machine-id' && req.method === 'GET') {
+            const machineId = license.generateMachineId();
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ machineId }));
+            return;
+        }
+
+        // API: 온라인 라이선스 활성화
+        if (pathname === '/api/license/activate' && req.method === 'POST') {
+            try {
+                const { licenseKey } = await parseBody(req);
+                if (!licenseKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '라이선스 키가 필요합니다.' }));
+                    return;
+                }
+
+                const result = await license.activateOnline(licenseKey);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify(result));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+            return;
+        }
+
+        // API: 오프라인 라이선스 활성화
+        if (pathname === '/api/license/activate-offline' && req.method === 'POST') {
+            try {
+                const { offlineKey } = await parseBody(req);
+                if (!offlineKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '오프라인 키가 필요합니다.' }));
+                    return;
+                }
+
+                const result = license.activateOffline(offlineKey);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify(result));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+            return;
+        }
+
+        // API: Trial 리셋 (개발용)
+        if (pathname === '/api/license/reset-trial' && req.method === 'POST') {
+            const result = license.resetTrial();
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(result));
+            return;
+        }
+
+        // API: Pro/Trial 토글 (개발용)
+        if (pathname === '/api/license/toggle' && req.method === 'POST') {
+            const result = license.toggleLicenseType();
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(result));
+            return;
+        }
+
+        // API: 테스트 라이선스 활성화 (개발용)
+        // POST /api/license/activate-test { months: 3 } 또는 { days: 1 }
+        if (pathname === '/api/license/activate-test' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', () => {
+                try {
+                    const { months, days } = JSON.parse(body || '{}');
+                    // days가 있으면 일 단위, 없으면 months 사용 (기본 3개월)
+                    const result = license.activateTestLicense(months || 3, days || null);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify(result));
+                } catch (e) {
+                    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: e.message }));
+                }
+            });
+            return;
+        }
+
+        // API: 기능 사용 가능 여부 확인
+        if (pathname.startsWith('/api/license/can-use/') && req.method === 'GET') {
+            const featureName = pathname.split('/').pop();
+            const canUse = license.canUseFeature(featureName);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ feature: featureName, canUse }));
+            return;
+        }
+
+        // ========================================
         // 회의록 API
         // ========================================
 
@@ -1206,6 +1481,80 @@ const server = http.createServer(async (req, res) => {
                 modelPath: WHISPER_MODEL_PATH,
                 modelExists: whisperReady
             }));
+            return;
+        }
+
+        // API: Ollama (로컬 LLM) 상태
+        if (pathname === '/api/ollama/status' && req.method === 'GET') {
+            const status = await checkOllamaStatus();
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                ...status,
+                model: OLLAMA_MODEL,
+                host: OLLAMA_HOST
+            }));
+            return;
+        }
+
+        // API: 회의록 AI 요약
+        if (pathname === '/api/meeting/summarize' && req.method === 'POST') {
+            try {
+                const { meetingId, text } = await parseBody(req);
+
+                // meetingId로 회의록 찾기 또는 직접 텍스트 사용
+                let transcriptText = text;
+                if (meetingId && !text) {
+                    const meeting = meetings.find(m => m.id === meetingId);
+                    if (!meeting) {
+                        res.writeHead(404, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: '회의록을 찾을 수 없습니다' }));
+                        return;
+                    }
+                    transcriptText = meeting.transcript;
+                }
+
+                if (!transcriptText) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '요약할 텍스트가 없습니다' }));
+                    return;
+                }
+
+                // Ollama 상태 확인
+                const ollamaStatus = await checkOllamaStatus();
+                if (!ollamaStatus.ready) {
+                    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        error: 'Ollama 서버가 실행 중이 아닙니다. brew services start ollama를 실행해주세요.',
+                        details: ollamaStatus.error
+                    }));
+                    return;
+                }
+
+                console.log('AI 요약 생성 중...');
+                const summary = await summarizeWithOllama(transcriptText, 'meeting');
+                console.log('AI 요약 완료');
+
+                // 회의록에 요약 저장
+                if (meetingId) {
+                    const meeting = meetings.find(m => m.id === meetingId);
+                    if (meeting) {
+                        meeting.aiSummary = summary;
+                        meeting.summarizedAt = new Date().toISOString();
+                        saveMeetings();
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    summary,
+                    model: OLLAMA_MODEL
+                }));
+            } catch (e) {
+                console.error('AI 요약 오류:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
             return;
         }
 
@@ -1276,6 +1625,83 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // API: 녹음 파일에서 회의록 생성
+        if (pathname === '/api/recording/transcribe' && req.method === 'POST') {
+            try {
+                const body = await parseBody(req);
+                const { filename } = JSON.parse(body);
+
+                if (!filename) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '파일명이 필요합니다' }));
+                    return;
+                }
+
+                const audioPath = path.join(MEETINGS_DIR, filename);
+
+                if (!fs.existsSync(audioPath)) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '녹음 파일을 찾을 수 없습니다' }));
+                    return;
+                }
+
+                if (!checkWhisperModel()) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.'
+                    }));
+                    return;
+                }
+
+                console.log('녹음 파일에서 회의록 생성:', audioPath);
+
+                // 로컬 Whisper로 음성 인식
+                const transcribeResult = await transcribeAudio(audioPath);
+                const transcript = transcribeResult.text;
+
+                console.log('음성 인식 완료');
+
+                // 규칙 기반 분석
+                const analysis = analyzeTranscript(transcript);
+
+                // 회의록 메타데이터 생성
+                const meetingId = generateId();
+                const title = filename.replace(/^audio_[^_]+_/, '').replace(/\.[^.]+$/, '') || '회의녹음';
+
+                const meeting = {
+                    id: meetingId,
+                    title: title,
+                    createdAt: new Date().toISOString(),
+                    transcript,
+                    analysis,
+                    audioFile: filename
+                };
+
+                // 원본 녹취록 문서 생성
+                const transcriptContent = generateTranscriptDoc(meeting);
+                const transcriptFilename = `transcript_${meetingId}.txt`;
+                const transcriptPath = path.join(MEETINGS_DIR, transcriptFilename);
+                fs.writeFileSync(transcriptPath, transcriptContent, 'utf8');
+                meeting.transcriptFile = transcriptFilename;
+
+                meetings.push(meeting);
+                saveMeetings();
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    meetingId,
+                    filename: transcriptFilename
+                }));
+            } catch (e) {
+                console.error('회의록 생성 오류:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+            return;
+        }
+
         // API: 회의록 목록
         if (pathname === '/api/meetings' && req.method === 'GET') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1323,12 +1749,12 @@ const server = http.createServer(async (req, res) => {
                     createdAt: new Date().toISOString()
                 };
 
-                // 회의록 문서 생성
-                const docContent = generateMeetingDoc(meeting, analysis);
-                const docFilename = `meeting_${meeting.id}.txt`;
-                const docPath = path.join(MEETINGS_DIR, docFilename);
-                fs.writeFileSync(docPath, docContent, 'utf8');
-                meeting.docFile = docFilename;
+                // 원본 녹취록 문서 생성
+                const transcriptContent = generateTranscriptDoc(meeting);
+                const transcriptFilename = `transcript_${meeting.id}.txt`;
+                const transcriptPath = path.join(MEETINGS_DIR, transcriptFilename);
+                fs.writeFileSync(transcriptPath, transcriptContent, 'utf8');
+                meeting.transcriptFile = transcriptFilename;
 
                 // 저장
                 meetings.unshift(meeting);

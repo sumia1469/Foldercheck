@@ -749,10 +749,21 @@ function showAnalysisModal(state, data) {
         const result = data;
         let changesHtml = '';
 
+        // AI 요약 섹션
+        const aiSummaryHtml = result.aiSummary ? `
+            <div class="analysis-section ai-summary-section">
+                <h4>✨ AI 요약</h4>
+                <div class="ai-summary-content">
+                    <pre class="ai-summary-text">${escapeHtml(result.aiSummary)}</pre>
+                </div>
+            </div>
+        ` : '';
+
         if (result.isNewDocument) {
             // 새 문서 개요
             const overview = result.overview || {};
             changesHtml = `
+                ${aiSummaryHtml}
                 <div class="analysis-section">
                     <h4>📄 새 문서 분석</h4>
                     <ul class="analysis-list">
@@ -775,6 +786,7 @@ function showAnalysisModal(state, data) {
         } else {
             // 변경 사항
             changesHtml = `
+                ${aiSummaryHtml}
                 <div class="analysis-section">
                     <h4>📝 변경 사항 요약</h4>
                     <p class="analysis-meta">이전 분석: ${new Date(result.previousAnalyzedAt).toLocaleString('ko-KR')}</p>
@@ -1516,15 +1528,28 @@ function renderMeetings(meetings) {
     }
 
     meetingList.innerHTML = meetings.map(meeting => `
-        <div class="meeting-item">
+        <div class="meeting-item" id="meeting-${meeting.id}">
             <div class="meeting-info">
                 <div class="meeting-title">${escapeHtml(meeting.title)}</div>
                 <div class="meeting-date">${new Date(meeting.createdAt).toLocaleString('ko-KR')}</div>
+                ${meeting.aiSummary ? `<div class="meeting-summary-badge">✨ AI 요약 완료</div>` : ''}
             </div>
             <div class="meeting-actions">
+                <button class="btn btn-primary" onclick="summarizeMeeting('${meeting.id}')" ${meeting.aiSummary ? 'title="다시 요약"' : ''}>
+                    ${meeting.aiSummary ? '🔄 재요약' : '✨ AI 요약'}
+                </button>
                 <button class="btn btn-secondary" onclick="downloadMeeting('${meeting.id}')">다운로드</button>
                 <button class="btn btn-danger" onclick="deleteMeeting('${meeting.id}')">삭제</button>
             </div>
+            ${meeting.aiSummary ? `
+                <div class="meeting-summary-content">
+                    <div class="summary-header">
+                        <strong>📝 AI 요약</strong>
+                        <span class="summary-date">${meeting.summarizedAt ? new Date(meeting.summarizedAt).toLocaleString('ko-KR') : ''}</span>
+                    </div>
+                    <pre class="summary-text">${escapeHtml(meeting.aiSummary)}</pre>
+                </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -1541,6 +1566,62 @@ async function deleteMeeting(id) {
         loadMeetings();
     } catch (e) {
         alert('삭제 실패');
+    }
+}
+
+// AI 요약 생성
+async function summarizeMeeting(meetingId) {
+    const meetingEl = document.getElementById(`meeting-${meetingId}`);
+    const btn = meetingEl?.querySelector('.btn-primary');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ 요약 중...';
+    }
+
+    try {
+        const res = await fetch('/api/meeting/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ meetingId })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.error || '요약 생성 실패');
+        }
+
+        // 성공 시 목록 새로고침
+        await loadMeetings();
+
+        // 요약된 회의록으로 스크롤
+        const updatedEl = document.getElementById(`meeting-${meetingId}`);
+        if (updatedEl) {
+            updatedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            updatedEl.classList.add('highlight');
+            setTimeout(() => updatedEl.classList.remove('highlight'), 2000);
+        }
+
+    } catch (e) {
+        console.error('요약 오류:', e);
+        alert(`요약 생성 실패: ${e.message}`);
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '✨ AI 요약';
+        }
+    }
+}
+
+// Ollama 상태 확인
+async function checkOllamaStatus() {
+    try {
+        const res = await fetch('/api/ollama/status');
+        const data = await res.json();
+        return data;
+    } catch (e) {
+        return { ready: false, error: e.message };
     }
 }
 
@@ -1566,6 +1647,493 @@ async function checkWhisperStatus() {
     }
 }
 
+// ========================================
+// 녹음 파일 목록 기능
+// ========================================
+
+const recordingList = document.getElementById('recordingList');
+
+// 녹음 파일 목록 로드
+async function loadRecordings() {
+    try {
+        const res = await fetch('/api/recordings');
+        const data = await res.json();
+        renderRecordings(data.recordings || []);
+    } catch (e) {
+        console.error('녹음 파일 목록 로드 실패:', e);
+    }
+}
+
+// 녹음 파일 목록 렌더링
+function renderRecordings(recordings) {
+    if (!recordingList) return;
+
+    if (recordings.length === 0) {
+        recordingList.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <circle cx="18" cy="16" r="3"/>
+                </svg>
+                <p>저장된 녹음 파일이 없습니다</p>
+            </div>
+        `;
+        return;
+    }
+
+    recordingList.innerHTML = recordings.map(recording => {
+        const ext = recording.filename.split('.').pop().toUpperCase();
+        const sizeStr = formatFileSize(recording.size);
+        const dateStr = new Date(recording.createdAt).toLocaleString('ko-KR');
+
+        return `
+            <div class="recording-item">
+                <div class="recording-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                </div>
+                <div class="recording-info">
+                    <div class="recording-name">${escapeHtml(recording.filename)}</div>
+                    <div class="recording-meta">
+                        <span class="recording-format">${ext}</span>
+                        <span class="recording-size">${sizeStr}</span>
+                        <span class="recording-date">${dateStr}</span>
+                    </div>
+                </div>
+                <div class="recording-actions">
+                    <button class="btn btn-sm btn-primary" onclick="transcribeRecording('${escapeHtml(recording.filename)}')" title="회의록 생성">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="downloadRecordingFile('${escapeHtml(recording.filename)}')" title="다운로드">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteRecordingFile('${escapeHtml(recording.filename)}')" title="삭제">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 파일 크기 포맷
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// 녹음 파일 다운로드
+function downloadRecordingFile(filename) {
+    window.location.href = `/api/recording/download/${encodeURIComponent(filename)}`;
+}
+
+// 녹음 파일 삭제
+async function deleteRecordingFile(filename) {
+    if (!confirm(`녹음 파일을 삭제하시겠습니까?\n${filename}`)) return;
+
+    try {
+        const res = await fetch(`/api/recording/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            loadRecordings();
+        } else {
+            alert(data.error || '삭제 실패');
+        }
+    } catch (e) {
+        console.error('녹음 파일 삭제 실패:', e);
+        alert('삭제 중 오류가 발생했습니다.');
+    }
+}
+
+// 녹음 파일에서 회의록 생성
+async function transcribeRecording(filename) {
+    if (!confirm(`이 녹음 파일로 회의록을 생성하시겠습니까?\n${filename}`)) return;
+
+    // 프로그래스 UI 표시
+    if (processingCard) processingCard.style.display = 'block';
+    updateProgress(10, '녹음 파일 처리 중...');
+
+    try {
+        const res = await fetch('/api/recording/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            updateProgress(100, '완료!');
+            setTimeout(() => {
+                if (processingCard) processingCard.style.display = 'none';
+                loadMeetings();
+                alert('회의록이 생성되었습니다!');
+            }, 1000);
+        } else {
+            throw new Error(result.error || '회의록 생성 실패');
+        }
+    } catch (e) {
+        console.error('회의록 생성 실패:', e);
+        updateProgress(0, '오류 발생');
+        if (processingStatus) processingStatus.textContent = e.message;
+        alert('회의록 생성 실패: ' + e.message);
+    }
+}
+
+// ========================================
+// 라이선스 관리 기능
+// ========================================
+
+let currentLicenseStatus = null;
+let appEnvironment = null;
+
+// 앱 환경 확인 (Electron 앱 vs 웹 브라우저)
+async function checkAppEnvironment() {
+    try {
+        const res = await fetch('/api/app/environment');
+        appEnvironment = await res.json();
+
+        // 웹 브라우저에서 실행 중이면 기능 제한 UI 표시
+        if (appEnvironment.isWeb) {
+            showWebRestrictionWarning();
+            applyWebRestrictions();
+        }
+
+        return appEnvironment;
+    } catch (e) {
+        console.error('앱 환경 확인 실패:', e);
+        // 에러 시 웹으로 간주
+        appEnvironment = { isWeb: true, isApp: false, environment: 'web' };
+        showWebRestrictionWarning();
+        applyWebRestrictions();
+    }
+}
+
+// 웹 브라우저 제한 경고 표시
+function showWebRestrictionWarning() {
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'webWarning';
+    warningDiv.className = 'web-warning';
+    warningDiv.innerHTML = `
+        <div class="web-warning-content">
+            <span class="web-warning-icon">⚠️</span>
+            <span class="web-warning-text">웹 브라우저에서 실행 중입니다. 일부 기능(녹음, 폴더 감시)이 제한됩니다. 전체 기능을 사용하려면 앱을 설치하세요.</span>
+            <button class="web-warning-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+
+    // 이미 경고가 있으면 추가하지 않음
+    if (!document.getElementById('webWarning')) {
+        document.body.insertBefore(warningDiv, document.body.firstChild);
+    }
+}
+
+// 웹 브라우저 기능 제한 적용
+function applyWebRestrictions() {
+    // 녹음 버튼 비활성화
+    const startRecordBtn = document.getElementById('startRecordBtn');
+    const stopRecordBtn = document.getElementById('stopRecordBtn');
+
+    if (startRecordBtn) {
+        startRecordBtn.disabled = true;
+        startRecordBtn.title = '앱에서만 사용 가능합니다';
+        startRecordBtn.innerHTML = '🔒 녹음 (앱 전용)';
+    }
+    if (stopRecordBtn) {
+        stopRecordBtn.disabled = true;
+    }
+
+    // 폴더 추가 버튼 비활성화
+    const addBtn = document.getElementById('addBtn');
+    if (addBtn) {
+        addBtn.disabled = true;
+        addBtn.title = '앱에서만 사용 가능합니다';
+        addBtn.textContent = '🔒 폴더 추가 (앱 전용)';
+    }
+
+    // 폴더 감시 섹션에 경고 추가
+    const foldersSection = document.getElementById('folders');
+    if (foldersSection) {
+        const existingWarning = foldersSection.querySelector('.feature-locked-warning');
+        if (!existingWarning) {
+            const warning = document.createElement('div');
+            warning.className = 'feature-locked-warning';
+            warning.innerHTML = '🔒 폴더 감시 기능은 앱에서만 사용할 수 있습니다.';
+            foldersSection.insertBefore(warning, foldersSection.firstChild);
+        }
+    }
+
+    // 회의 녹음 섹션에 경고 추가
+    const meetingRecordSection = document.querySelector('.meeting-record');
+    if (meetingRecordSection) {
+        const existingWarning = meetingRecordSection.querySelector('.feature-locked-warning');
+        if (!existingWarning) {
+            const warning = document.createElement('div');
+            warning.className = 'feature-locked-warning';
+            warning.innerHTML = '🔒 회의 녹음 기능은 앱에서만 사용할 수 있습니다.';
+            meetingRecordSection.insertBefore(warning, meetingRecordSection.firstChild);
+        }
+    }
+}
+
+// 앱 환경에서만 기능 실행
+function requireAppEnvironment(callback, featureName = '이 기능') {
+    if (!appEnvironment || appEnvironment.isWeb) {
+        alert(`${featureName}은 앱에서만 사용 가능합니다.\n\n전체 기능을 사용하려면 DocWatch 앱을 설치해 주세요.`);
+        return false;
+    }
+    if (callback) callback();
+    return true;
+}
+
+// 라이선스 상태 로드
+async function loadLicenseStatus() {
+    try {
+        const res = await fetch('/api/license/status');
+        const status = await res.json();
+        currentLicenseStatus = status;
+        updateLicenseUI(status);
+        applyFeatureRestrictions(status);
+        return status;
+    } catch (e) {
+        console.error('라이선스 상태 로드 실패:', e);
+    }
+}
+
+// 라이선스 UI 업데이트
+function updateLicenseUI(status) {
+    const licenseType = document.getElementById('licenseType');
+    const licenseExpiry = document.getElementById('licenseExpiry');
+    const licenseDays = document.getElementById('licenseDays');
+    const licenseDaysRow = document.getElementById('licenseDaysRow');
+    const activationUI = document.getElementById('licenseActivationUI');
+    const proStatus = document.getElementById('licenseProStatus');
+
+    if (!licenseType) return;
+
+    // 상태 표시
+    if (status.isPro) {
+        licenseType.textContent = 'Pro (정품)';
+        licenseType.style.color = 'var(--accent-primary)';
+        if (proStatus) proStatus.style.display = 'block';
+        if (activationUI) activationUI.style.display = 'none';
+    } else if (status.isTrial) {
+        if (status.isExpired) {
+            licenseType.textContent = 'Trial (만료됨)';
+            licenseType.style.color = 'var(--danger)';
+        } else {
+            licenseType.textContent = `Trial (${status.daysRemaining}일 남음)`;
+            licenseType.style.color = '#fdcb6e';
+        }
+        if (proStatus) proStatus.style.display = 'none';
+        if (activationUI) activationUI.style.display = 'block';
+    }
+
+    // 만료일 표시
+    if (status.expiresAt) {
+        licenseExpiry.textContent = new Date(status.expiresAt).toLocaleDateString('ko-KR');
+    }
+
+    // 남은 일수
+    if (status.daysRemaining > 0 && !status.isPro) {
+        licenseDaysRow.style.display = 'flex';
+        licenseDays.textContent = `${status.daysRemaining}일`;
+        if (status.daysRemaining <= 3) {
+            licenseDays.style.color = 'var(--danger)';
+        } else if (status.daysRemaining <= 7) {
+            licenseDays.style.color = '#fdcb6e';
+        }
+    } else {
+        licenseDaysRow.style.display = 'none';
+    }
+}
+
+// Pro 기능 제한 적용
+function applyFeatureRestrictions(status) {
+    const recordingCard = document.querySelector('.recording-card');
+    const recordingList = document.getElementById('recordingList')?.closest('.settings-card');
+
+    if (!status.features.meetingTranscription) {
+        // 회의 녹음 기능 제한
+        if (recordingCard) {
+            recordingCard.classList.add('feature-locked');
+        }
+    } else {
+        if (recordingCard) {
+            recordingCard.classList.remove('feature-locked');
+        }
+    }
+}
+
+// 기기 ID 로드
+async function loadMachineId() {
+    try {
+        const res = await fetch('/api/license/machine-id');
+        const data = await res.json();
+        const machineIdDisplay = document.getElementById('machineIdDisplay');
+        if (machineIdDisplay) {
+            machineIdDisplay.textContent = data.machineId;
+        }
+    } catch (e) {
+        console.error('기기 ID 로드 실패:', e);
+    }
+}
+
+// 온라인 활성화
+async function activateOnline() {
+    const keyInput = document.getElementById('licenseKeyInput');
+    const key = keyInput?.value.trim();
+
+    if (!key) {
+        alert('라이선스 키를 입력해주세요.');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/license/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ licenseKey: key })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            alert('라이선스가 활성화되었습니다!');
+            loadLicenseStatus();
+        } else {
+            alert('활성화 실패: ' + (result.error || '알 수 없는 오류'));
+        }
+    } catch (e) {
+        alert('활성화 실패: ' + e.message);
+    }
+}
+
+// 오프라인 활성화
+async function activateOffline() {
+    const keyInput = document.getElementById('offlineKeyInput');
+    const key = keyInput?.value.trim();
+
+    if (!key) {
+        alert('오프라인 라이선스 키를 입력해주세요.');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/license/activate-offline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ offlineKey: key })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            alert('오프라인 라이선스가 활성화되었습니다!');
+            loadLicenseStatus();
+        } else {
+            alert('활성화 실패: ' + (result.error || '알 수 없는 오류'));
+        }
+    } catch (e) {
+        alert('활성화 실패: ' + e.message);
+    }
+}
+
+// 기기 ID 복사
+function copyMachineId() {
+    const machineIdDisplay = document.getElementById('machineIdDisplay');
+    if (machineIdDisplay) {
+        navigator.clipboard.writeText(machineIdDisplay.textContent).then(() => {
+            alert('기기 ID가 클립보드에 복사되었습니다.');
+        });
+    }
+}
+
+// 라이선스 탭 전환
+function initLicenseTabs() {
+    const tabs = document.querySelectorAll('.license-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // 탭 활성화
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // 컨텐츠 전환
+            const targetTab = tab.dataset.tab;
+            const onlineContent = document.getElementById('onlineActivation');
+            const offlineContent = document.getElementById('offlineActivation');
+
+            if (targetTab === 'online') {
+                onlineContent.style.display = 'block';
+                offlineContent.style.display = 'none';
+            } else {
+                onlineContent.style.display = 'none';
+                offlineContent.style.display = 'block';
+                loadMachineId();
+            }
+        });
+    });
+}
+
+// 라이선스 버튼 이벤트
+function initLicenseButtons() {
+    const activateOnlineBtn = document.getElementById('activateOnlineBtn');
+    const activateOfflineBtn = document.getElementById('activateOfflineBtn');
+    const copyMachineIdBtn = document.getElementById('copyMachineIdBtn');
+
+    if (activateOnlineBtn) {
+        activateOnlineBtn.addEventListener('click', activateOnline);
+    }
+    if (activateOfflineBtn) {
+        activateOfflineBtn.addEventListener('click', activateOffline);
+    }
+    if (copyMachineIdBtn) {
+        copyMachineIdBtn.addEventListener('click', copyMachineId);
+    }
+}
+
+// Pro 기능 사용 가능 여부 확인
+function canUseProFeature(featureName) {
+    if (!currentLicenseStatus) return false;
+    return currentLicenseStatus.features[featureName] === true;
+}
+
+// Pro 기능 체크 래퍼
+function requireProFeature(featureName, callback) {
+    if (canUseProFeature(featureName)) {
+        callback();
+    } else {
+        alert('이 기능은 Pro 라이선스가 필요합니다.\n설정 > 라이선스에서 활성화해주세요.');
+        // 알림 탭의 라이선스 섹션으로 이동
+        showSection('notifications');
+        document.getElementById('licenseCard')?.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
 // 초기 로드
 loadMeetings();
+loadRecordings();
 checkWhisperStatus();
+checkAppEnvironment();  // 앱 환경 확인 (웹 vs Electron)
+loadLicenseStatus();
+initLicenseTabs();
+initLicenseButtons();

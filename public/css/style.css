@@ -1107,6 +1107,71 @@ body {
     font-size: 12px;
 }
 
+/* Meeting Item - AI 요약 추가 스타일 */
+.meeting-item {
+    flex-wrap: wrap;
+}
+
+.meeting-summary-badge {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--accent-primary);
+    margin-top: 4px;
+}
+
+.meeting-summary-content {
+    width: 100%;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.summary-header strong {
+    color: var(--accent-primary);
+    font-size: 13px;
+}
+
+.summary-date {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.summary-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--bg-secondary);
+    padding: 12px;
+    border-radius: 6px;
+    margin: 0;
+    font-family: inherit;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.meeting-item.highlight {
+    animation: highlight-pulse 1s ease-out;
+    box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+@keyframes highlight-pulse {
+    0% {
+        box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+    100% {
+        box-shadow: 0 0 0 2px var(--accent-primary);
+    }
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .stats-grid,
@@ -1852,4 +1917,387 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+/* ========================================
+   녹음 파일 목록 스타일
+   ======================================== */
+
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.card-header-flex h3 {
+    margin: 0;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.recording-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.recording-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.recording-item:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+}
+
+.recording-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.recording-icon svg {
+    width: 20px;
+    height: 20px;
+    color: var(--bg-primary);
+}
+
+.recording-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.recording-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+}
+
+.recording-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.recording-format {
+    background: var(--bg-hover);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.recording-size {
+    color: var(--text-muted);
+}
+
+.recording-date {
+    color: var(--text-muted);
+}
+
+.recording-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.recording-actions .btn-sm {
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.recording-actions .btn-sm svg {
+    margin: 0;
+}
+
+/* 반응형 녹음 파일 목록 */
+@media (max-width: 768px) {
+    .recording-item {
+        flex-wrap: wrap;
+    }
+
+    .recording-info {
+        flex: 1 1 calc(100% - 55px);
+    }
+
+    .recording-actions {
+        flex: 1 1 100%;
+        margin-top: 10px;
+        justify-content: flex-end;
+    }
+
+    .recording-meta {
+        font-size: 11px;
+    }
+}
+
+/* ========================================
+   AI 요약 스타일
+   ======================================== */
+
+.ai-summary-section {
+    background: linear-gradient(135deg, rgba(0, 212, 170, 0.1), rgba(0, 184, 148, 0.05));
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.ai-summary-section h4 {
+    color: var(--accent-primary);
+    margin-bottom: 12px;
+}
+
+.ai-summary-content {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.ai-summary-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ========================================
+   라이선스 스타일
+   ======================================== */
+
+.license-status {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 12px;
+}
+
+.license-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.license-tab {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.license-tab:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.license-tab.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.license-tab-content {
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+}
+
+.machine-id-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-secondary);
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.machine-id-box code {
+    flex: 1;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent-primary);
+    word-break: break-all;
+}
+
+#offlineKeyInput {
+    width: 100%;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    resize: vertical;
+}
+
+.pro-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, var(--accent-primary), #00b894);
+    color: white;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* Trial 만료 경고 */
+.license-warning {
+    background: linear-gradient(135deg, rgba(253, 203, 110, 0.2), rgba(225, 112, 85, 0.1));
+    border: 1px solid rgba(253, 203, 110, 0.5);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    color: #fdcb6e;
+}
+
+.license-expired {
+    background: linear-gradient(135deg, rgba(225, 112, 85, 0.2), rgba(214, 48, 49, 0.1));
+    border: 1px solid rgba(225, 112, 85, 0.5);
+    color: #e17055;
+}
+
+/* Pro 기능 잠금 오버레이 */
+.feature-locked {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.feature-locked::after {
+    content: '🔒 Pro 기능';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: auto;
+}
+
+.upgrade-prompt {
+    text-align: center;
+    padding: 20px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+.upgrade-prompt p {
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.upgrade-prompt .btn {
+    margin: 0 auto;
+}
+
+/* 웹 브라우저 제한 경고 */
+.web-warning {
+    background: linear-gradient(135deg, #f85149 0%, #d29922 100%);
+    color: white;
+    padding: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+}
+
+.web-warning-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.web-warning-icon {
+    font-size: 18px;
+}
+
+.web-warning-text {
+    flex: 1;
+    font-size: 14px;
+    text-align: center;
+}
+
+.web-warning-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.web-warning-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* 웹 브라우저에서 제한된 기능 경고 */
+.feature-locked-warning {
+    background: linear-gradient(135deg, rgba(248, 81, 73, 0.1), rgba(210, 153, 34, 0.1));
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    color: var(--warning);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* 웹 경고가 표시될 때 본문 여백 추가 */
+body:has(.web-warning) .app-container {
+    margin-top: 50px;
+}
+
+/* :has 미지원 브라우저 대응 */
+@supports not selector(:has(.web-warning)) {
+    .app-container.with-warning {
+        margin-top: 50px;
+    }
 }

@@ -1,0 +1,15 @@
+{
+  "type": "pro",
+  "machineId": "467AED299CDFE62B6E51AD4970747A98",
+  "licenseKey": "TEST-LICENSE-1766859466618",
+  "activatedAt": "2025-12-27T18:17:46.617Z",
+  "expiresAt": "2026-03-27T18:17:46.617Z",
+  "features": {
+    "documentMonitoring": true,
+    "meetingTranscription": true,
+    "aiSummary": true
+  },
+  "signature": "test-signature",
+  "testLicense": true,
+  "testDuration": "3개월"
+}

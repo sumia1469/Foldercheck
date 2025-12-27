@@ -471,6 +471,71 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 라이선스 관리 -->
+                <div class="settings-card" id="licenseCard">
+                    <h3>🔐 라이선스</h3>
+                    <p class="help-text">DocWatch Pro 라이선스를 관리합니다.</p>
+
+                    <div class="license-status" id="licenseStatusContainer">
+                        <div class="status-row">
+                            <span class="status-label">상태:</span>
+                            <span class="status-value" id="licenseType">확인 중...</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">만료일:</span>
+                            <span class="status-value" id="licenseExpiry">-</span>
+                        </div>
+                        <div class="status-row" id="licenseDaysRow" style="display: none;">
+                            <span class="status-label">남은 기간:</span>
+                            <span class="status-value" id="licenseDays">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Trial/만료 시 활성화 UI -->
+                    <div id="licenseActivationUI" style="display: none; margin-top: 16px;">
+                        <div class="license-tabs">
+                            <button class="license-tab active" data-tab="online">온라인 활성화</button>
+                            <button class="license-tab" data-tab="offline">오프라인 활성화</button>
+                        </div>
+
+                        <!-- 온라인 활성화 -->
+                        <div class="license-tab-content" id="onlineActivation">
+                            <div class="form-group">
+                                <label>라이선스 키</label>
+                                <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX">
+                            </div>
+                            <button class="btn btn-primary" id="activateOnlineBtn">활성화</button>
+                        </div>
+
+                        <!-- 오프라인 활성화 -->
+                        <div class="license-tab-content" id="offlineActivation" style="display: none;">
+                            <div class="form-group">
+                                <label>기기 ID (복사하여 관리자에게 전달)</label>
+                                <div class="machine-id-box">
+                                    <code id="machineIdDisplay">로딩 중...</code>
+                                    <button class="btn btn-sm btn-secondary" id="copyMachineIdBtn">복사</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>오프라인 라이선스 키</label>
+                                <textarea id="offlineKeyInput" rows="3" placeholder="관리자로부터 받은 오프라인 키를 입력하세요"></textarea>
+                            </div>
+                            <button class="btn btn-primary" id="activateOfflineBtn">오프라인 활성화</button>
+                        </div>
+                    </div>
+
+                    <!-- Pro 상태일 때 -->
+                    <div id="licenseProStatus" style="display: none; margin-top: 16px;">
+                        <div class="pro-badge">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            Pro 라이선스 활성화됨
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- 회의록 섹션 -->
@@ -610,6 +675,37 @@
                         <span class="progress-text" id="progressText">음성 인식 중...</span>
                     </div>
                     <p class="help-text" id="processingStatus">파일을 분석하고 있습니다. 잠시 기다려주세요.</p>
+                </div>
+
+                <!-- 녹음 파일 목록 -->
+                <div class="settings-card">
+                    <div class="card-header-flex">
+                        <h3>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;">
+                                <path d="M9 18V5l12-2v13"/>
+                                <circle cx="6" cy="18" r="3"/>
+                                <circle cx="18" cy="16" r="3"/>
+                            </svg>
+                            녹음 파일
+                        </h3>
+                        <button class="btn btn-sm btn-secondary" onclick="loadRecordings()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            새로고침
+                        </button>
+                    </div>
+                    <div id="recordingList" class="recording-list">
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M9 18V5l12-2v13"/>
+                                <circle cx="6" cy="18" r="3"/>
+                                <circle cx="18" cy="16" r="3"/>
+                            </svg>
+                            <p>저장된 녹음 파일이 없습니다</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="settings-card">

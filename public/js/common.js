@@ -286,6 +286,16 @@ function renderLogs() {
     logContainer.innerHTML = logs.map(log => {
         const time = new Date(log.timestamp).toLocaleString('ko-KR');
         const actionClass = getActionClass(log.action);
+        const isDocumentFile = isAnalyzableDocument(log.extension);
+        const analyzeBtn = isDocumentFile ? `
+            <button class="btn btn-analyze" onclick="analyzeDocument('${escapeHtml(log.fullPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'"))}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                </svg>
+                요약
+            </button>
+        ` : '';
         return `
             <div class="log-entry">
                 <span class="log-time">${time}</span>
@@ -294,6 +304,7 @@ function renderLogs() {
                     ${escapeHtml(log.file)}
                     <div class="log-folder">${escapeHtml(log.folder)}</div>
                 </div>
+                ${analyzeBtn}
             </div>
         `;
     }).join('');
@@ -617,6 +628,181 @@ function escapeHtml(text) {
 }
 
 // ========================================
+// 문서 분석 기능 (PPTX, DOCX, XLSX)
+// ========================================
+
+// 분석 가능한 문서 확장자 체크
+function isAnalyzableDocument(extension) {
+    const analyzable = ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt'];
+    return analyzable.includes(extension?.toLowerCase());
+}
+
+// 문서 분석 실행
+async function analyzeDocument(filePath) {
+    try {
+        // 분석 중 표시
+        const modal = showAnalysisModal('analyzing');
+
+        const res = await fetch('/api/document/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath })
+        });
+
+        const result = await res.json();
+
+        if (result.error) {
+            showAnalysisModal('error', result.error);
+        } else {
+            showAnalysisModal('result', result);
+        }
+    } catch (e) {
+        console.error('문서 분석 오류:', e);
+        showAnalysisModal('error', '문서 분석 중 오류가 발생했습니다.');
+    }
+}
+
+// 분석 결과 모달 표시
+function showAnalysisModal(state, data) {
+    // 기존 모달 제거
+    const existingModal = document.getElementById('analysisModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'analysisModal';
+    modal.className = 'analysis-modal-overlay';
+
+    let content = '';
+
+    if (state === 'analyzing') {
+        content = `
+            <div class="analysis-modal">
+                <div class="analysis-header">
+                    <h3>문서 분석 중...</h3>
+                </div>
+                <div class="analysis-body">
+                    <div class="analysis-loading">
+                        <div class="spinner"></div>
+                        <p>문서를 분석하고 있습니다. 잠시 기다려주세요.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (state === 'error') {
+        content = `
+            <div class="analysis-modal">
+                <div class="analysis-header">
+                    <h3>분석 오류</h3>
+                    <button class="close-btn" onclick="closeAnalysisModal()">&times;</button>
+                </div>
+                <div class="analysis-body">
+                    <div class="analysis-error">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <p>${escapeHtml(data)}</p>
+                    </div>
+                </div>
+                <div class="analysis-footer">
+                    <button class="btn btn-secondary" onclick="closeAnalysisModal()">닫기</button>
+                </div>
+            </div>
+        `;
+    } else if (state === 'result') {
+        const result = data;
+        let changesHtml = '';
+
+        if (result.isNewDocument) {
+            // 새 문서 개요
+            const overview = result.overview || {};
+            changesHtml = `
+                <div class="analysis-section">
+                    <h4>📄 새 문서 분석</h4>
+                    <ul class="analysis-list">
+                        <li><strong>문서 유형:</strong> ${result.documentType}</li>
+                        <li><strong>글자 수:</strong> ${overview.contentLength?.toLocaleString() || 0}자</li>
+                        <li><strong>단어 수:</strong> ${overview.wordCount?.toLocaleString() || 0}개</li>
+                        ${overview.slideCount ? `<li><strong>슬라이드:</strong> ${overview.slideCount}장</li>` : ''}
+                        ${overview.sheetCount ? `<li><strong>시트:</strong> ${overview.sheetCount}개 (${overview.sheetNames?.join(', ') || ''})</li>` : ''}
+                    </ul>
+                </div>
+                ${overview.topKeywords?.length > 0 ? `
+                    <div class="analysis-section">
+                        <h4>🔑 주요 키워드</h4>
+                        <div class="keyword-tags">
+                            ${overview.topKeywords.map(k => `<span class="keyword-tag">${escapeHtml(k.word)} (${k.count})</span>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        } else {
+            // 변경 사항
+            changesHtml = `
+                <div class="analysis-section">
+                    <h4>📝 변경 사항 요약</h4>
+                    <p class="analysis-meta">이전 분석: ${new Date(result.previousAnalyzedAt).toLocaleString('ko-KR')}</p>
+                    <ul class="changes-list">
+                        ${result.changes.map(change => {
+                            let changeContent = `<strong>${change.type}</strong>`;
+                            if (change.description) {
+                                changeContent += `: ${escapeHtml(change.description)}`;
+                            }
+                            if (change.keywords) {
+                                changeContent += `<br><span class="change-keywords">${change.keywords.slice(0, 5).map(k => escapeHtml(k)).join(', ')}${change.keywords.length > 5 ? '...' : ''}</span>`;
+                            }
+                            if (change.sheets) {
+                                changeContent += `: ${change.sheets.join(', ')}`;
+                            }
+                            return `<li>${changeContent}</li>`;
+                        }).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        content = `
+            <div class="analysis-modal">
+                <div class="analysis-header">
+                    <h3>📊 문서 변경 요약</h3>
+                    <button class="close-btn" onclick="closeAnalysisModal()">&times;</button>
+                </div>
+                <div class="analysis-body">
+                    <div class="analysis-info">
+                        <div class="file-info">
+                            <span class="file-name">${escapeHtml(result.fileName)}</span>
+                            <span class="file-type">${result.documentType}</span>
+                        </div>
+                        <p class="analysis-time">분석 시간: ${new Date(result.analyzedAt).toLocaleString('ko-KR')}</p>
+                    </div>
+                    ${changesHtml}
+                </div>
+                <div class="analysis-footer">
+                    <button class="btn btn-secondary" onclick="closeAnalysisModal()">닫기</button>
+                </div>
+            </div>
+        `;
+    }
+
+    modal.innerHTML = content;
+    document.body.appendChild(modal);
+
+    // 모달 바깥 클릭시 닫기
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeAnalysisModal();
+    });
+
+    return modal;
+}
+
+// 분석 모달 닫기
+function closeAnalysisModal() {
+    const modal = document.getElementById('analysisModal');
+    if (modal) modal.remove();
+}
+
+// ========================================
 // 폴더/파일 선택 기능 (Electron API 사용)
 // ========================================
 
@@ -731,6 +917,315 @@ if (selectFolderBtn) selectFolderBtn.addEventListener('click', selectFolder);
 if (selectFileBtn) selectFileBtn.addEventListener('click', selectFile);
 if (selectMultipleFoldersBtn) selectMultipleFoldersBtn.addEventListener('click', selectMultipleFolders);
 if (selectMultipleFilesBtn) selectMultipleFilesBtn.addEventListener('click', selectMultipleFiles);
+
+// ========================================
+// 회의 녹음 기능
+// ========================================
+
+// 녹음 관련 DOM 요소
+const startRecordingBtn = document.getElementById('startRecordingBtn');
+const pauseRecordingBtn = document.getElementById('pauseRecordingBtn');
+const stopRecordingBtn = document.getElementById('stopRecordingBtn');
+const statusIndicator = document.getElementById('statusIndicator');
+const statusText = document.getElementById('statusText');
+const recordingTimer = document.getElementById('recordingTimer');
+const visualizerCanvas = document.getElementById('visualizerCanvas');
+const meetingTitleInput = document.getElementById('meetingTitle');
+const audioQualitySelect = document.getElementById('audioQuality');
+const recordingControls = document.querySelector('.recording-controls');
+const recordingComplete = document.getElementById('recordingComplete');
+const recordingInfo = document.getElementById('recordingInfo');
+const generateMinutesBtn = document.getElementById('generateMinutesBtn');
+const downloadRecordingBtn = document.getElementById('downloadRecordingBtn');
+const discardRecordingBtn = document.getElementById('discardRecordingBtn');
+const recordingCard = document.querySelector('.recording-card');
+
+// 녹음 상태 변수
+let mediaRecorder = null;
+let audioChunks = [];
+let audioStream = null;
+let audioContext = null;
+let analyser = null;
+let recordingStartTime = null;
+let timerInterval = null;
+let isPaused = false;
+let recordedBlob = null;
+let animationId = null;
+
+// 음질 설정
+const qualitySettings = {
+    low: { audioBitsPerSecond: 64000 },
+    medium: { audioBitsPerSecond: 128000 },
+    high: { audioBitsPerSecond: 256000 }
+};
+
+// 녹음 시작
+async function startRecording() {
+    try {
+        // 마이크 권한 요청
+        audioStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                sampleRate: 44100
+            }
+        });
+
+        // 오디오 컨텍스트 및 분석기 설정
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(audioStream);
+        source.connect(analyser);
+        analyser.fftSize = 256;
+
+        // MediaRecorder 설정
+        const quality = audioQualitySelect ? audioQualitySelect.value : 'medium';
+        const options = {
+            mimeType: 'audio/webm;codecs=opus',
+            ...qualitySettings[quality]
+        };
+
+        mediaRecorder = new MediaRecorder(audioStream, options);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            showRecordingComplete();
+        };
+
+        // 녹음 시작
+        mediaRecorder.start(1000); // 1초마다 데이터 수집
+        recordingStartTime = Date.now();
+        isPaused = false;
+
+        // UI 업데이트
+        updateRecordingUI('recording');
+        startTimer();
+        startVisualizer();
+
+        console.log('녹음 시작');
+    } catch (error) {
+        console.error('녹음 시작 실패:', error);
+        if (error.name === 'NotAllowedError') {
+            alert('마이크 사용 권한이 필요합니다.\n브라우저 설정에서 마이크 권한을 허용해주세요.');
+        } else {
+            alert('녹음을 시작할 수 없습니다: ' + error.message);
+        }
+    }
+}
+
+// 녹음 일시정지/재개
+function togglePauseRecording() {
+    if (!mediaRecorder) return;
+
+    if (isPaused) {
+        mediaRecorder.resume();
+        isPaused = false;
+        updateRecordingUI('recording');
+        if (pauseRecordingBtn) {
+            pauseRecordingBtn.textContent = '일시정지';
+            pauseRecordingBtn.classList.remove('active');
+        }
+    } else {
+        mediaRecorder.pause();
+        isPaused = true;
+        updateRecordingUI('paused');
+        if (pauseRecordingBtn) {
+            pauseRecordingBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                재개
+            `;
+            pauseRecordingBtn.classList.add('active');
+        }
+    }
+}
+
+// 녹음 중지
+function stopRecording() {
+    if (!mediaRecorder) return;
+
+    mediaRecorder.stop();
+    clearInterval(timerInterval);
+    cancelAnimationFrame(animationId);
+
+    // 스트림 정리
+    if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContext) {
+        audioContext.close();
+    }
+
+    console.log('녹음 중지');
+}
+
+// UI 상태 업데이트
+function updateRecordingUI(state) {
+    if (!statusIndicator || !statusText) return;
+
+    statusIndicator.className = 'status-indicator ' + state;
+
+    switch (state) {
+        case 'recording':
+            statusText.textContent = '녹음 중';
+            if (startRecordingBtn) startRecordingBtn.disabled = true;
+            if (pauseRecordingBtn) pauseRecordingBtn.disabled = false;
+            if (stopRecordingBtn) stopRecordingBtn.disabled = false;
+            if (recordingCard) recordingCard.classList.add('is-recording');
+            break;
+        case 'paused':
+            statusText.textContent = '일시정지';
+            break;
+        case 'ready':
+            statusText.textContent = '대기 중';
+            if (startRecordingBtn) startRecordingBtn.disabled = false;
+            if (pauseRecordingBtn) pauseRecordingBtn.disabled = true;
+            if (stopRecordingBtn) stopRecordingBtn.disabled = true;
+            if (recordingCard) recordingCard.classList.remove('is-recording');
+            break;
+    }
+}
+
+// 타이머 시작
+function startTimer() {
+    timerInterval = setInterval(() => {
+        if (!isPaused && recordingStartTime) {
+            const elapsed = Date.now() - recordingStartTime;
+            if (recordingTimer) {
+                recordingTimer.textContent = formatTime(elapsed);
+            }
+        }
+    }, 1000);
+}
+
+// 시간 포맷
+function formatTime(ms) {
+    const seconds = Math.floor(ms / 1000) % 60;
+    const minutes = Math.floor(ms / 60000) % 60;
+    const hours = Math.floor(ms / 3600000);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// 오디오 시각화
+function startVisualizer() {
+    if (!visualizerCanvas || !analyser) return;
+
+    const canvasCtx = visualizerCanvas.getContext('2d');
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    function draw() {
+        animationId = requestAnimationFrame(draw);
+
+        analyser.getByteFrequencyData(dataArray);
+
+        canvasCtx.fillStyle = '#21262d';
+        canvasCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+
+        const barWidth = (visualizerCanvas.width / bufferLength) * 2.5;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+            const barHeight = (dataArray[i] / 255) * visualizerCanvas.height;
+
+            // 그라데이션 색상
+            const gradient = canvasCtx.createLinearGradient(0, visualizerCanvas.height, 0, 0);
+            gradient.addColorStop(0, '#f85149');
+            gradient.addColorStop(1, '#00d4aa');
+
+            canvasCtx.fillStyle = gradient;
+            canvasCtx.fillRect(x, visualizerCanvas.height - barHeight, barWidth, barHeight);
+
+            x += barWidth + 1;
+        }
+    }
+
+    draw();
+}
+
+// 녹음 완료 화면 표시
+function showRecordingComplete() {
+    if (recordingControls) recordingControls.style.display = 'none';
+    if (recordingComplete) recordingComplete.style.display = 'block';
+
+    const elapsed = Date.now() - recordingStartTime;
+    if (recordingInfo) {
+        recordingInfo.textContent = `녹음 시간: ${formatTime(elapsed)}`;
+    }
+
+    updateRecordingUI('ready');
+}
+
+// 녹음 초기화
+function resetRecording() {
+    recordedBlob = null;
+    audioChunks = [];
+    recordingStartTime = null;
+
+    if (recordingTimer) recordingTimer.textContent = '00:00:00';
+    if (recordingControls) recordingControls.style.display = 'flex';
+    if (recordingComplete) recordingComplete.style.display = 'none';
+    if (pauseRecordingBtn) {
+        pauseRecordingBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <rect x="6" y="4" width="4" height="16"/>
+                <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            일시정지
+        `;
+        pauseRecordingBtn.classList.remove('active');
+    }
+
+    updateRecordingUI('ready');
+}
+
+// 녹음 파일 다운로드
+function downloadRecording() {
+    if (!recordedBlob) return;
+
+    const title = meetingTitleInput?.value || '회의녹음';
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `${title}_${date}.webm`;
+
+    const url = URL.createObjectURL(recordedBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// 녹음 파일로 회의록 생성
+async function generateMinutesFromRecording() {
+    if (!recordedBlob) return;
+
+    const title = meetingTitleInput?.value || '회의녹음';
+    const file = new File([recordedBlob], `${title}.webm`, { type: 'audio/webm' });
+
+    // 기존 handleAudioFile 함수 호출
+    handleAudioFile(file);
+
+    // 녹음 초기화
+    resetRecording();
+}
+
+// 이벤트 리스너 등록
+if (startRecordingBtn) startRecordingBtn.addEventListener('click', startRecording);
+if (pauseRecordingBtn) pauseRecordingBtn.addEventListener('click', togglePauseRecording);
+if (stopRecordingBtn) stopRecordingBtn.addEventListener('click', stopRecording);
+if (generateMinutesBtn) generateMinutesBtn.addEventListener('click', generateMinutesFromRecording);
+if (downloadRecordingBtn) downloadRecordingBtn.addEventListener('click', downloadRecording);
+if (discardRecordingBtn) discardRecordingBtn.addEventListener('click', resetRecording);
 
 // 이벤트 리스너
 if (addBtn) addBtn.addEventListener('click', addFolder);

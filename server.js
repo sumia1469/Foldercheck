@@ -2,6 +2,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const mammoth = require('mammoth');
+const XLSX = require('xlsx');
+const unzipper = require('unzipper');
+const xml2js = require('xml2js');
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -295,6 +299,328 @@ function generateCSV(logs) {
         return `"${log.timestamp}","${log.folder}","${log.file}","${log.action}","${log.fullPath}","${log.extension || ''}"`;
     }).join('\n');
     return '\uFEFF' + header + rows; // BOM for Excel
+}
+
+// ========================================
+// 문서 분석 및 요약 기능 (PPTX, DOCX, XLSX)
+// ========================================
+
+// 문서 변경 이력 저장소
+let documentHistory = {};
+const DOC_HISTORY_FILE = 'docHistory.json';
+
+// 문서 이력 로드
+function loadDocHistory() {
+    try {
+        if (fs.existsSync(DOC_HISTORY_FILE)) {
+            const data = fs.readFileSync(DOC_HISTORY_FILE, 'utf8');
+            documentHistory = JSON.parse(data);
+        }
+    } catch (e) {
+        console.error('문서 이력 로드 실패:', e.message);
+        documentHistory = {};
+    }
+}
+
+// 문서 이력 저장
+function saveDocHistory() {
+    try {
+        fs.writeFileSync(DOC_HISTORY_FILE, JSON.stringify(documentHistory, null, 2));
+    } catch (e) {
+        console.error('문서 이력 저장 실패:', e.message);
+    }
+}
+
+// DOCX 파일 내용 추출
+async function extractDocxContent(filePath) {
+    try {
+        const result = await mammoth.extractRawText({ path: filePath });
+        return {
+            text: result.value,
+            messages: result.messages
+        };
+    } catch (e) {
+        console.error('DOCX 추출 오류:', e.message);
+        return { text: '', error: e.message };
+    }
+}
+
+// XLSX 파일 내용 추출
+function extractXlsxContent(filePath) {
+    try {
+        const workbook = XLSX.readFile(filePath);
+        const sheets = {};
+        let fullText = '';
+
+        workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            sheets[sheetName] = data;
+
+            // 텍스트 추출
+            data.forEach(row => {
+                if (Array.isArray(row)) {
+                    fullText += row.filter(cell => cell != null).join(' ') + '\n';
+                }
+            });
+        });
+
+        return {
+            sheets,
+            sheetNames: workbook.SheetNames,
+            text: fullText
+        };
+    } catch (e) {
+        console.error('XLSX 추출 오류:', e.message);
+        return { sheets: {}, sheetNames: [], text: '', error: e.message };
+    }
+}
+
+// PPTX 파일 내용 추출
+async function extractPptxContent(filePath) {
+    try {
+        const slides = [];
+        let fullText = '';
+
+        const directory = await unzipper.Open.file(filePath);
+        const slideFiles = directory.files.filter(f =>
+            f.path.startsWith('ppt/slides/slide') && f.path.endsWith('.xml')
+        );
+
+        // 슬라이드 번호 순서대로 정렬
+        slideFiles.sort((a, b) => {
+            const numA = parseInt(a.path.match(/slide(\d+)/)?.[1] || 0);
+            const numB = parseInt(b.path.match(/slide(\d+)/)?.[1] || 0);
+            return numA - numB;
+        });
+
+        for (const file of slideFiles) {
+            const content = await file.buffer();
+            const xmlContent = content.toString('utf8');
+
+            // XML에서 텍스트 추출
+            const parser = new xml2js.Parser();
+            const result = await parser.parseStringPromise(xmlContent);
+
+            const slideText = extractTextFromPptxXml(result);
+            const slideNum = parseInt(file.path.match(/slide(\d+)/)?.[1] || 0);
+
+            slides.push({
+                number: slideNum,
+                text: slideText
+            });
+
+            fullText += `[슬라이드 ${slideNum}]\n${slideText}\n\n`;
+        }
+
+        return { slides, text: fullText, slideCount: slides.length };
+    } catch (e) {
+        console.error('PPTX 추출 오류:', e.message);
+        return { slides: [], text: '', slideCount: 0, error: e.message };
+    }
+}
+
+// PPTX XML에서 텍스트 추출 헬퍼
+function extractTextFromPptxXml(obj, texts = []) {
+    if (typeof obj === 'string') {
+        texts.push(obj);
+    } else if (Array.isArray(obj)) {
+        obj.forEach(item => extractTextFromPptxXml(item, texts));
+    } else if (typeof obj === 'object' && obj !== null) {
+        // a:t 요소에서 텍스트 추출
+        if (obj['a:t']) {
+            const t = obj['a:t'];
+            if (Array.isArray(t)) {
+                t.forEach(item => {
+                    if (typeof item === 'string') texts.push(item);
+                    else if (item._) texts.push(item._);
+                });
+            } else if (typeof t === 'string') {
+                texts.push(t);
+            }
+        }
+
+        Object.values(obj).forEach(value => extractTextFromPptxXml(value, texts));
+    }
+    return texts.join(' ').trim();
+}
+
+// 문서 분석 및 요약 생성
+async function analyzeDocument(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const fileName = path.basename(filePath);
+    const fileKey = filePath.replace(/[^a-zA-Z0-9]/g, '_');
+
+    let currentContent = null;
+    let documentType = '';
+
+    // 파일 타입별 내용 추출
+    switch (ext) {
+        case '.docx':
+            currentContent = await extractDocxContent(filePath);
+            documentType = 'Word 문서';
+            break;
+        case '.xlsx':
+        case '.xls':
+            currentContent = extractXlsxContent(filePath);
+            documentType = 'Excel 스프레드시트';
+            break;
+        case '.pptx':
+        case '.ppt':
+            currentContent = await extractPptxContent(filePath);
+            documentType = 'PowerPoint 프레젠테이션';
+            break;
+        default:
+            return { error: '지원하지 않는 파일 형식입니다.' };
+    }
+
+    if (currentContent.error) {
+        return { error: currentContent.error };
+    }
+
+    // 이전 버전과 비교
+    const previousVersion = documentHistory[fileKey];
+    let summary = {
+        fileName,
+        documentType,
+        filePath,
+        analyzedAt: new Date().toISOString(),
+        isNewDocument: !previousVersion,
+        changes: []
+    };
+
+    if (previousVersion) {
+        // 변경 사항 분석
+        summary.changes = compareDocuments(previousVersion, currentContent, ext);
+        summary.previousAnalyzedAt = previousVersion.analyzedAt;
+    } else {
+        // 새 문서 요약
+        summary.overview = generateDocumentOverview(currentContent, ext);
+    }
+
+    // 현재 버전 저장
+    documentHistory[fileKey] = {
+        content: currentContent,
+        analyzedAt: summary.analyzedAt,
+        fileName
+    };
+    saveDocHistory();
+
+    return summary;
+}
+
+// 문서 비교
+function compareDocuments(previous, current, ext) {
+    const changes = [];
+    const prevText = previous.content.text || '';
+    const currText = current.text || '';
+
+    // 텍스트 길이 변화
+    const lengthDiff = currText.length - prevText.length;
+    if (Math.abs(lengthDiff) > 50) {
+        changes.push({
+            type: lengthDiff > 0 ? '내용 추가' : '내용 삭제',
+            description: `약 ${Math.abs(lengthDiff)}자 ${lengthDiff > 0 ? '증가' : '감소'}`
+        });
+    }
+
+    // 단어 단위 비교
+    const prevWords = new Set(prevText.split(/\s+/).filter(w => w.length > 2));
+    const currWords = new Set(currText.split(/\s+/).filter(w => w.length > 2));
+
+    const newWords = [...currWords].filter(w => !prevWords.has(w));
+    const removedWords = [...prevWords].filter(w => !currWords.has(w));
+
+    if (newWords.length > 0) {
+        changes.push({
+            type: '새로 추가된 키워드',
+            keywords: newWords.slice(0, 10)
+        });
+    }
+
+    if (removedWords.length > 0) {
+        changes.push({
+            type: '삭제된 키워드',
+            keywords: removedWords.slice(0, 10)
+        });
+    }
+
+    // PPTX 슬라이드 수 변화
+    if (ext === '.pptx' || ext === '.ppt') {
+        const prevSlides = previous.content.slideCount || 0;
+        const currSlides = current.slideCount || 0;
+        if (prevSlides !== currSlides) {
+            changes.push({
+                type: '슬라이드 수 변경',
+                description: `${prevSlides}장 → ${currSlides}장 (${currSlides - prevSlides > 0 ? '+' : ''}${currSlides - prevSlides}장)`
+            });
+        }
+    }
+
+    // XLSX 시트 변화
+    if (ext === '.xlsx' || ext === '.xls') {
+        const prevSheets = previous.content.sheetNames || [];
+        const currSheets = current.sheetNames || [];
+
+        const newSheets = currSheets.filter(s => !prevSheets.includes(s));
+        const removedSheets = prevSheets.filter(s => !currSheets.includes(s));
+
+        if (newSheets.length > 0) {
+            changes.push({
+                type: '새 시트 추가',
+                sheets: newSheets
+            });
+        }
+        if (removedSheets.length > 0) {
+            changes.push({
+                type: '시트 삭제',
+                sheets: removedSheets
+            });
+        }
+    }
+
+    if (changes.length === 0) {
+        changes.push({
+            type: '미세한 변경',
+            description: '내용에 작은 수정이 있었습니다.'
+        });
+    }
+
+    return changes;
+}
+
+// 문서 개요 생성 (새 문서일 때)
+function generateDocumentOverview(content, ext) {
+    const overview = {
+        contentLength: (content.text || '').length,
+        wordCount: (content.text || '').split(/\s+/).filter(w => w).length
+    };
+
+    if (ext === '.pptx' || ext === '.ppt') {
+        overview.slideCount = content.slideCount;
+    }
+
+    if (ext === '.xlsx' || ext === '.xls') {
+        overview.sheetCount = content.sheetNames?.length || 0;
+        overview.sheetNames = content.sheetNames;
+    }
+
+    // 주요 키워드 추출
+    const words = (content.text || '').split(/\s+/).filter(w => w.length > 3);
+    const wordCount = {};
+    words.forEach(w => {
+        const word = w.toLowerCase().replace(/[^가-힣a-z0-9]/g, '');
+        if (word.length > 2) {
+            wordCount[word] = (wordCount[word] || 0) + 1;
+        }
+    });
+
+    overview.topKeywords = Object.entries(wordCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([word, count]) => ({ word, count }));
+
+    return overview;
 }
 
 // ========================================
@@ -645,6 +971,60 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // API: 문서 분석 (PPTX, DOCX, XLSX)
+        if (pathname === '/api/document/analyze' && req.method === 'POST') {
+            const { filePath } = await parseBody(req);
+            if (!filePath) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '파일 경로가 필요합니다.' }));
+                return;
+            }
+
+            if (!fs.existsSync(filePath)) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '파일을 찾을 수 없습니다.' }));
+                return;
+            }
+
+            const result = await analyzeDocument(filePath);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(result));
+            return;
+        }
+
+        // API: 문서 이력 조회
+        if (pathname === '/api/document/history' && req.method === 'GET') {
+            const histories = Object.entries(documentHistory).map(([key, value]) => ({
+                key,
+                fileName: value.fileName,
+                analyzedAt: value.analyzedAt
+            }));
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ histories }));
+            return;
+        }
+
+        // API: 문서 이력 삭제
+        if (pathname === '/api/document/history' && req.method === 'DELETE') {
+            const { key } = await parseBody(req);
+            if (key && documentHistory[key]) {
+                delete documentHistory[key];
+                saveDocHistory();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } else if (!key) {
+                // 전체 삭제
+                documentHistory = {};
+                saveDocHistory();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '이력을 찾을 수 없습니다.' }));
+            }
+            return;
+        }
+
         // API: 설정
         if (pathname === '/api/settings' && req.method === 'GET') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -824,6 +1204,7 @@ const server = http.createServer(async (req, res) => {
 loadConfig();
 loadSettings();
 loadMeetings();
+loadDocHistory();
 initWhisper();
 startAllWatchers();
 

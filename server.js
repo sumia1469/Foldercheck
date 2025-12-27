@@ -8,18 +8,14 @@ const unzipper = require('unzipper');
 const xml2js = require('xml2js');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
-let whisper;
-try {
-    whisper = require('whisper-node').whisper;
-} catch (e) {
-    console.log('whisper-node 로드 실패, 대체 방식 사용');
-}
+const { execSync, spawn } = require('child_process');
 
 // FFmpeg 경로 설정
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-// Whisper 모델 경로
+// Whisper 설정
 const WHISPER_MODEL_PATH = path.join(__dirname, 'models', 'ggml-small.bin');
+const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
 
 const PORT = 4400;
 const CONFIG_FILE = 'folderList.json';
@@ -42,11 +38,29 @@ let meetings = [];
 // Whisper 상태
 let whisperReady = false;
 
-// 모델 존재 여부 확인
+// Whisper 준비 상태 확인
 function checkWhisperModel() {
-    const exists = fs.existsSync(WHISPER_MODEL_PATH);
-    whisperReady = exists;
-    return exists;
+    const modelExists = fs.existsSync(WHISPER_MODEL_PATH);
+    const cliExists = fs.existsSync(WHISPER_CLI_PATH);
+    whisperReady = modelExists && cliExists;
+    return whisperReady;
+}
+
+// Whisper CLI 경로 찾기 (다양한 플랫폼 지원)
+function findWhisperCli() {
+    const paths = [
+        '/opt/homebrew/bin/whisper-cli',  // macOS (Apple Silicon)
+        '/usr/local/bin/whisper-cli',      // macOS (Intel) / Linux
+        path.join(__dirname, 'whisper-cpp', 'build', 'bin', 'whisper-cli'),  // 로컬 빌드
+        path.join(__dirname, 'whisper-cli.exe')  // Windows
+    ];
+
+    for (const p of paths) {
+        if (fs.existsSync(p)) {
+            return p;
+        }
+    }
+    return null;
 }
 
 // WebM을 WAV로 변환
@@ -76,32 +90,75 @@ async function transcribeAudio(audioPath) {
     console.log('로컬 Whisper 음성 인식 시작...');
     console.log('WAV 파일:', wavPath);
 
-    // whisper-node로 음성 인식
-    const transcript = await whisper(wavPath, {
-        modelPath: WHISPER_MODEL_PATH,
-        language: 'ko',
-        word_timestamps: true
+    // whisper-cli로 음성 인식 (JSON 출력)
+    return new Promise((resolve, reject) => {
+        const args = [
+            '-m', WHISPER_MODEL_PATH,
+            '-f', wavPath,
+            '-l', 'ko',
+            '-oj',  // JSON 출력
+            '-pp'   // 진행상황 표시
+        ];
+
+        console.log('실행 명령:', WHISPER_CLI_PATH, args.join(' '));
+
+        const whisperProcess = spawn(WHISPER_CLI_PATH, args);
+        let stdout = '';
+        let stderr = '';
+
+        whisperProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        whisperProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+            console.log('Whisper:', data.toString().trim());
+        });
+
+        whisperProcess.on('close', (code) => {
+            if (code !== 0) {
+                console.error('Whisper 오류:', stderr);
+                reject(new Error(`Whisper 처리 실패: ${stderr}`));
+                return;
+            }
+
+            try {
+                // JSON 출력 파싱
+                const jsonPath = wavPath + '.json';
+                let result = '';
+
+                if (fs.existsSync(jsonPath)) {
+                    const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+                    if (jsonData.transcription) {
+                        for (const seg of jsonData.transcription) {
+                            const start = seg.offsets?.from || 0;
+                            const startSec = Math.floor(start / 1000);
+                            const minutes = Math.floor(startSec / 60);
+                            const seconds = startSec % 60;
+                            const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
+                            result += `${timestamp} ${seg.text.trim()}\n`;
+                        }
+                    }
+                    // JSON 파일 정리
+                    fs.unlinkSync(jsonPath);
+                } else {
+                    // stdout에서 텍스트 추출
+                    result = stdout.trim();
+                }
+
+                console.log('음성 인식 완료');
+                resolve({ text: result.trim() || '(인식된 텍스트 없음)', wavPath });
+            } catch (e) {
+                console.error('결과 파싱 오류:', e);
+                reject(e);
+            }
+        });
+
+        whisperProcess.on('error', (err) => {
+            console.error('Whisper 실행 오류:', err);
+            reject(err);
+        });
     });
-
-    console.log('음성 인식 완료:', transcript);
-
-    // 결과 포맷팅
-    let result = '';
-    if (Array.isArray(transcript)) {
-        for (const seg of transcript) {
-            const start = seg.start || 0;
-            const minutes = Math.floor(start / 60);
-            const seconds = Math.floor(start % 60);
-            const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
-            result += `${timestamp} ${(seg.speech || seg.text || '').trim()}\n`;
-        }
-    } else if (typeof transcript === 'string') {
-        result = transcript;
-    } else if (transcript && transcript.text) {
-        result = transcript.text;
-    }
-
-    return { text: result.trim(), wavPath };
 }
 
 let watchedFolders = [];
@@ -1149,6 +1206,73 @@ const server = http.createServer(async (req, res) => {
                 modelPath: WHISPER_MODEL_PATH,
                 modelExists: whisperReady
             }));
+            return;
+        }
+
+        // API: 녹음 파일 목록
+        if (pathname === '/api/recordings' && req.method === 'GET') {
+            try {
+                const files = fs.readdirSync(MEETINGS_DIR);
+                const recordings = files
+                    .filter(f => f.endsWith('.wav') || f.endsWith('.webm'))
+                    .map(f => {
+                        const filePath = path.join(MEETINGS_DIR, f);
+                        const stat = fs.statSync(filePath);
+                        return {
+                            filename: f,
+                            size: stat.size,
+                            sizeFormatted: formatFileSize(stat.size),
+                            createdAt: stat.birthtime.toISOString(),
+                            duration: null // TODO: 실제 오디오 길이 추출
+                        };
+                    })
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ recordings }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+            return;
+        }
+
+        // API: 녹음 파일 다운로드
+        if (pathname.startsWith('/api/recording/download/') && req.method === 'GET') {
+            const filename = decodeURIComponent(pathname.split('/').pop());
+            const filePath = path.join(MEETINGS_DIR, filename);
+
+            if (fs.existsSync(filePath)) {
+                const stat = fs.statSync(filePath);
+                const ext = path.extname(filename).toLowerCase();
+                const mimeType = ext === '.wav' ? 'audio/wav' : 'audio/webm';
+
+                res.writeHead(200, {
+                    'Content-Type': mimeType,
+                    'Content-Length': stat.size,
+                    'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
+                });
+                fs.createReadStream(filePath).pipe(res);
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '파일을 찾을 수 없습니다' }));
+            }
+            return;
+        }
+
+        // API: 녹음 파일 삭제
+        if (pathname.startsWith('/api/recording/') && req.method === 'DELETE') {
+            const filename = decodeURIComponent(pathname.split('/').pop());
+            const filePath = path.join(MEETINGS_DIR, filename);
+
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '파일을 찾을 수 없습니다' }));
+            }
             return;
         }
 

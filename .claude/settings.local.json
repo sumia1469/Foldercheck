@@ -31,7 +31,11 @@
       "Bash(npm install:*)",
       "Bash(npm run build:mac:*)",
       "Bash(pkill:*)",
-      "Bash(cmake:*)"
+      "Bash(cmake:*)",
+      "Bash(brew info:*)",
+      "Bash(brew install:*)",
+      "Bash(brew services:*)",
+      "Bash(ollama pull:*)"
     ]
   }
 }

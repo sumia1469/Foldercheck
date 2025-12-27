@@ -616,6 +616,122 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ========================================
+// 폴더/파일 선택 기능 (Electron API 사용)
+// ========================================
+
+const selectFolderBtn = document.getElementById('selectFolderBtn');
+const selectFileBtn = document.getElementById('selectFileBtn');
+const selectMultipleFoldersBtn = document.getElementById('selectMultipleFoldersBtn');
+const selectMultipleFilesBtn = document.getElementById('selectMultipleFilesBtn');
+
+// Electron 환경 체크
+function isElectron() {
+    return window.electronAPI && window.electronAPI.isElectron;
+}
+
+// 폴더 선택
+async function selectFolder() {
+    if (!isElectron()) {
+        alert('이 기능은 데스크톱 앱에서만 사용할 수 있습니다.\n경로를 직접 입력해주세요.');
+        return;
+    }
+
+    try {
+        const folderPath = await window.electronAPI.selectFolder();
+        if (folderPath) {
+            await addFolderByPath(folderPath);
+        }
+    } catch (e) {
+        console.error('폴더 선택 오류:', e);
+        alert('폴더 선택 중 오류가 발생했습니다.');
+    }
+}
+
+// 파일 선택
+async function selectFile() {
+    if (!isElectron()) {
+        alert('이 기능은 데스크톱 앱에서만 사용할 수 있습니다.\n경로를 직접 입력해주세요.');
+        return;
+    }
+
+    try {
+        const filePath = await window.electronAPI.selectFile();
+        if (filePath) {
+            await addFolderByPath(filePath);
+        }
+    } catch (e) {
+        console.error('파일 선택 오류:', e);
+        alert('파일 선택 중 오류가 발생했습니다.');
+    }
+}
+
+// 여러 폴더 선택
+async function selectMultipleFolders() {
+    if (!isElectron()) {
+        alert('이 기능은 데스크톱 앱에서만 사용할 수 있습니다.\n경로를 직접 입력해주세요.');
+        return;
+    }
+
+    try {
+        const folderPaths = await window.electronAPI.selectMultiple('folder');
+        if (folderPaths && folderPaths.length > 0) {
+            for (const path of folderPaths) {
+                await addFolderByPath(path);
+            }
+        }
+    } catch (e) {
+        console.error('폴더 선택 오류:', e);
+        alert('폴더 선택 중 오류가 발생했습니다.');
+    }
+}
+
+// 여러 파일 선택
+async function selectMultipleFiles() {
+    if (!isElectron()) {
+        alert('이 기능은 데스크톱 앱에서만 사용할 수 있습니다.\n경로를 직접 입력해주세요.');
+        return;
+    }
+
+    try {
+        const filePaths = await window.electronAPI.selectMultiple('file');
+        if (filePaths && filePaths.length > 0) {
+            for (const path of filePaths) {
+                await addFolderByPath(path);
+            }
+        }
+    } catch (e) {
+        console.error('파일 선택 오류:', e);
+        alert('파일 선택 중 오류가 발생했습니다.');
+    }
+}
+
+// 경로로 폴더/파일 추가
+async function addFolderByPath(path) {
+    try {
+        const res = await fetch('/api/folders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: path })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            loadFolders();
+        } else {
+            alert(data.error || '추가 실패: ' + path);
+        }
+    } catch (e) {
+        console.error('추가 오류:', e);
+    }
+}
+
+// 선택 버튼 이벤트 리스너
+if (selectFolderBtn) selectFolderBtn.addEventListener('click', selectFolder);
+if (selectFileBtn) selectFileBtn.addEventListener('click', selectFile);
+if (selectMultipleFoldersBtn) selectMultipleFoldersBtn.addEventListener('click', selectMultipleFolders);
+if (selectMultipleFilesBtn) selectMultipleFilesBtn.addEventListener('click', selectMultipleFiles);
+
 // 이벤트 리스너
 if (addBtn) addBtn.addEventListener('click', addFolder);
 if (folderInput) folderInput.addEventListener('keypress', (e) => {

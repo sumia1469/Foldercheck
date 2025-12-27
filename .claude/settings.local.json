@@ -12,7 +12,23 @@
       "Bash(mkdir:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(open:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(node -e:*)",
+      "Bash(./node_modules/.bin/electron:*)",
+      "Bash(cat:*)",
+      "Bash(node_modules/electron/dist/Electron.app/Contents/MacOS/Electron:*)",
+      "Bash(npm start)",
+      "Bash(/Users/ibyeonghyeon/docwatch/docwatch/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /private/tmp)",
+      "Bash(dist/mac-arm64/DocWatch.app/Contents/MacOS/DocWatch)",
+      "Bash(node main.js:*)",
+      "Bash(/Volumes/DocWatch 1.0.0-arm64/DocWatch.app/Contents/MacOS/DocWatch)",
+      "Bash(npm cache clean:*)",
+      "Bash(node --version:*)",
+      "Bash(export PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\")",
+      "Bash(npm install:*)"
     ]
   }
 }

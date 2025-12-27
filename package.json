@@ -6,19 +6,24 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:all": "electron-builder --win --mac",
     "build:portable": "electron-builder --win portable"
   },
   "author": "DocWatch Team",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0",
+    "electron": "^39.2.7",
     "electron-builder": "^24.9.1"
   },
   "build": {
     "appId": "app.docwatch.desktop",
     "productName": "DocWatch",
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "icon.ico",
       "signAndEditExecutable": false
     },
@@ -28,7 +33,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DocWatch",
-      "installerLanguages": ["ko-KR", "en-US"],
+      "installerLanguages": [
+        "ko-KR",
+        "en-US"
+      ],
       "language": "1042"
     },
     "files": [

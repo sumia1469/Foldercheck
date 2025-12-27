@@ -157,62 +157,114 @@ function updateStats(action, filename) {
     stats.byHour[hour]++;
 }
 
-// 폴더 감시 시작
-function startWatching(folderPath) {
-    if (watchers[folderPath]) return;
+// 경로가 파일인지 폴더인지 확인
+function isFile(targetPath) {
+    try {
+        return fs.existsSync(targetPath) && fs.statSync(targetPath).isFile();
+    } catch (e) {
+        return false;
+    }
+}
 
-    if (!fs.existsSync(folderPath)) {
-        console.error(`폴더가 존재하지 않음: ${folderPath}`);
+// 폴더 또는 파일 감시 시작
+function startWatching(targetPath) {
+    if (watchers[targetPath]) return;
+
+    if (!fs.existsSync(targetPath)) {
+        console.error(`경로가 존재하지 않음: ${targetPath}`);
         return;
     }
 
     try {
-        watchers[folderPath] = fs.watch(folderPath, { recursive: true }, (eventType, filename) => {
-            if (!filename) return;
+        const isTargetFile = isFile(targetPath);
 
-            // 제외 패턴 체크
-            if (isExcluded(filename)) return;
+        if (isTargetFile) {
+            // 파일 감시: 부모 폴더를 감시하고 특정 파일만 필터링
+            const parentDir = path.dirname(targetPath);
+            const targetFilename = path.basename(targetPath);
 
-            // 확장자 필터 체크
-            if (!passesFilter(filename)) return;
+            watchers[targetPath] = fs.watch(parentDir, (eventType, filename) => {
+                if (!filename || filename !== targetFilename) return;
 
-            const fullPath = path.join(folderPath, filename);
-            const timestamp = new Date().toISOString();
-            let action = '';
+                const timestamp = new Date().toISOString();
+                let action = '';
 
-            if (eventType === 'rename') {
-                action = fs.existsSync(fullPath) ? '생성' : '삭제';
-            } else if (eventType === 'change') {
-                action = '수정';
-            }
+                if (eventType === 'rename') {
+                    action = fs.existsSync(targetPath) ? '생성' : '삭제';
+                } else if (eventType === 'change') {
+                    action = '수정';
+                }
 
-            const logEntry = {
-                timestamp,
-                folder: folderPath,
-                file: filename,
-                action,
-                fullPath,
-                extension: path.extname(filename).toLowerCase()
-            };
+                const logEntry = {
+                    timestamp,
+                    folder: parentDir,
+                    file: targetFilename,
+                    action,
+                    fullPath: targetPath,
+                    extension: path.extname(targetFilename).toLowerCase(),
+                    isFile: true
+                };
 
-            changeLog.unshift(logEntry);
-            if (changeLog.length > 500) changeLog.pop();
+                changeLog.unshift(logEntry);
+                if (changeLog.length > 500) changeLog.pop();
 
-            // 통계 업데이트
-            updateStats(action, filename);
+                updateStats(action, targetFilename);
+                console.log(`[${action}] ${targetPath}`);
 
-            console.log(`[${action}] ${fullPath}`);
+                if (settings.telegram.enabled) {
+                    const msg = `📄 <b>[DocWatch] 파일 ${action}</b>\n📄 ${targetFilename}\n📂 ${parentDir}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
+                    sendTelegramNotification(msg);
+                }
+            });
 
-            // 텔레그램 알림
-            if (settings.telegram.enabled) {
-                const msg = `📁 <b>[DocWatch] 파일 ${action}</b>\n📄 ${filename}\n📂 ${folderPath}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
-                sendTelegramNotification(msg);
-            }
-        });
+            console.log(`파일 감시 시작: ${targetPath}`);
+        } else {
+            // 폴더 감시 (기존 로직)
+            watchers[targetPath] = fs.watch(targetPath, { recursive: true }, (eventType, filename) => {
+                if (!filename) return;
 
-        console.log(`감시 시작: ${folderPath}`);
+                // 제외 패턴 체크
+                if (isExcluded(filename)) return;
+
+                // 확장자 필터 체크
+                if (!passesFilter(filename)) return;
+
+                const fullPath = path.join(targetPath, filename);
+                const timestamp = new Date().toISOString();
+                let action = '';
+
+                if (eventType === 'rename') {
+                    action = fs.existsSync(fullPath) ? '생성' : '삭제';
+                } else if (eventType === 'change') {
+                    action = '수정';
+                }
+
+                const logEntry = {
+                    timestamp,
+                    folder: targetPath,
+                    file: filename,
+                    action,
+                    fullPath,
+                    extension: path.extname(filename).toLowerCase(),
+                    isFile: false
+                };
+
+                changeLog.unshift(logEntry);
+                if (changeLog.length > 500) changeLog.pop();
+
+                updateStats(action, filename);
+                console.log(`[${action}] ${fullPath}`);
+
+                if (settings.telegram.enabled) {
+                    const msg = `📁 <b>[DocWatch] 파일 ${action}</b>\n📄 ${filename}\n📂 ${targetPath}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
+                    sendTelegramNotification(msg);
+                }
+            });
+
+            console.log(`폴더 감시 시작: ${targetPath}`);
+        }
     } catch (e) {
-        console.error(`감시 실패: ${folderPath} - ${e.message}`);
+        console.error(`감시 실패: ${targetPath} - ${e.message}`);
     }
 }
 

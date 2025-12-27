@@ -1147,3 +1147,94 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* ========================================
+   폴더/파일 선택 버튼 스타일
+   ======================================== */
+
+.select-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.select-buttons .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.select-buttons .btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    border-style: solid;
+}
+
+.select-buttons .btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* 구분선 */
+.input-divider {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin: 20px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.input-divider::before,
+.input-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+/* 폴더 목록 아이템 개선 */
+.folder-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.folder-list li:last-child {
+    margin-bottom: 0;
+}
+
+.folder-path {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-primary);
+    word-break: break-all;
+    font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.folder-list .btn-danger {
+    padding: 6px 12px;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+/* 파일 타입 아이콘 구분 */
+.folder-list li[data-type="file"] .folder-path::before {
+    content: '📄 ';
+}
+
+.folder-list li[data-type="folder"] .folder-path::before {
+    content: '📁 ';
+}

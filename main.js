@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Tray, Menu } = require('electron');
+// Electron 메인 프로세스
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
@@ -6,61 +7,33 @@ const net = require('net');
 
 let mainWindow;
 let tray;
-
 const PORT = 4400;
 
-// 캐시 삭제 함수
-function clearCache() {
-    const userDataPath = app.getPath('userData');
-    const cacheFolders = [
-        'Cache',
-        'Code Cache',
-        'GPUCache',
-        'DawnCache',
-        'blob_storage',
-        'Session Storage',
-        'Local Storage'
-    ];
-
-    cacheFolders.forEach(folder => {
-        const folderPath = path.join(userDataPath, folder);
-        try {
-            if (fs.existsSync(folderPath)) {
-                fs.rmSync(folderPath, { recursive: true, force: true });
-                console.log(`캐시 삭제: ${folder}`);
-            }
-        } catch (e) {
-            console.log(`캐시 삭제 실패: ${folder}`, e.message);
-        }
-    });
-}
-
-// 포트 사용 중인 프로세스 종료
+// 포트 사용 중인 프로세스 종료 (크로스 플랫폼)
 function killProcessOnPort(port) {
     try {
-        // netstat로 포트 사용 중인 PID 찾기
-        const result = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf8' });
-        const lines = result.trim().split('\n');
-
-        for (const line of lines) {
-            const parts = line.trim().split(/\s+/);
-            const pid = parts[parts.length - 1];
-
-            if (pid && pid !== '0') {
-                try {
-                    execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
-                    console.log(`포트 ${port} 사용 중인 프로세스 종료: PID ${pid}`);
-                } catch (e) {
-                    // 이미 종료되었거나 권한 없음
+        if (process.platform === 'win32') {
+            const result = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf8' });
+            const lines = result.trim().split('\n');
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && pid !== '0') {
+                    try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch (e) {}
                 }
             }
+        } else {
+            try {
+                const result = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
+                const pids = result.trim().split('\n').filter(p => p);
+                for (const pid of pids) {
+                    try { execSync(`kill -9 ${pid}`, { stdio: 'ignore' }); } catch (e) {}
+                }
+            } catch (e) {}
         }
-    } catch (e) {
-        // 포트 사용 중인 프로세스 없음
-    }
+    } catch (e) {}
 }
 
-// 포트 사용 가능 여부 확인
 function isPortAvailable(port) {
     return new Promise((resolve) => {
         const server = net.createServer();
@@ -73,13 +46,11 @@ function isPortAvailable(port) {
     });
 }
 
-// 서버 시작 전 포트 확인 및 정리
 async function ensurePortAvailable() {
     const available = await isPortAvailable(PORT);
     if (!available) {
         console.log(`포트 ${PORT} 사용 중. 기존 프로세스 종료 중...`);
         killProcessOnPort(PORT);
-        // 잠시 대기
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
 }
@@ -91,11 +62,13 @@ function createWindow() {
         minWidth: 600,
         minHeight: 400,
         title: 'DocWatch',
+        center: true,
         webPreferences: {
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
         },
-        show: false
+        show: true
     });
 
     mainWindow.loadURL(`http://localhost:${PORT}`);
@@ -104,7 +77,6 @@ function createWindow() {
         mainWindow.show();
     });
 
-    // 닫기 버튼 클릭 시 트레이로 최소화
     mainWindow.on('close', (event) => {
         if (!app.isQuitting) {
             event.preventDefault();
@@ -112,44 +84,37 @@ function createWindow() {
         }
     });
 
-    // 메뉴바 숨기기
-    mainWindow.setMenuBarVisibility(false);
+    if (process.platform !== 'darwin') {
+        mainWindow.setMenuBarVisibility(false);
+    }
 }
 
 function createTray() {
-    const iconPath = path.join(__dirname, 'icon.ico');
-
-    try {
-        tray = new Tray(iconPath);
-    } catch (e) {
-        const { nativeImage } = require('electron');
-        const emptyIcon = nativeImage.createEmpty();
-        tray = new Tray(emptyIcon);
+    let trayIcon;
+    if (process.platform === 'darwin') {
+        trayIcon = nativeImage.createEmpty();
+    } else {
+        const iconPath = path.join(__dirname, 'icon.ico');
+        if (fs.existsSync(iconPath)) {
+            trayIcon = nativeImage.createFromPath(iconPath);
+        } else {
+            trayIcon = nativeImage.createEmpty();
+        }
     }
 
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: '열기',
-            click: () => {
-                mainWindow.show();
-            }
-        },
-        { type: 'separator' },
-        {
-            label: '종료',
-            click: () => {
-                app.isQuitting = true;
-                app.quit();
-            }
-        }
-    ]);
-
-    tray.setToolTip('DocWatch - 로컬 업무 자동화');
-    tray.setContextMenu(contextMenu);
-
-    tray.on('double-click', () => {
-        mainWindow.show();
-    });
+    try {
+        tray = new Tray(trayIcon);
+        const contextMenu = Menu.buildFromTemplate([
+            { label: '열기', click: () => { if (mainWindow) mainWindow.show(); } },
+            { type: 'separator' },
+            { label: '종료', click: () => { app.isQuitting = true; app.quit(); } }
+        ]);
+        tray.setToolTip('DocWatch - 로컬 업무 자동화');
+        tray.setContextMenu(contextMenu);
+        tray.on('double-click', () => { if (mainWindow) mainWindow.show(); });
+    } catch (e) {
+        console.log('트레이 생성 실패:', e.message);
+    }
 }
 
 // 단일 인스턴스 실행
@@ -167,17 +132,18 @@ if (!gotTheLock) {
     });
 
     app.whenReady().then(async () => {
-        // 캐시 삭제 (새 버전 적용을 위해)
-        clearCache();
-
-        // 포트 정리 후 서버 시작
+        console.log('App ready, starting server...');
         await ensurePortAvailable();
         require('./server.js');
-
         createWindow();
         createTray();
     });
 }
+
+// 앱 종료 전 처리
+app.on('before-quit', () => {
+    app.isQuitting = true;
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
@@ -186,7 +152,62 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (mainWindow) {
+        mainWindow.show();
+    } else if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
     }
+});
+
+// macOS 기본 메뉴 (Cmd+Q 지원)
+if (process.platform === 'darwin') {
+    const template = [
+        {
+            label: app.name,
+            submenu: [
+                { label: 'DocWatch 정보', role: 'about' },
+                { type: 'separator' },
+                { label: '숨기기', role: 'hide' },
+                { label: '다른 앱 숨기기', role: 'hideOthers' },
+                { label: '모두 보기', role: 'unhide' },
+                { type: 'separator' },
+                { label: '종료', accelerator: 'Cmd+Q', click: () => { app.isQuitting = true; app.quit(); } }
+            ]
+        }
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+// IPC 핸들러: 폴더 선택 다이얼로그
+ipcMain.handle('select-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+        title: '감시할 폴더 선택'
+    });
+    if (result.canceled) return null;
+    return result.filePaths[0];
+});
+
+// IPC 핸들러: 파일 선택 다이얼로그
+ipcMain.handle('select-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        title: '감시할 파일 선택'
+    });
+    if (result.canceled) return null;
+    return result.filePaths[0];
+});
+
+// IPC 핸들러: 여러 파일/폴더 선택
+ipcMain.handle('select-multiple', async (event, type) => {
+    const properties = type === 'folder'
+        ? ['openDirectory', 'multiSelections']
+        : ['openFile', 'multiSelections'];
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties,
+        title: type === 'folder' ? '감시할 폴더 선택 (여러 개 가능)' : '감시할 파일 선택 (여러 개 가능)'
+    });
+    if (result.canceled) return [];
+    return result.filePaths;
 });

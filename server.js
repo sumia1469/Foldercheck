@@ -777,9 +777,44 @@ async function quickChangeAnalysis(filePath, action) {
                     }
                 }
 
+                // 의미 없는 메타데이터 텍스트 필터링
+                const isValidContent = (text) => {
+                    if (!text || text.length < 3) return false;
+
+                    // 필터링할 패턴들
+                    const invalidPatterns = [
+                        /^root\s*entry/i,
+                        /^workbook$/i,
+                        /^\[content_types\]/i,
+                        /^_rels$/i,
+                        /^docprops$/i,
+                        /^xl$/i,
+                        /^ppt$/i,
+                        /^word$/i,
+                        /^http:\/\//i,
+                        /^https:\/\//i,
+                        /^urn:/i,
+                        /^xmlns/i,
+                        /^\d+(\.\d+)*$/,  // 숫자만 있는 경우
+                        /^[a-f0-9]{8}-[a-f0-9]{4}/i,  // UUID
+                        /^[A-Z]\d+$/,  // 셀 참조 (A1, B2 등)
+                    ];
+
+                    const trimmed = text.trim();
+                    for (const pattern of invalidPatterns) {
+                        if (pattern.test(trimmed)) return false;
+                    }
+
+                    // 한글, 영문 또는 의미있는 문자가 포함되어 있어야 함
+                    const hasKorean = /[\uAC00-\uD7AF]/.test(trimmed);
+                    const hasEnglishWord = /[a-zA-Z]{2,}/.test(trimmed);
+
+                    return hasKorean || hasEnglishWord;
+                };
+
                 // 실제 변경 내용 분석 (문장/단락 단위)
-                const prevParagraphs = prevText.split(/[\n\r]+/).filter(p => p.trim().length > 0);
-                const currParagraphs = currText.split(/[\n\r]+/).filter(p => p.trim().length > 0);
+                const prevParagraphs = prevText.split(/[\n\r]+/).filter(p => p.trim().length > 0 && isValidContent(p));
+                const currParagraphs = currText.split(/[\n\r]+/).filter(p => p.trim().length > 0 && isValidContent(p));
 
                 const prevSet = new Set(prevParagraphs.map(p => p.trim()));
                 const currSet = new Set(currParagraphs.map(p => p.trim()));
@@ -787,7 +822,7 @@ async function quickChangeAnalysis(filePath, action) {
                 // 추가된 내용 찾기
                 for (const p of currParagraphs) {
                     const trimmed = p.trim();
-                    if (trimmed.length > 5 && !prevSet.has(trimmed)) {
+                    if (trimmed.length > 5 && !prevSet.has(trimmed) && isValidContent(trimmed)) {
                         addedTexts.push(trimmed.length > 100 ? trimmed.substring(0, 100) + '...' : trimmed);
                     }
                 }
@@ -795,7 +830,7 @@ async function quickChangeAnalysis(filePath, action) {
                 // 삭제된 내용 찾기
                 for (const p of prevParagraphs) {
                     const trimmed = p.trim();
-                    if (trimmed.length > 5 && !currSet.has(trimmed)) {
+                    if (trimmed.length > 5 && !currSet.has(trimmed) && isValidContent(trimmed)) {
                         removedTexts.push(trimmed.length > 100 ? trimmed.substring(0, 100) + '...' : trimmed);
                     }
                 }

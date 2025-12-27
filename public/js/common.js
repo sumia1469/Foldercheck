@@ -554,10 +554,11 @@ function showChangeSummary(event, fileName, summaryData) {
 
     document.body.appendChild(popup);
 
-    // 위치 조정
-    const rect = event.target.getBoundingClientRect();
-    popup.style.top = `${rect.bottom + 10}px`;
-    popup.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
+    // 화면 중앙에 위치
+    popup.style.position = 'fixed';
+    popup.style.top = '50%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
 
     // 외부 클릭 시 닫기
     setTimeout(() => {

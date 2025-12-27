@@ -90,7 +90,7 @@ function createWindow() {
         height: 700,
         minWidth: 600,
         minHeight: 400,
-        title: '폴더 감시 프로그램',
+        title: 'DocWatch',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
@@ -144,7 +144,7 @@ function createTray() {
         }
     ]);
 
-    tray.setToolTip('폴더 감시 프로그램');
+    tray.setToolTip('DocWatch - 로컬 업무 자동화');
     tray.setContextMenu(contextMenu);
 
     tray.on('double-click', () => {

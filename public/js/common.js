@@ -653,3 +653,185 @@ loadSettings();
 
 // 2초마다 로그 갱신
 setInterval(loadLogs, 2000);
+
+// ========================================
+// 회의록 기능
+// ========================================
+
+const uploadArea = document.getElementById('uploadArea');
+const audioFileInput = document.getElementById('audioFileInput');
+const processingCard = document.getElementById('processingCard');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const processingStatus = document.getElementById('processingStatus');
+const meetingList = document.getElementById('meetingList');
+const whisperStatus = document.getElementById('whisperStatus');
+
+// 업로드 영역 이벤트
+if (uploadArea) {
+    uploadArea.addEventListener('click', () => audioFileInput.click());
+
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && isAudioFile(file)) {
+            handleAudioFile(file);
+        } else {
+            alert('지원되지 않는 파일 형식입니다.');
+        }
+    });
+}
+
+if (audioFileInput) {
+    audioFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            handleAudioFile(file);
+        }
+    });
+}
+
+function isAudioFile(file) {
+    const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/x-m4a'];
+    const validExts = ['.wav', '.mp3', '.m4a'];
+    return validTypes.includes(file.type) || validExts.some(ext => file.name.toLowerCase().endsWith(ext));
+}
+
+async function handleAudioFile(file) {
+    console.log('오디오 파일 처리:', file.name);
+
+    // 프로그래스 UI 표시
+    if (processingCard) processingCard.style.display = 'block';
+    updateProgress(0, '파일 업로드 중...');
+
+    // FormData로 파일 전송
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    try {
+        updateProgress(10, '음성 인식 준비 중...');
+
+        const response = await fetch('/api/meeting/transcribe', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error('처리 실패');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            updateProgress(100, '완료!');
+            setTimeout(() => {
+                if (processingCard) processingCard.style.display = 'none';
+                loadMeetings();
+                alert('회의록이 생성되었습니다: ' + result.filename);
+            }, 1000);
+        } else {
+            throw new Error(result.error || '알 수 없는 오류');
+        }
+    } catch (e) {
+        console.error('회의록 생성 실패:', e);
+        updateProgress(0, '오류 발생');
+        if (processingStatus) processingStatus.textContent = e.message;
+        alert('회의록 생성에 실패했습니다: ' + e.message);
+    }
+}
+
+function updateProgress(percent, text) {
+    if (progressFill) progressFill.style.width = percent + '%';
+    if (progressText) progressText.textContent = text;
+}
+
+async function loadMeetings() {
+    try {
+        const res = await fetch('/api/meetings');
+        const data = await res.json();
+        renderMeetings(data.meetings || []);
+    } catch (e) {
+        console.error('회의록 목록 로드 실패:', e);
+    }
+}
+
+function renderMeetings(meetings) {
+    if (!meetingList) return;
+
+    if (meetings.length === 0) {
+        meetingList.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                </svg>
+                <p>아직 생성된 회의록이 없습니다</p>
+            </div>
+        `;
+        return;
+    }
+
+    meetingList.innerHTML = meetings.map(meeting => `
+        <div class="meeting-item">
+            <div class="meeting-info">
+                <div class="meeting-title">${escapeHtml(meeting.title)}</div>
+                <div class="meeting-date">${new Date(meeting.createdAt).toLocaleString('ko-KR')}</div>
+            </div>
+            <div class="meeting-actions">
+                <button class="btn btn-secondary" onclick="downloadMeeting('${meeting.id}')">다운로드</button>
+                <button class="btn btn-danger" onclick="deleteMeeting('${meeting.id}')">삭제</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function downloadMeeting(id) {
+    window.location.href = `/api/meeting/download/${id}`;
+}
+
+async function deleteMeeting(id) {
+    if (!confirm('이 회의록을 삭제하시겠습니까?')) return;
+
+    try {
+        await fetch(`/api/meeting/${id}`, { method: 'DELETE' });
+        loadMeetings();
+    } catch (e) {
+        alert('삭제 실패');
+    }
+}
+
+// Whisper 상태 체크
+async function checkWhisperStatus() {
+    try {
+        const res = await fetch('/api/whisper/status');
+        const data = await res.json();
+        if (whisperStatus) {
+            if (data.ready) {
+                whisperStatus.textContent = '준비됨';
+                whisperStatus.style.color = 'var(--success)';
+            } else {
+                whisperStatus.textContent = data.status || '준비 중';
+                whisperStatus.style.color = 'var(--warning)';
+            }
+        }
+    } catch (e) {
+        if (whisperStatus) {
+            whisperStatus.textContent = '연결 오류';
+            whisperStatus.style.color = 'var(--danger)';
+        }
+    }
+}
+
+// 초기 로드
+loadMeetings();
+checkWhisperStatus();

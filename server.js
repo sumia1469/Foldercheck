@@ -282,9 +282,108 @@ function passesFilter(filename) {
 
 // 제외 패턴 체크
 function isExcluded(filePath) {
+    // 사용자 정의 제외 패턴
     for (const pattern of settings.excludePatterns) {
         if (filePath.includes(pattern)) return true;
     }
+
+    // Office 임시 파일 자동 제외 (파일 열기 시 생성되는 파일들)
+    const filename = path.basename(filePath);
+
+    // ~$로 시작하는 Office 임시 파일
+    if (filename.startsWith('~$')) return true;
+
+    // .tmp 임시 파일
+    if (filename.endsWith('.tmp')) return true;
+
+    // ~로 시작하는 임시 파일
+    if (filename.startsWith('~')) return true;
+
+    // .DS_Store (macOS)
+    if (filename === '.DS_Store') return true;
+
+    // Thumbs.db (Windows)
+    if (filename === 'Thumbs.db') return true;
+
+    return false;
+}
+
+// 파일 변경 디바운싱 (중복 이벤트 방지)
+const fileChangeDebounce = new Map();
+const DEBOUNCE_DELAY = 1000; // 1초 내 중복 이벤트 무시
+
+function shouldProcessChange(filePath) {
+    const now = Date.now();
+    const lastChange = fileChangeDebounce.get(filePath);
+
+    if (lastChange && (now - lastChange) < DEBOUNCE_DELAY) {
+        return false; // 디바운스 기간 내 중복 이벤트
+    }
+
+    fileChangeDebounce.set(filePath, now);
+
+    // 오래된 항목 정리 (5분 이상)
+    if (fileChangeDebounce.size > 100) {
+        for (const [key, time] of fileChangeDebounce.entries()) {
+            if (now - time > 300000) {
+                fileChangeDebounce.delete(key);
+            }
+        }
+    }
+
+    return true;
+}
+
+// 파일이 사용 가능한지 확인 (저장 완료 대기)
+async function waitForFileReady(filePath, maxWait = 5000) {
+    const start = Date.now();
+    const checkInterval = 300;
+    let lastSize = -1;
+    let stableCount = 0;
+
+    console.log(`[waitForFileReady] 시작: ${filePath}`);
+
+    while (Date.now() - start < maxWait) {
+        try {
+            if (!fs.existsSync(filePath)) {
+                console.log(`[waitForFileReady] 파일 없음, 대기 중...`);
+                await new Promise(r => setTimeout(r, checkInterval));
+                continue;
+            }
+
+            const stats = fs.statSync(filePath);
+            const currentSize = stats.size;
+
+            console.log(`[waitForFileReady] 크기: ${currentSize}, 이전: ${lastSize}`);
+
+            // 파일 크기가 0보다 크고, 이전과 같으면 안정적
+            if (currentSize > 0 && currentSize === lastSize) {
+                stableCount++;
+                if (stableCount >= 2) {
+                    // 파일 읽기 시도
+                    try {
+                        const fd = fs.openSync(filePath, 'r');
+                        fs.closeSync(fd);
+                        console.log(`[waitForFileReady] 성공: ${filePath}`);
+                        return true;
+                    } catch (e) {
+                        console.log(`[waitForFileReady] 파일 잠김: ${e.message}`);
+                        stableCount = 0;
+                    }
+                }
+            } else {
+                stableCount = 0;
+            }
+
+            lastSize = currentSize;
+        } catch (e) {
+            console.log(`[waitForFileReady] 오류: ${e.message}`);
+            stableCount = 0;
+        }
+        await new Promise(r => setTimeout(r, checkInterval));
+    }
+
+    console.log(`[waitForFileReady] 타임아웃: ${filePath}`);
     return false;
 }
 
@@ -362,16 +461,71 @@ function startWatching(targetPath) {
             const parentDir = path.dirname(targetPath);
             const targetFilename = path.basename(targetPath);
 
-            watchers[targetPath] = fs.watch(parentDir, (eventType, filename) => {
-                if (!filename || filename !== targetFilename) return;
+            watchers[targetPath] = fs.watch(parentDir, async (eventType, filename) => {
+                // 디버그 로그
+                console.log(`[감시 이벤트] ${eventType} - ${filename} (대상: ${targetFilename})`);
+
+                if (!filename) return;
+
+                // 파일명 비교 (대소문자 무시, 유니코드 정규화 - macOS NFD 처리)
+                const normalizedFilename = filename.normalize('NFC').toLowerCase();
+                const normalizedTarget = targetFilename.normalize('NFC').toLowerCase();
+                const isMatch = normalizedFilename === normalizedTarget;
+
+                console.log(`[비교] "${normalizedFilename}" vs "${normalizedTarget}" => ${isMatch}`);
+
+                if (!isMatch) {
+                    // 다른 파일 이벤트는 무시
+                    return;
+                }
+
+                console.log(`[매칭됨] ${filename}`);
+
+                // 임시 파일 제외
+                if (isExcluded(filename)) {
+                    console.log(`[제외됨] ${filename}`);
+                    return;
+                }
+
+                console.log(`[임시파일 체크 통과] ${filename}`);
+
+                // 디바운싱: 1초 내 중복 이벤트 무시
+                if (!shouldProcessChange(targetPath)) {
+                    console.log(`[디바운스] ${targetPath} - 중복 이벤트 무시`);
+                    return;
+                }
+
+                console.log(`[디바운스 통과] ${filename}`);
 
                 const timestamp = new Date().toISOString();
                 let action = '';
 
+                // macOS에서 Office 저장 시 rename 이벤트가 발생할 수 있음
                 if (eventType === 'rename') {
-                    action = fs.existsSync(targetPath) ? '생성' : '삭제';
+                    action = fs.existsSync(targetPath) ? '수정' : '삭제';  // rename도 수정으로 처리
                 } else if (eventType === 'change') {
                     action = '수정';
+                }
+
+                // action이 비어있으면 무시
+                if (!action) {
+                    console.log(`[무시] ${targetPath} - 알 수 없는 이벤트 타입: ${eventType}`);
+                    return;
+                }
+
+                console.log(`[처리 시작] ${action} - ${targetPath}`);
+
+                // Office 파일인 경우 저장 완료 대기
+                const ext = path.extname(targetFilename).toLowerCase();
+                const officeExts = ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt'];
+                if (officeExts.includes(ext) && action !== '삭제') {
+                    console.log(`[파일 대기] ${targetPath}`);
+                    const isReady = await waitForFileReady(targetPath);
+                    if (!isReady) {
+                        console.log(`[대기 초과] ${targetPath} - 파일이 아직 사용 중`);
+                        return;
+                    }
+                    console.log(`[파일 준비됨] ${targetPath}`);
                 }
 
                 const logEntry = {
@@ -380,26 +534,30 @@ function startWatching(targetPath) {
                     file: targetFilename,
                     action,
                     fullPath: targetPath,
-                    extension: path.extname(targetFilename).toLowerCase(),
+                    extension: ext,
                     isFile: true,
                     changeSummary: null
                 };
 
                 // 빠른 변경 분석 수행 (비동기)
-                quickChangeAnalysis(targetPath, action).then(analysis => {
+                try {
+                    const analysis = await quickChangeAnalysis(targetPath, action);
                     if (analysis) {
                         logEntry.changeSummary = analysis;
                     }
-                }).catch(e => console.error('변경 분석 오류:', e.message));
+                } catch (e) {
+                    console.error('변경 분석 오류:', e.message);
+                }
 
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
 
                 updateStats(action, targetFilename);
-                console.log(`[${action}] ${targetPath}`);
+                console.log(`[${action}] ${targetPath}${logEntry.changeSummary ? ` (${logEntry.changeSummary.summary})` : ''}`);
 
                 if (settings.telegram.enabled) {
-                    const msg = `📄 <b>[DocWatch] 파일 ${action}</b>\n📄 ${targetFilename}\n📂 ${parentDir}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
+                    const summaryText = logEntry.changeSummary ? `\n📊 ${logEntry.changeSummary.summary}` : '';
+                    const msg = `📄 <b>[DocWatch] 파일 ${action}</b>\n📄 ${targetFilename}${summaryText}\n📂 ${parentDir}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
                     sendTelegramNotification(msg);
                 }
             });
@@ -407,16 +565,22 @@ function startWatching(targetPath) {
             console.log(`파일 감시 시작: ${targetPath}`);
         } else {
             // 폴더 감시 (기존 로직)
-            watchers[targetPath] = fs.watch(targetPath, { recursive: true }, (eventType, filename) => {
+            watchers[targetPath] = fs.watch(targetPath, { recursive: true }, async (eventType, filename) => {
                 if (!filename) return;
 
-                // 제외 패턴 체크
+                // 제외 패턴 체크 (임시 파일 포함)
                 if (isExcluded(filename)) return;
 
                 // 확장자 필터 체크
                 if (!passesFilter(filename)) return;
 
                 const fullPath = path.join(targetPath, filename);
+
+                // 디바운싱: 1초 내 중복 이벤트 무시 (Office 앱이 여러 번 저장하는 경우)
+                if (!shouldProcessChange(fullPath)) {
+                    return;
+                }
+
                 const timestamp = new Date().toISOString();
                 let action = '';
 
@@ -426,32 +590,47 @@ function startWatching(targetPath) {
                     action = '수정';
                 }
 
+                // Office 파일인 경우 저장 완료 대기
+                const ext = path.extname(filename).toLowerCase();
+                const officeExts = ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt'];
+                if (officeExts.includes(ext) && action !== '삭제') {
+                    const isReady = await waitForFileReady(fullPath);
+                    if (!isReady) {
+                        console.log(`[대기 초과] ${fullPath} - 파일이 아직 사용 중`);
+                        return; // 파일이 준비되지 않으면 무시
+                    }
+                }
+
                 const logEntry = {
                     timestamp,
                     folder: targetPath,
                     file: filename,
                     action,
                     fullPath,
-                    extension: path.extname(filename).toLowerCase(),
+                    extension: ext,
                     isFile: false,
                     changeSummary: null
                 };
 
                 // 빠른 변경 분석 수행 (비동기)
-                quickChangeAnalysis(fullPath, action).then(analysis => {
+                try {
+                    const analysis = await quickChangeAnalysis(fullPath, action);
                     if (analysis) {
                         logEntry.changeSummary = analysis;
                     }
-                }).catch(e => console.error('변경 분석 오류:', e.message));
+                } catch (e) {
+                    console.error('변경 분석 오류:', e.message);
+                }
 
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
 
                 updateStats(action, filename);
-                console.log(`[${action}] ${fullPath}`);
+                console.log(`[${action}] ${fullPath}${logEntry.changeSummary ? ` (${logEntry.changeSummary.summary})` : ''}`);
 
                 if (settings.telegram.enabled) {
-                    const msg = `📁 <b>[DocWatch] 파일 ${action}</b>\n📄 ${filename}\n📂 ${targetPath}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
+                    const summaryText = logEntry.changeSummary ? `\n📊 ${logEntry.changeSummary.summary}` : '';
+                    const msg = `📁 <b>[DocWatch] 파일 ${action}</b>\n📄 ${filename}${summaryText}\n📂 ${targetPath}\n🕐 ${new Date().toLocaleString('ko-KR')}`;
                     sendTelegramNotification(msg);
                 }
             });
@@ -481,15 +660,31 @@ async function quickChangeAnalysis(filePath, action) {
         const fileKey = filePath.replace(/[^a-zA-Z0-9]/g, '_');
         const previousVersion = documentHistory[fileKey];
 
-        // 빠른 텍스트 추출 (텍스트 기반 파일만)
+        // 파일 타입별 분류
         const textExts = ['.txt', '.md', '.markdown', '.js', '.ts', '.jsx', '.tsx', '.py',
                         '.java', '.c', '.cpp', '.h', '.css', '.scss', '.less', '.html',
                         '.xml', '.json', '.yaml', '.yml'];
 
+        // 컨텐츠 추출 함수
+        async function extractContent() {
+            if (!fs.existsSync(filePath)) return null;
+
+            if (textExts.includes(ext)) {
+                return extractTextContent(filePath);
+            } else if (ext === '.pptx' || ext === '.ppt') {
+                return await extractPptxContent(filePath);
+            } else if (ext === '.docx' || ext === '.doc') {
+                return await extractDocxContent(filePath);
+            } else if (ext === '.xlsx' || ext === '.xls') {
+                return extractXlsxContent(filePath);
+            }
+            return null;
+        }
+
         // 새 파일 생성 시 - 초기 이력 저장
         if (action === '생성') {
-            if (textExts.includes(ext) && fs.existsSync(filePath)) {
-                const currentContent = extractTextContent(filePath);
+            try {
+                const currentContent = await extractContent();
                 if (currentContent && currentContent.text) {
                     documentHistory[fileKey] = {
                         content: currentContent,
@@ -497,16 +692,22 @@ async function quickChangeAnalysis(filePath, action) {
                         fileName: path.basename(filePath)
                     };
                     saveDocHistory();
-                    return {
-                        type: 'new',
-                        summary: `새 파일 (${currentContent.lineCount}줄)`
-                    };
+
+                    if (textExts.includes(ext)) {
+                        return { type: 'new', summary: `새 파일 (${currentContent.lineCount}줄)` };
+                    } else if (ext === '.pptx' || ext === '.ppt') {
+                        return { type: 'new', summary: `새 파일 (${currentContent.slideCount || 0}슬라이드)` };
+                    } else if (ext === '.xlsx' || ext === '.xls') {
+                        return { type: 'new', summary: `새 파일 (${currentContent.sheetNames?.length || 0}시트)` };
+                    }
                 }
+            } catch (e) {
+                console.log('새 파일 분석 스킵:', e.message);
             }
             return { type: 'new', summary: '새 파일 생성됨' };
         }
+
         if (action === '삭제') {
-            // 삭제된 파일 이력 제거
             if (documentHistory[fileKey]) {
                 delete documentHistory[fileKey];
                 saveDocHistory();
@@ -518,8 +719,11 @@ async function quickChangeAnalysis(filePath, action) {
         if (action === '수정') {
             let currentContent = null;
 
-            if (textExts.includes(ext)) {
-                currentContent = extractTextContent(filePath);
+            try {
+                currentContent = await extractContent();
+            } catch (e) {
+                console.log('컨텐츠 추출 실패:', e.message);
+                return { type: 'modified', summary: '파일 수정됨' };
             }
 
             // 이전 버전이 없으면 현재 버전 저장 후 종료
@@ -535,25 +739,66 @@ async function quickChangeAnalysis(filePath, action) {
                 return { type: 'modified', summary: '파일 수정됨' };
             }
 
+            // 비교 분석
             if (currentContent && currentContent.text && previousVersion.content && previousVersion.content.text) {
                 const prevText = previousVersion.content.text;
                 const currText = currentContent.text;
-
-                const lengthDiff = currText.length - prevText.length;
-                const prevLines = prevText.split('\n').length;
-                const currLines = currText.split('\n').length;
-                const lineDiff = currLines - prevLines;
-
                 let summaryParts = [];
+                let addedTexts = [];
+                let removedTexts = [];
 
+                // 텍스트 길이 변화
+                const lengthDiff = currText.length - prevText.length;
                 if (Math.abs(lengthDiff) > 10) {
                     summaryParts.push(`${lengthDiff > 0 ? '+' : ''}${lengthDiff}자`);
                 }
-                if (lineDiff !== 0) {
-                    summaryParts.push(`${lineDiff > 0 ? '+' : ''}${lineDiff}줄`);
+
+                // 파일 타입별 추가 정보
+                if (textExts.includes(ext)) {
+                    const prevLines = prevText.split('\n').length;
+                    const currLines = currText.split('\n').length;
+                    const lineDiff = currLines - prevLines;
+                    if (lineDiff !== 0) {
+                        summaryParts.push(`${lineDiff > 0 ? '+' : ''}${lineDiff}줄`);
+                    }
+                } else if (ext === '.pptx' || ext === '.ppt') {
+                    const prevSlides = previousVersion.content.slideCount || 0;
+                    const currSlides = currentContent.slideCount || 0;
+                    if (prevSlides !== currSlides) {
+                        summaryParts.push(`${currSlides - prevSlides > 0 ? '+' : ''}${currSlides - prevSlides}슬라이드`);
+                    }
+                } else if (ext === '.xlsx' || ext === '.xls') {
+                    const prevSheets = previousVersion.content.sheetNames?.length || 0;
+                    const currSheets = currentContent.sheetNames?.length || 0;
+                    if (prevSheets !== currSheets) {
+                        summaryParts.push(`${currSheets - prevSheets > 0 ? '+' : ''}${currSheets - prevSheets}시트`);
+                    }
                 }
 
-                // 현재 버전 저장 (다음 비교를 위해)
+                // 실제 변경 내용 분석 (문장/단락 단위)
+                const prevParagraphs = prevText.split(/[\n\r]+/).filter(p => p.trim().length > 0);
+                const currParagraphs = currText.split(/[\n\r]+/).filter(p => p.trim().length > 0);
+
+                const prevSet = new Set(prevParagraphs.map(p => p.trim()));
+                const currSet = new Set(currParagraphs.map(p => p.trim()));
+
+                // 추가된 내용 찾기
+                for (const p of currParagraphs) {
+                    const trimmed = p.trim();
+                    if (trimmed.length > 5 && !prevSet.has(trimmed)) {
+                        addedTexts.push(trimmed.length > 100 ? trimmed.substring(0, 100) + '...' : trimmed);
+                    }
+                }
+
+                // 삭제된 내용 찾기
+                for (const p of prevParagraphs) {
+                    const trimmed = p.trim();
+                    if (trimmed.length > 5 && !currSet.has(trimmed)) {
+                        removedTexts.push(trimmed.length > 100 ? trimmed.substring(0, 100) + '...' : trimmed);
+                    }
+                }
+
+                // 현재 버전 저장
                 documentHistory[fileKey] = {
                     content: currentContent,
                     analyzedAt: new Date().toISOString(),
@@ -561,13 +806,26 @@ async function quickChangeAnalysis(filePath, action) {
                 };
                 saveDocHistory();
 
-                if (summaryParts.length > 0) {
-                    return {
-                        type: 'modified',
-                        summary: summaryParts.join(', '),
-                        details: { lengthDiff, lineDiff }
-                    };
+                // 상세 변경 내용 구성
+                const result = {
+                    type: 'modified',
+                    summary: summaryParts.length > 0 ? summaryParts.join(', ') : '내용 변경됨',
+                    details: {
+                        lengthDiff,
+                        added: addedTexts.slice(0, 5),  // 최대 5개
+                        removed: removedTexts.slice(0, 5)
+                    }
+                };
+
+                // 요약에 변경 내용 힌트 추가
+                if (addedTexts.length > 0 || removedTexts.length > 0) {
+                    let hints = [];
+                    if (addedTexts.length > 0) hints.push(`+${addedTexts.length}항목`);
+                    if (removedTexts.length > 0) hints.push(`-${removedTexts.length}항목`);
+                    result.summary += ` (${hints.join(', ')})`;
                 }
+
+                return result;
             }
         }
 

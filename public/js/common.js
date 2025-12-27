@@ -328,7 +328,7 @@ function renderLogs() {
         return;
     }
 
-    logContainer.innerHTML = logs.map(log => {
+    logContainer.innerHTML = logs.map((log, index) => {
         const time = new Date(log.timestamp).toLocaleString('ko-KR');
         const actionClass = getActionClass(log.action);
         const isDocumentFile = isAnalyzableDocument(log.extension);
@@ -345,12 +345,22 @@ function renderLogs() {
             </button>
         ` : '';
 
-        // 변경 요약 표시
-        let changeSummaryHtml = '';
+        // 변경 요약 아이콘 (클릭 시 팝업)
+        let changeSummaryBtn = '';
         if (log.changeSummary && log.changeSummary.summary) {
             const summaryClass = log.changeSummary.type === 'new' ? 'summary-new' :
                                 log.changeSummary.type === 'deleted' ? 'summary-deleted' : 'summary-modified';
-            changeSummaryHtml = `<span class="change-summary ${summaryClass}">${escapeHtml(log.changeSummary.summary)}</span>`;
+            const summaryData = encodeURIComponent(JSON.stringify(log.changeSummary));
+            changeSummaryBtn = `
+                <button class="btn btn-icon btn-change-info ${summaryClass}"
+                        onclick="showChangeSummary(event, '${escapeHtml(log.file)}', '${summaryData}')"
+                        title="변경 내역 보기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                </button>
+            `;
         }
 
         return `
@@ -358,13 +368,11 @@ function renderLogs() {
                 <span class="log-time">${time}</span>
                 <span class="log-action ${actionClass}">${log.action}</span>
                 <div class="log-file">
-                    <div class="log-file-name">
-                        ${escapeHtml(log.file)}
-                        ${changeSummaryHtml}
-                    </div>
+                    <div class="log-file-name">${escapeHtml(log.file)}</div>
                     <div class="log-folder">${escapeHtml(log.folder)}</div>
                 </div>
                 <div class="log-actions">
+                    ${changeSummaryBtn}
                     <button class="btn btn-icon" onclick="openFile('${escapedFullPath}')" title="파일 위치 열기">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -428,6 +436,108 @@ function getActionClass(action) {
     if (action === '수정') return 'modify';
     if (action === '삭제') return 'delete';
     return '';
+}
+
+// 변경 요약 팝업 표시
+function showChangeSummary(event, fileName, summaryData) {
+    event.stopPropagation();
+
+    // 기존 팝업 제거
+    const existingPopup = document.getElementById('changeSummaryPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const summary = JSON.parse(decodeURIComponent(summaryData));
+
+    // 타입별 아이콘과 색상
+    let typeIcon = '📝';
+    let typeText = '수정됨';
+    let typeClass = 'modified';
+
+    if (summary.type === 'new') {
+        typeIcon = '✨';
+        typeText = '새 파일';
+        typeClass = 'new';
+    } else if (summary.type === 'deleted') {
+        typeIcon = '🗑️';
+        typeText = '삭제됨';
+        typeClass = 'deleted';
+    }
+
+    // 상세 정보 구성
+    let detailsHtml = '';
+    let changesHtml = '';
+
+    if (summary.details) {
+        const details = summary.details;
+        if (details.lengthDiff !== undefined && details.lengthDiff !== 0) {
+            const sign = details.lengthDiff > 0 ? '+' : '';
+            detailsHtml += `<div class="detail-item">📊 텍스트: ${sign}${details.lengthDiff}자</div>`;
+        }
+        if (details.lineDiff !== undefined && details.lineDiff !== 0) {
+            const sign = details.lineDiff > 0 ? '+' : '';
+            detailsHtml += `<div class="detail-item">📄 줄 수: ${sign}${details.lineDiff}줄</div>`;
+        }
+
+        // 추가된 내용 표시
+        if (details.added && details.added.length > 0) {
+            changesHtml += `<div class="changes-section added">
+                <div class="changes-title">➕ 추가된 내용</div>
+                ${details.added.map(text => `<div class="change-item">${escapeHtml(text)}</div>`).join('')}
+            </div>`;
+        }
+
+        // 삭제된 내용 표시
+        if (details.removed && details.removed.length > 0) {
+            changesHtml += `<div class="changes-section removed">
+                <div class="changes-title">➖ 삭제된 내용</div>
+                ${details.removed.map(text => `<div class="change-item">${escapeHtml(text)}</div>`).join('')}
+            </div>`;
+        }
+    }
+
+    // 팝업 생성
+    const popup = document.createElement('div');
+    popup.id = 'changeSummaryPopup';
+    popup.className = 'change-summary-popup';
+    popup.innerHTML = `
+        <div class="popup-header">
+            <span class="popup-icon">${typeIcon}</span>
+            <span class="popup-title">변경 내역</span>
+            <button class="popup-close" onclick="closeChangeSummaryPopup()">×</button>
+        </div>
+        <div class="popup-content">
+            <div class="popup-filename">${escapeHtml(fileName)}</div>
+            <div class="popup-type ${typeClass}">${typeText}</div>
+            <div class="popup-summary">${escapeHtml(summary.summary)}</div>
+            ${detailsHtml ? `<div class="popup-details">${detailsHtml}</div>` : ''}
+            ${changesHtml ? `<div class="popup-changes">${changesHtml}</div>` : ''}
+        </div>
+    `;
+
+    document.body.appendChild(popup);
+
+    // 위치 조정
+    const rect = event.target.getBoundingClientRect();
+    popup.style.top = `${rect.bottom + 10}px`;
+    popup.style.left = `${Math.min(rect.left, window.innerWidth - 280)}px`;
+
+    // 외부 클릭 시 닫기
+    setTimeout(() => {
+        document.addEventListener('click', closeChangeSummaryOnOutsideClick);
+    }, 100);
+}
+
+function closeChangeSummaryPopup() {
+    const popup = document.getElementById('changeSummaryPopup');
+    if (popup) popup.remove();
+    document.removeEventListener('click', closeChangeSummaryOnOutsideClick);
+}
+
+function closeChangeSummaryOnOutsideClick(event) {
+    const popup = document.getElementById('changeSummaryPopup');
+    if (popup && !popup.contains(event.target)) {
+        closeChangeSummaryPopup();
+    }
 }
 
 // 로그 지우기

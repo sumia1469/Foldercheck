@@ -540,7 +540,7 @@ async function loadWhisperStatus() {
             }
         }
     } catch (e) {
-        console.error('Whisper 상태 확인 실패:', e);
+        console.error('음성 인식 상태 확인 실패:', e);
         const whisperStateSettings = document.getElementById('whisperStateSettings');
         if (whisperStateSettings) {
             whisperStateSettings.textContent = '확인 실패';
@@ -1498,22 +1498,30 @@ async function handleAudioFile(file) {
 
     // 프로그래스 UI 표시
     if (processingCard) processingCard.style.display = 'block';
-    updateProgress(0, '파일 업로드 중...');
+    updateProgressUI(0, '파일 업로드 중...');
 
     // FormData로 파일 전송
     const formData = new FormData();
     formData.append('audio', file);
 
-    try {
-        updateProgress(10, '서버로 전송 중...');
-
-        // 진행 상태 시뮬레이션 (실제 진행률을 알 수 없으므로)
-        let progressInterval = setInterval(() => {
-            const currentWidth = parseInt(progressFill?.style.width || '10');
-            if (currentWidth < 85) {
-                updateProgress(currentWidth + 5, getProgressMessage(currentWidth + 5));
+    // 서버 진행 상황 폴링
+    let progressInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/processing/progress');
+            const progress = await res.json();
+            if (progress.active) {
+                const text = progress.detail
+                    ? `${progress.stage} - ${progress.detail}`
+                    : progress.stage;
+                updateProgressUI(progress.percent, text);
             }
-        }, 3000);
+        } catch (e) {
+            // 폴링 실패는 무시
+        }
+    }, 1000);
+
+    try {
+        updateProgressUI(5, '📤 서버로 전송 중...');
 
         const response = await fetch('/api/meeting/transcribe', {
             method: 'POST',
@@ -1529,7 +1537,7 @@ async function handleAudioFile(file) {
         const result = await response.json();
 
         if (result.success) {
-            updateProgress(100, '✅ 완료!');
+            updateProgressUI(100, '✅ 완료!');
             setTimeout(() => {
                 if (processingCard) processingCard.style.display = 'none';
                 setProcessingState(false);
@@ -1540,8 +1548,9 @@ async function handleAudioFile(file) {
             throw new Error(result.error || '알 수 없는 오류');
         }
     } catch (e) {
+        clearInterval(progressInterval);
         console.error('회의록 생성 실패:', e);
-        updateProgress(0, '❌ 오류 발생');
+        updateProgressUI(0, '❌ 오류 발생');
         if (processingStatus) processingStatus.textContent = e.message;
         setProcessingState(false);
         setTimeout(() => {
@@ -1551,15 +1560,7 @@ async function handleAudioFile(file) {
     }
 }
 
-function getProgressMessage(percent) {
-    if (percent < 20) return '📤 서버로 전송 중...';
-    if (percent < 40) return '🔄 오디오 변환 중...';
-    if (percent < 60) return '🎙️ 음성 인식 중...';
-    if (percent < 80) return '📝 텍스트 분석 중...';
-    return '⏳ 거의 완료...';
-}
-
-function updateProgress(percent, text) {
+function updateProgressUI(percent, text) {
     if (progressFill) progressFill.style.width = percent + '%';
     if (progressText) progressText.textContent = text;
 }
@@ -1618,7 +1619,39 @@ function renderMeetings(meetings) {
 }
 
 async function downloadMeeting(id) {
-    window.location.href = `/api/meeting/download/${id}`;
+    try {
+        const res = await fetch(`/api/meeting/download/${id}`);
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ error: '다운로드 실패' }));
+            alert(`다운로드 실패: ${errorData.error || '회의록을 찾을 수 없습니다'}`);
+            return;
+        }
+
+        // 파일명 추출
+        const contentDisposition = res.headers.get('Content-Disposition');
+        let filename = '회의록.txt';
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+                filename = decodeURIComponent(match[1].replace(/['"]/g, ''));
+            }
+        }
+
+        // Blob으로 다운로드
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('다운로드 오류:', e);
+        alert('다운로드 중 오류가 발생했습니다.');
+    }
 }
 
 async function deleteMeeting(id) {
@@ -1802,8 +1835,30 @@ function formatFileSize(bytes) {
 }
 
 // 녹음 파일 다운로드
-function downloadRecordingFile(filename) {
-    window.location.href = `/api/recording/download/${encodeURIComponent(filename)}`;
+async function downloadRecordingFile(filename) {
+    try {
+        const res = await fetch(`/api/recording/download/${encodeURIComponent(filename)}`);
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ error: '다운로드 실패' }));
+            alert(`다운로드 실패: ${errorData.error || '녹음 파일을 찾을 수 없습니다'}`);
+            return;
+        }
+
+        // Blob으로 다운로드
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('다운로드 오류:', e);
+        alert('다운로드 중 오류가 발생했습니다.');
+    }
 }
 
 // 녹음 파일 삭제

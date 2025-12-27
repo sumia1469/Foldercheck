@@ -87,7 +87,7 @@ function convertToWav(inputPath, outputPath) {
 // 로컬 Whisper로 음성을 텍스트로 변환
 async function transcribeAudio(audioPath) {
     if (!checkWhisperModel()) {
-        throw new Error('Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.');
+        throw new Error('음성 인식 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.');
     }
 
     // WAV로 변환 (이미 WAV인 경우 _converted 접미사 추가)
@@ -104,7 +104,7 @@ async function transcribeAudio(audioPath) {
         await convertToWav(audioPath, wavPath);
     }
 
-    console.log('로컬 Whisper 음성 인식 시작...');
+    console.log('로컬 음성 인식 시작...');
     console.log('WAV 파일:', wavPath);
 
     // whisper-cli로 음성 인식 (JSON 출력)
@@ -129,13 +129,13 @@ async function transcribeAudio(audioPath) {
 
         whisperProcess.stderr.on('data', (data) => {
             stderr += data.toString();
-            console.log('Whisper:', data.toString().trim());
+            console.log('음성 인식:', data.toString().trim());
         });
 
         whisperProcess.on('close', (code) => {
             if (code !== 0) {
-                console.error('Whisper 오류:', stderr);
-                reject(new Error(`Whisper 처리 실패: ${stderr}`));
+                console.error('음성 인식 오류:', stderr);
+                reject(new Error(`음성 인식 처리 실패: ${stderr}`));
                 return;
             }
 
@@ -172,7 +172,7 @@ async function transcribeAudio(audioPath) {
         });
 
         whisperProcess.on('error', (err) => {
-            console.error('Whisper 실행 오류:', err);
+            console.error('음성 인식 실행 오류:', err);
             reject(err);
         });
     });
@@ -181,6 +181,24 @@ async function transcribeAudio(audioPath) {
 let watchedFolders = [];
 let changeLog = [];
 let watchers = {};
+
+// 회의록 처리 진행 상황
+let processingProgress = {
+    active: false,
+    stage: '',
+    percent: 0,
+    detail: ''
+};
+
+function updateProgress(stage, percent, detail = '') {
+    processingProgress = { active: true, stage, percent, detail };
+    console.log(`[진행] ${stage} ${percent}% ${detail}`);
+}
+
+function clearProgress() {
+    processingProgress = { active: false, stage: '', percent: 0, detail: '' };
+}
+
 let settings = {
     filters: [],           // 확장자 필터 (예: ['.txt', '.xlsx'])
     excludePatterns: [],   // 제외 패턴 (예: ['node_modules', '.git'])
@@ -853,10 +871,13 @@ async function summarizeLongMeeting(text, chunkSize) {
     }
 
     console.log(`긴 회의 분할 처리: ${chunks.length}개 청크`);
+    updateProgress('📝 AI 요약', 55, `총 ${chunks.length}개 청크`);
 
     // 각 청크별 요약
     const chunkSummaries = [];
     for (let i = 0; i < chunks.length; i++) {
+        const percent = 55 + Math.floor((i / chunks.length) * 35);
+        updateProgress('📝 AI 요약', percent, `청크 ${i + 1}/${chunks.length} 처리 중...`);
         console.log(`청크 ${i + 1}/${chunks.length} 요약 중...`);
         const summary = await summarizeChunk(chunks[i], 'meeting_chunk', i + 1, chunks.length);
         chunkSummaries.push(summary);
@@ -868,10 +889,12 @@ async function summarizeLongMeeting(text, chunkSize) {
     }
 
     // 여러 청크 요약을 통합
+    updateProgress('🔄 통합 요약', 92, '최종 회의록 생성 중...');
     console.log('최종 통합 요약 생성 중...');
     const combinedSummaries = chunkSummaries.join('\n\n---\n\n');
     const finalSummary = await summarizeChunk(combinedSummaries, 'meeting_final');
 
+    updateProgress('✅ 완료', 98, '저장 중...');
     return finalSummary;
 }
 
@@ -1037,12 +1060,12 @@ function saveMeetings() {
 
 // Whisper 초기화 (실제 구현 시 whisper.cpp 바인딩)
 function initWhisper() {
-    console.log('Whisper 엔진 초기화 중...');
+    console.log('음성 인식 엔진 초기화 중...');
     // TODO: whisper.cpp 바인딩 로드
     // 현재는 시뮬레이션 모드
     setTimeout(() => {
         whisperReady = true;
-        console.log('Whisper 엔진 준비 완료 (시뮬레이션 모드)');
+        console.log('음성 인식 엔진 준비 완료 (시뮬레이션 모드)');
     }, 2000);
 }
 
@@ -1574,13 +1597,20 @@ const server = http.createServer(async (req, res) => {
         // 회의록 API
         // ========================================
 
+        // API: 처리 진행 상황
+        if (pathname === '/api/processing/progress' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(processingProgress));
+            return;
+        }
+
         // API: Whisper 상태
         if (pathname === '/api/whisper/status' && req.method === 'GET') {
             checkWhisperModel();
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 ready: whisperReady,
-                status: whisperReady ? '준비됨 (로컬 Whisper)' : '모델 파일 필요',
+                status: whisperReady ? '준비됨 (로컬)' : '모델 파일 필요',
                 model: 'ggml-small',
                 local: true,
                 modelPath: WHISPER_MODEL_PATH,
@@ -1754,7 +1784,7 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         success: false,
-                        error: 'Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.'
+                        error: '음성 인식 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.'
                     }));
                     return;
                 }
@@ -1821,24 +1851,27 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         success: false,
-                        error: 'Whisper 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.'
+                        error: '음성 인식 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.'
                     }));
                     return;
                 }
 
+                updateProgress('📤 파일 업로드', 5);
                 const fileData = await parseMultipart(req);
                 const audioId = generateId();
                 const audioPath = path.join(MEETINGS_DIR, `audio_${audioId}_${fileData.filename}`);
                 fs.writeFileSync(audioPath, fileData.content);
 
                 console.log('음성 파일 저장됨:', audioPath);
-                console.log('로컬 Whisper 처리 중...');
+                updateProgress('🔄 오디오 변환', 10);
 
                 // 로컬 Whisper로 음성 인식
+                updateProgress('🎙️ 음성 인식', 15, '처리 중...');
                 const transcribeResult = await transcribeAudio(audioPath);
                 const transcript = transcribeResult.text;
 
                 console.log('음성 인식 완료');
+                updateProgress('🎙️ 음성 인식', 50, '완료');
 
                 // 규칙 기반 분석
                 const analysis = analyzeTranscript(transcript);
@@ -1865,6 +1898,9 @@ const server = http.createServer(async (req, res) => {
                 meetings.unshift(meeting);
                 saveMeetings();
 
+                updateProgress('✅ 완료', 100, '회의록 생성 완료!');
+                setTimeout(clearProgress, 3000);
+
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({
                     success: true,
@@ -1873,6 +1909,7 @@ const server = http.createServer(async (req, res) => {
                 }));
             } catch (e) {
                 console.error('회의록 생성 오류:', e);
+                clearProgress();
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: e.message }));
             }

@@ -540,15 +540,19 @@ function startWatching(targetPath) {
                 };
 
                 // 빠른 변경 분석 수행 (비동기)
+                let analysis = null;
                 try {
-                    const analysis = await quickChangeAnalysis(targetPath, action);
-                    if (analysis) {
-                        logEntry.changeSummary = analysis;
-                    }
+                    analysis = await quickChangeAnalysis(targetPath, action);
                 } catch (e) {
                     console.error('변경 분석 오류:', e.message);
                 }
 
+                // 첫 감지(기준 버전 저장)일 경우 로그에 기록하지 않음
+                if (analysis === null) {
+                    return;
+                }
+
+                logEntry.changeSummary = analysis;
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
 
@@ -613,15 +617,19 @@ function startWatching(targetPath) {
                 };
 
                 // 빠른 변경 분석 수행 (비동기)
+                let analysis = null;
                 try {
-                    const analysis = await quickChangeAnalysis(fullPath, action);
-                    if (analysis) {
-                        logEntry.changeSummary = analysis;
-                    }
+                    analysis = await quickChangeAnalysis(fullPath, action);
                 } catch (e) {
                     console.error('변경 분석 오류:', e.message);
                 }
 
+                // 첫 감지(기준 버전 저장)일 경우 로그에 기록하지 않음
+                if (analysis === null) {
+                    return;
+                }
+
+                logEntry.changeSummary = analysis;
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
 
@@ -681,7 +689,7 @@ async function quickChangeAnalysis(filePath, action) {
             return null;
         }
 
-        // 새 파일 생성 시 - 초기 이력 저장
+        // 새 파일 생성 시 - 기준 버전 저장 (알림 없음)
         if (action === '생성') {
             try {
                 const currentContent = await extractContent();
@@ -692,19 +700,12 @@ async function quickChangeAnalysis(filePath, action) {
                         fileName: path.basename(filePath)
                     };
                     saveDocHistory();
-
-                    if (textExts.includes(ext)) {
-                        return { type: 'new', summary: `새 파일 (${currentContent.lineCount}줄)` };
-                    } else if (ext === '.pptx' || ext === '.ppt') {
-                        return { type: 'new', summary: `새 파일 (${currentContent.slideCount || 0}슬라이드)` };
-                    } else if (ext === '.xlsx' || ext === '.xls') {
-                        return { type: 'new', summary: `새 파일 (${currentContent.sheetNames?.length || 0}시트)` };
-                    }
+                    console.log(`[기준 버전 저장] ${path.basename(filePath)}`);
                 }
             } catch (e) {
                 console.log('새 파일 분석 스킵:', e.message);
             }
-            return { type: 'new', summary: '새 파일 생성됨' };
+            return null;  // 첫 감지 시 알림 없음
         }
 
         if (action === '삭제') {
@@ -726,7 +727,7 @@ async function quickChangeAnalysis(filePath, action) {
                 return { type: 'modified', summary: '파일 수정됨' };
             }
 
-            // 이전 버전이 없으면 현재 버전 저장 후 종료
+            // 이전 버전이 없으면 현재 버전 저장 후 알림 없이 종료 (첫 감지 시)
             if (!previousVersion) {
                 if (currentContent && currentContent.text) {
                     documentHistory[fileKey] = {
@@ -735,8 +736,9 @@ async function quickChangeAnalysis(filePath, action) {
                         fileName: path.basename(filePath)
                     };
                     saveDocHistory();
+                    console.log(`[기준 버전 저장] ${path.basename(filePath)}`);
                 }
-                return { type: 'modified', summary: '파일 수정됨' };
+                return null;  // 첫 감지 시 알림 없음
             }
 
             // 비교 분석
@@ -806,14 +808,54 @@ async function quickChangeAnalysis(filePath, action) {
                 };
                 saveDocHistory();
 
+                // 파일 타입별 상세 정보
+                let fileTypeInfo = {};
+                if (textExts.includes(ext)) {
+                    const prevLines = prevText.split('\n').length;
+                    const currLines = currText.split('\n').length;
+                    fileTypeInfo = {
+                        type: 'text',
+                        prevLines,
+                        currLines,
+                        lineDiff: currLines - prevLines
+                    };
+                } else if (ext === '.pptx' || ext === '.ppt') {
+                    const prevSlides = previousVersion.content.slideCount || 0;
+                    const currSlides = currentContent.slideCount || 0;
+                    fileTypeInfo = {
+                        type: 'pptx',
+                        prevSlides,
+                        currSlides,
+                        slideDiff: currSlides - prevSlides
+                    };
+                } else if (ext === '.xlsx' || ext === '.xls') {
+                    const prevSheetNames = previousVersion.content.sheetNames || [];
+                    const currSheetNames = currentContent.sheetNames || [];
+                    fileTypeInfo = {
+                        type: 'xlsx',
+                        prevSheets: prevSheetNames.length,
+                        currSheets: currSheetNames.length,
+                        sheetDiff: currSheetNames.length - prevSheetNames.length,
+                        newSheets: currSheetNames.filter(s => !prevSheetNames.includes(s)),
+                        removedSheets: prevSheetNames.filter(s => !currSheetNames.includes(s))
+                    };
+                } else if (ext === '.docx' || ext === '.doc') {
+                    fileTypeInfo = { type: 'docx' };
+                }
+
                 // 상세 변경 내용 구성
                 const result = {
                     type: 'modified',
                     summary: summaryParts.length > 0 ? summaryParts.join(', ') : '내용 변경됨',
                     details: {
                         lengthDiff,
-                        added: addedTexts.slice(0, 5),  // 최대 5개
-                        removed: removedTexts.slice(0, 5)
+                        prevLength: prevText.length,
+                        currLength: currText.length,
+                        added: addedTexts.slice(0, 10),  // 최대 10개
+                        removed: removedTexts.slice(0, 10),
+                        addedCount: addedTexts.length,
+                        removedCount: removedTexts.length,
+                        fileTypeInfo
                     }
                 };
 
@@ -895,8 +937,58 @@ function saveDocHistory() {
     }
 }
 
-// DOCX 파일 내용 추출
+// DOCX/DOC 파일 내용 추출
 async function extractDocxContent(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+
+    // .doc 파일 (구 형식) - 바이너리에서 텍스트 추출 시도
+    if (ext === '.doc') {
+        try {
+            const buffer = fs.readFileSync(filePath);
+            let text = '';
+
+            // Word 바이너리에서 유니코드/ASCII 텍스트 추출
+            // UTF-16LE로 한글 추출 시도
+            const utf16Text = buffer.toString('utf16le');
+            const koreanMatches = utf16Text.match(/[\uAC00-\uD7AF\u0020-\u007E]+/g);
+
+            if (koreanMatches) {
+                text = koreanMatches
+                    .filter(m => m.trim().length > 2)
+                    .join(' ');
+            }
+
+            // 텍스트가 부족하면 latin1으로도 시도
+            if (text.length < 100) {
+                const latinText = buffer.toString('latin1');
+                const asciiMatches = latinText.match(/[\x20-\x7E]{4,}/g);
+                if (asciiMatches) {
+                    const additionalText = asciiMatches
+                        .filter(m => !/^[0-9\s\.\-\_\{\}\[\]]+$/.test(m))
+                        .join(' ');
+                    text = text + ' ' + additionalText;
+                }
+            }
+
+            text = text.trim();
+            if (text.length > 50) {
+                console.log(`[DOC 추출] ${path.basename(filePath)}: ${text.length}자 추출됨`);
+                return { text, isLegacyFormat: true };
+            } else {
+                console.log(`[DOC 추출 제한] ${path.basename(filePath)}: 텍스트 추출 부족`);
+                return {
+                    text: '',
+                    error: '.doc 파일(구 형식)은 제한적으로 지원됩니다.',
+                    isLegacyFormat: true
+                };
+            }
+        } catch (e) {
+            console.error('DOC 추출 오류:', e.message);
+            return { text: '', error: '.doc 파일 읽기 실패', isLegacyFormat: true };
+        }
+    }
+
+    // .docx 파일 (새 형식)
     try {
         const result = await mammoth.extractRawText({ path: filePath });
         return {
@@ -1171,45 +1263,22 @@ async function analyzeDocument(filePath) {
         changes: []
     };
 
-    if (previousVersion) {
-        // 변경 사항 분석
-        summary.changes = compareDocuments(previousVersion, currentContent, ext);
-        summary.previousAnalyzedAt = previousVersion.analyzedAt;
+    // 문서 개요 생성
+    summary.overview = generateDocumentOverview(currentContent, ext);
 
-        // AI로 변경사항 요약 생성 (Ollama 사용)
-        try {
-            const ollamaStatus = await checkOllamaStatus();
-            if (ollamaStatus.ready && summary.changes.length > 0) {
-                const changesText = summary.changes.map(c => {
-                    let text = c.type;
-                    if (c.description) text += `: ${c.description}`;
-                    if (c.keywords) text += ` - ${c.keywords.join(', ')}`;
-                    return text;
-                }).join('\n');
-
-                const aiSummary = await summarizeWithOllama(
-                    `문서: ${fileName}\n변경사항:\n${changesText}`,
-                    'document_changes'
-                );
-                summary.aiSummary = aiSummary;
-            }
-        } catch (e) {
-            console.log('AI 요약 생성 실패 (선택적 기능):', e.message);
+    // AI로 파일 전체 내용 요약 생성 (Ollama 사용)
+    try {
+        const ollamaStatus = await checkOllamaStatus();
+        if (ollamaStatus.ready && currentContent.text) {
+            const textToSummarize = currentContent.text.substring(0, 8000); // 최대 8000자
+            const aiSummary = await summarizeWithOllama(textToSummarize, 'document');
+            summary.aiSummary = aiSummary;
+        } else if (!ollamaStatus.ready) {
+            summary.aiSummary = 'AI 요약을 사용하려면 Ollama가 실행 중이어야 합니다.';
         }
-    } else {
-        // 새 문서 요약
-        summary.overview = generateDocumentOverview(currentContent, ext);
-
-        // AI로 새 문서 요약 생성 (Ollama 사용)
-        try {
-            const ollamaStatus = await checkOllamaStatus();
-            if (ollamaStatus.ready && currentContent.text) {
-                const aiSummary = await summarizeWithOllama(currentContent.text, 'document');
-                summary.aiSummary = aiSummary;
-            }
-        } catch (e) {
-            console.log('AI 요약 생성 실패 (선택적 기능):', e.message);
-        }
+    } catch (e) {
+        console.log('AI 요약 생성 실패:', e.message);
+        summary.aiSummary = 'AI 요약 생성 실패: ' + e.message;
     }
 
     // 현재 버전 저장
@@ -1223,87 +1292,7 @@ async function analyzeDocument(filePath) {
     return summary;
 }
 
-// 문서 비교
-function compareDocuments(previous, current, ext) {
-    const changes = [];
-    const prevText = previous.content.text || '';
-    const currText = current.text || '';
-
-    // 텍스트 길이 변화
-    const lengthDiff = currText.length - prevText.length;
-    if (Math.abs(lengthDiff) > 50) {
-        changes.push({
-            type: lengthDiff > 0 ? '내용 추가' : '내용 삭제',
-            description: `약 ${Math.abs(lengthDiff)}자 ${lengthDiff > 0 ? '증가' : '감소'}`
-        });
-    }
-
-    // 단어 단위 비교
-    const prevWords = new Set(prevText.split(/\s+/).filter(w => w.length > 2));
-    const currWords = new Set(currText.split(/\s+/).filter(w => w.length > 2));
-
-    const newWords = [...currWords].filter(w => !prevWords.has(w));
-    const removedWords = [...prevWords].filter(w => !currWords.has(w));
-
-    if (newWords.length > 0) {
-        changes.push({
-            type: '새로 추가된 키워드',
-            keywords: newWords.slice(0, 10)
-        });
-    }
-
-    if (removedWords.length > 0) {
-        changes.push({
-            type: '삭제된 키워드',
-            keywords: removedWords.slice(0, 10)
-        });
-    }
-
-    // PPTX 슬라이드 수 변화
-    if (ext === '.pptx' || ext === '.ppt') {
-        const prevSlides = previous.content.slideCount || 0;
-        const currSlides = current.slideCount || 0;
-        if (prevSlides !== currSlides) {
-            changes.push({
-                type: '슬라이드 수 변경',
-                description: `${prevSlides}장 → ${currSlides}장 (${currSlides - prevSlides > 0 ? '+' : ''}${currSlides - prevSlides}장)`
-            });
-        }
-    }
-
-    // XLSX 시트 변화
-    if (ext === '.xlsx' || ext === '.xls') {
-        const prevSheets = previous.content.sheetNames || [];
-        const currSheets = current.sheetNames || [];
-
-        const newSheets = currSheets.filter(s => !prevSheets.includes(s));
-        const removedSheets = prevSheets.filter(s => !currSheets.includes(s));
-
-        if (newSheets.length > 0) {
-            changes.push({
-                type: '새 시트 추가',
-                sheets: newSheets
-            });
-        }
-        if (removedSheets.length > 0) {
-            changes.push({
-                type: '시트 삭제',
-                sheets: removedSheets
-            });
-        }
-    }
-
-    if (changes.length === 0) {
-        changes.push({
-            type: '미세한 변경',
-            description: '내용에 작은 수정이 있었습니다.'
-        });
-    }
-
-    return changes;
-}
-
-// 문서 개요 생성 (새 문서일 때)
+// 문서 개요 생성
 function generateDocumentOverview(content, ext) {
     const overview = {
         contentLength: (content.text || '').length,

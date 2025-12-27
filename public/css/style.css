@@ -669,10 +669,10 @@ body {
     z-index: 10000;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    min-width: 260px;
-    max-width: 350px;
+    border-radius: 16px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+    min-width: 400px;
+    max-width: 550px;
     animation: popupFadeIn 0.2s ease;
 }
 
@@ -690,20 +690,21 @@ body {
 .change-summary-popup .popup-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 15px;
+    gap: 12px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-tertiary);
-    border-radius: 12px 12px 0 0;
+    border-radius: 16px 16px 0 0;
 }
 
 .change-summary-popup .popup-icon {
-    font-size: 18px;
+    font-size: 24px;
 }
 
 .change-summary-popup .popup-title {
     flex: 1;
     font-weight: 600;
+    font-size: 16px;
     color: var(--text-primary);
 }
 
@@ -711,7 +712,7 @@ body {
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 20px;
+    font-size: 24px;
     cursor: pointer;
     padding: 0 5px;
     line-height: 1;
@@ -722,23 +723,24 @@ body {
 }
 
 .change-summary-popup .popup-content {
-    padding: 15px;
+    padding: 20px;
 }
 
 .change-summary-popup .popup-filename {
     font-weight: 600;
+    font-size: 15px;
     color: var(--text-primary);
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     word-break: break-all;
 }
 
 .change-summary-popup .popup-type {
     display: inline-block;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-    margin-bottom: 10px;
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
 }
 
 .change-summary-popup .popup-type.new {
@@ -756,15 +758,6 @@ body {
     color: var(--danger);
 }
 
-.change-summary-popup .popup-summary {
-    font-size: 14px;
-    color: var(--text-primary);
-    padding: 10px;
-    background: var(--bg-primary);
-    border-radius: 8px;
-    margin-bottom: 10px;
-}
-
 .change-summary-popup .popup-details {
     border-top: 1px solid var(--border-color);
     padding-top: 10px;
@@ -776,14 +769,59 @@ body {
     padding: 4px 0;
 }
 
+.change-summary-popup .popup-stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.change-summary-popup .stat-item {
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.change-summary-popup .stat-item.added {
+    background: rgba(63, 185, 80, 0.2);
+    color: var(--success);
+}
+
+.change-summary-popup .stat-item.removed {
+    background: rgba(248, 81, 73, 0.2);
+    color: var(--danger);
+}
+
+.change-summary-popup .popup-file-info {
+    background: var(--bg-primary);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.change-summary-popup .file-info-item {
+    font-size: 14px;
+    color: var(--text-secondary);
+    padding: 6px 0;
+}
+
+.change-summary-popup .file-info-item.new-sheets {
+    color: var(--success);
+}
+
+.change-summary-popup .file-info-item.removed-sheets {
+    color: var(--danger);
+}
+
 .change-summary-popup .popup-changes {
-    margin-top: 12px;
-    max-height: 250px;
+    margin-top: 16px;
+    max-height: 300px;
     overflow-y: auto;
 }
 
 .change-summary-popup .changes-section {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .change-summary-popup .changes-section.added .changes-title {
@@ -795,18 +833,18 @@ body {
 }
 
 .change-summary-popup .changes-title {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
-    margin-bottom: 6px;
-    padding-bottom: 4px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
     border-bottom: 1px solid var(--border-color);
 }
 
 .change-summary-popup .change-item {
-    font-size: 12px;
+    font-size: 14px;
     color: var(--text-secondary);
-    padding: 6px 10px;
-    margin: 4px 0;
+    padding: 8px 14px;
+    margin: 6px 0;
     background: var(--bg-primary);
     border-radius: 6px;
     line-height: 1.4;

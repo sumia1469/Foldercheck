@@ -464,32 +464,70 @@ function showChangeSummary(event, fileName, summaryData) {
     }
 
     // 상세 정보 구성
-    let detailsHtml = '';
+    let statsHtml = '';
+    let fileInfoHtml = '';
     let changesHtml = '';
 
     if (summary.details) {
         const details = summary.details;
+
+        // 기본 통계
+        let statsItems = [];
         if (details.lengthDiff !== undefined && details.lengthDiff !== 0) {
             const sign = details.lengthDiff > 0 ? '+' : '';
-            detailsHtml += `<div class="detail-item">📊 텍스트: ${sign}${details.lengthDiff}자</div>`;
+            statsItems.push(`<span class="stat-item ${details.lengthDiff > 0 ? 'added' : 'removed'}">${sign}${details.lengthDiff}자</span>`);
         }
-        if (details.lineDiff !== undefined && details.lineDiff !== 0) {
-            const sign = details.lineDiff > 0 ? '+' : '';
-            detailsHtml += `<div class="detail-item">📄 줄 수: ${sign}${details.lineDiff}줄</div>`;
+        if (details.addedCount > 0) {
+            statsItems.push(`<span class="stat-item added">+${details.addedCount}항목</span>`);
+        }
+        if (details.removedCount > 0) {
+            statsItems.push(`<span class="stat-item removed">-${details.removedCount}항목</span>`);
+        }
+        if (statsItems.length > 0) {
+            statsHtml = `<div class="popup-stats">${statsItems.join(' ')}</div>`;
+        }
+
+        // 파일 타입별 상세 정보
+        if (details.fileTypeInfo) {
+            const info = details.fileTypeInfo;
+            if (info.type === 'text' && info.lineDiff !== 0) {
+                const sign = info.lineDiff > 0 ? '+' : '';
+                fileInfoHtml += `<div class="file-info-item">📄 줄 수: ${info.prevLines} → ${info.currLines} (${sign}${info.lineDiff}줄)</div>`;
+            } else if (info.type === 'pptx') {
+                if (info.slideDiff !== 0) {
+                    const sign = info.slideDiff > 0 ? '+' : '';
+                    fileInfoHtml += `<div class="file-info-item">📊 슬라이드: ${info.prevSlides} → ${info.currSlides} (${sign}${info.slideDiff}장)</div>`;
+                } else {
+                    fileInfoHtml += `<div class="file-info-item">📊 슬라이드: ${info.currSlides}장</div>`;
+                }
+            } else if (info.type === 'xlsx') {
+                if (info.sheetDiff !== 0) {
+                    const sign = info.sheetDiff > 0 ? '+' : '';
+                    fileInfoHtml += `<div class="file-info-item">📋 시트: ${info.prevSheets} → ${info.currSheets} (${sign}${info.sheetDiff}개)</div>`;
+                }
+                if (info.newSheets && info.newSheets.length > 0) {
+                    fileInfoHtml += `<div class="file-info-item new-sheets">➕ 새 시트: ${info.newSheets.join(', ')}</div>`;
+                }
+                if (info.removedSheets && info.removedSheets.length > 0) {
+                    fileInfoHtml += `<div class="file-info-item removed-sheets">➖ 삭제된 시트: ${info.removedSheets.join(', ')}</div>`;
+                }
+            }
         }
 
         // 추가된 내용 표시
         if (details.added && details.added.length > 0) {
+            const moreCount = details.addedCount > details.added.length ? ` 외 ${details.addedCount - details.added.length}개` : '';
             changesHtml += `<div class="changes-section added">
-                <div class="changes-title">➕ 추가된 내용</div>
+                <div class="changes-title">➕ 추가된 내용${moreCount}</div>
                 ${details.added.map(text => `<div class="change-item">${escapeHtml(text)}</div>`).join('')}
             </div>`;
         }
 
         // 삭제된 내용 표시
         if (details.removed && details.removed.length > 0) {
+            const moreCount = details.removedCount > details.removed.length ? ` 외 ${details.removedCount - details.removed.length}개` : '';
             changesHtml += `<div class="changes-section removed">
-                <div class="changes-title">➖ 삭제된 내용</div>
+                <div class="changes-title">➖ 삭제된 내용${moreCount}</div>
                 ${details.removed.map(text => `<div class="change-item">${escapeHtml(text)}</div>`).join('')}
             </div>`;
         }
@@ -508,8 +546,8 @@ function showChangeSummary(event, fileName, summaryData) {
         <div class="popup-content">
             <div class="popup-filename">${escapeHtml(fileName)}</div>
             <div class="popup-type ${typeClass}">${typeText}</div>
-            <div class="popup-summary">${escapeHtml(summary.summary)}</div>
-            ${detailsHtml ? `<div class="popup-details">${detailsHtml}</div>` : ''}
+            ${statsHtml}
+            ${fileInfoHtml ? `<div class="popup-file-info">${fileInfoHtml}</div>` : ''}
             ${changesHtml ? `<div class="popup-changes">${changesHtml}</div>` : ''}
         </div>
     `;

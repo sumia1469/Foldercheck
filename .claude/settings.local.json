@@ -71,7 +71,8 @@
       "Bash(security find-identity:*)",
       "Bash(export APPLE_ID=\"sumia@naver.com\")",
       "Bash(export APPLE_APP_PASSWORD=\"wlzk-kave-vkmn-xsgd\")",
-      "Bash(sudo sntp:*)"
+      "Bash(sudo sntp:*)",
+      "Bash(export APPLE_APP_SPECIFIC_PASSWORD=\"wlzk-kave-vkmn-xsgd\")"
     ]
   }
 }

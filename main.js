@@ -55,6 +55,43 @@ async function ensurePortAvailable() {
     }
 }
 
+// 서버가 응답할 때까지 대기
+function waitForServer(port, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+
+        const tryConnect = () => {
+            const http = require('http');
+            const req = http.get(`http://localhost:${port}/`, (res) => {
+                console.log(`Server responded with status: ${res.statusCode}`);
+                resolve();
+            });
+
+            req.on('error', (err) => {
+                if (Date.now() - startTime > timeout) {
+                    console.log('Server timeout, proceeding anyway...');
+                    resolve(); // 타임아웃 시에도 진행
+                } else {
+                    console.log('Server not ready, retrying...');
+                    setTimeout(tryConnect, 500);
+                }
+            });
+
+            req.setTimeout(2000, () => {
+                req.destroy();
+                if (Date.now() - startTime > timeout) {
+                    resolve();
+                } else {
+                    setTimeout(tryConnect, 500);
+                }
+            });
+        };
+
+        // 서버 시작 후 1초 대기 후 연결 시도
+        setTimeout(tryConnect, 1000);
+    });
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1000,
@@ -77,11 +114,24 @@ function createWindow() {
         show: true
     });
 
+    // 서버 로드 시 오류 처리
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Failed to load:', errorCode, errorDescription);
+        // 로드 실패 시 재시도
+        setTimeout(() => {
+            console.log('Retrying to load...');
+            mainWindow.loadURL(`http://localhost:${PORT}`);
+        }, 2000);
+    });
+
     mainWindow.loadURL(`http://localhost:${PORT}`);
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
+
+    // 개발 시 DevTools 열기 (필요 시 주석 해제)
+    // mainWindow.webContents.openDevTools();
 
     mainWindow.on('close', (event) => {
         if (!app.isQuitting) {
@@ -140,7 +190,15 @@ if (!gotTheLock) {
     app.whenReady().then(async () => {
         console.log('App ready, starting server...');
         await ensurePortAvailable();
+
+        // 서버 모듈 로드
         require('./server.js');
+
+        // 서버가 완전히 시작될 때까지 대기
+        console.log('Waiting for server to be ready...');
+        await waitForServer(PORT, 30000); // 최대 30초 대기
+
+        console.log('Server ready, creating window...');
         createWindow();
         createTray();
     });

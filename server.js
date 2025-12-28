@@ -217,22 +217,36 @@ async function transcribeAudio(audioPath) {
         throw new Error('음성 인식 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.');
     }
 
+    // 고유한 타임스탬프 생성 (파일 충돌 방지)
+    const uniqueId = Date.now() + '_' + Math.random().toString(36).substring(7);
+
     // WAV로 변환 (이미 WAV인 경우 _converted 접미사 추가)
     const ext = path.extname(audioPath).toLowerCase();
     let wavPath;
 
     if (ext === '.wav') {
-        // 이미 WAV 파일인 경우: Whisper 형식(16kHz, mono)으로 변환
-        wavPath = audioPath.replace('.wav', '_converted.wav');
+        // 이미 WAV 파일인 경우: Whisper 형식(16kHz, mono)으로 변환 (고유 ID 포함)
+        wavPath = audioPath.replace('.wav', `_converted_${uniqueId}.wav`);
         await convertToWav(audioPath, wavPath);
     } else {
-        // 다른 형식인 경우: WAV로 변환
-        wavPath = audioPath.replace(/\.[^.]+$/, '.wav');
+        // 다른 형식인 경우: WAV로 변환 (고유 ID 포함)
+        wavPath = audioPath.replace(/\.[^.]+$/, `_${uniqueId}.wav`);
         await convertToWav(audioPath, wavPath);
     }
 
     console.log('로컬 음성 인식 시작...');
     console.log('WAV 파일:', wavPath);
+
+    // 예상되는 JSON 출력 경로 - 이전 실행에서 남은 파일이 있으면 삭제
+    const expectedJsonPath = wavPath + '.json';
+    if (fs.existsSync(expectedJsonPath)) {
+        console.log('이전 JSON 파일 삭제:', expectedJsonPath);
+        try {
+            fs.unlinkSync(expectedJsonPath);
+        } catch (e) {
+            console.log('이전 JSON 파일 삭제 실패 (무시):', e.message);
+        }
+    }
 
     // whisper-cli로 음성 인식 (JSON 출력)
     return new Promise((resolve, reject) => {
@@ -262,6 +276,10 @@ async function transcribeAudio(audioPath) {
         whisperProcess.on('close', (code) => {
             if (code !== 0) {
                 console.error('음성 인식 오류:', stderr);
+                // 임시 WAV 파일 정리
+                if (wavPath.includes('_converted_') || wavPath.includes(`_${uniqueId}`)) {
+                    try { fs.unlinkSync(wavPath); } catch (e) { /* 무시 */ }
+                }
                 reject(new Error(`음성 인식 처리 실패: ${stderr}`));
                 return;
             }
@@ -273,24 +291,36 @@ async function transcribeAudio(audioPath) {
 
                 if (fs.existsSync(jsonPath)) {
                     const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-                    if (jsonData.transcription) {
+                    console.log('Whisper JSON 출력:', JSON.stringify(jsonData).substring(0, 200));
+
+                    if (jsonData.transcription && Array.isArray(jsonData.transcription)) {
                         for (const seg of jsonData.transcription) {
                             const start = seg.offsets?.from || 0;
                             const startSec = Math.floor(start / 1000);
                             const minutes = Math.floor(startSec / 60);
                             const seconds = startSec % 60;
                             const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
-                            result += `${timestamp} ${seg.text.trim()}\n`;
+                            const text = (seg.text || '').trim();
+                            if (text) {
+                                result += `${timestamp} ${text}\n`;
+                            }
                         }
                     }
                     // JSON 파일 정리
-                    fs.unlinkSync(jsonPath);
+                    try {
+                        fs.unlinkSync(jsonPath);
+                        console.log('JSON 파일 삭제 완료:', jsonPath);
+                    } catch (e) {
+                        console.log('JSON 파일 삭제 실패:', e.message);
+                    }
                 } else {
                     // stdout에서 텍스트 추출
+                    console.log('JSON 파일 없음, stdout 사용:', stdout.substring(0, 200));
                     result = stdout.trim();
                 }
 
-                console.log('음성 인식 완료');
+                console.log('음성 인식 완료, 결과 길이:', result.length);
+                console.log('음성 인식 결과 미리보기:', result.substring(0, 100));
                 resolve({ text: result.trim() || '(인식된 텍스트 없음)', wavPath });
             } catch (e) {
                 console.error('결과 파싱 오류:', e);
@@ -300,6 +330,10 @@ async function transcribeAudio(audioPath) {
 
         whisperProcess.on('error', (err) => {
             console.error('음성 인식 실행 오류:', err);
+            // 임시 WAV 파일 정리
+            if (wavPath.includes('_converted_') || wavPath.includes(`_${uniqueId}`)) {
+                try { fs.unlinkSync(wavPath); } catch (e) { /* 무시 */ }
+            }
             reject(err);
         });
     });
@@ -1672,6 +1706,7 @@ async function callAI(prompt, systemPrompt, numPredict = 2000) {
             prompt: prompt,
             system: systemPrompt,
             stream: false,
+            context: [],  // 이전 대화 컨텍스트 초기화 (독립적인 요청 보장)
             options: {
                 temperature: 0.3,
                 num_predict: numPredict,
@@ -3695,6 +3730,19 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
+                // 텍스트가 너무 짧은 경우 (의미있는 내용이 없음)
+                const cleanedText = transcriptText.trim().replace(/\s+/g, ' ');
+                if (cleanedText.length < 20) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        error: '녹취 내용이 너무 짧습니다. 요약할 충분한 내용이 없습니다.',
+                        transcriptLength: cleanedText.length
+                    }));
+                    return;
+                }
+
+                console.log(`[요약 요청] 텍스트 길이: ${cleanedText.length}자`);
+
                 // Ollama 상태 확인
                 updateProgress('🔍 AI 준비', 10, '내장 AI 확인 중...');
                 const ollamaStatus = await checkOllamaStatus();
@@ -3839,22 +3887,43 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        // API: 녹음 파일 다운로드
+        // API: 녹음 파일 다운로드 (Range 요청 지원 - seek 가능)
         if (pathname.startsWith('/api/recording/download/') && req.method === 'GET') {
             const filename = decodeURIComponent(pathname.split('/').pop());
             const filePath = path.join(MEETINGS_DIR, filename);
 
             if (fs.existsSync(filePath)) {
                 const stat = fs.statSync(filePath);
+                const fileSize = stat.size;
                 const ext = path.extname(filename).toLowerCase();
                 const mimeType = ext === '.wav' ? 'audio/wav' : 'audio/webm';
 
-                res.writeHead(200, {
-                    'Content-Type': mimeType,
-                    'Content-Length': stat.size,
-                    'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
-                });
-                fs.createReadStream(filePath).pipe(res);
+                const range = req.headers.range;
+
+                if (range) {
+                    // Range 요청 처리 (오디오 seek 지원)
+                    const parts = range.replace(/bytes=/, '').split('-');
+                    const start = parseInt(parts[0], 10);
+                    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+                    const chunkSize = (end - start) + 1;
+
+                    res.writeHead(206, {
+                        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                        'Accept-Ranges': 'bytes',
+                        'Content-Length': chunkSize,
+                        'Content-Type': mimeType
+                    });
+
+                    fs.createReadStream(filePath, { start, end }).pipe(res);
+                } else {
+                    // 일반 요청 (전체 파일)
+                    res.writeHead(200, {
+                        'Content-Type': mimeType,
+                        'Content-Length': fileSize,
+                        'Accept-Ranges': 'bytes'
+                    });
+                    fs.createReadStream(filePath).pipe(res);
+                }
             } else {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: '파일을 찾을 수 없습니다' }));
@@ -3909,14 +3978,23 @@ const server = http.createServer(async (req, res) => {
                     const transcribeResult = await transcribeAudio(audioPath);
                     transcript = transcribeResult.text;
 
-                    // _converted.wav 임시 파일 정리
-                    if (transcribeResult.wavPath && transcribeResult.wavPath.includes('_converted')) {
+                    // 임시 WAV 파일 정리 (고유 ID가 포함된 파일)
+                    if (transcribeResult.wavPath && transcribeResult.wavPath !== audioPath) {
                         try {
                             fs.unlinkSync(transcribeResult.wavPath);
                             console.log('임시 변환 파일 삭제:', transcribeResult.wavPath);
                         } catch (e) {
                             console.log('임시 파일 삭제 실패 (무시):', e.message);
                         }
+                    }
+
+                    // 혹시 남아있을 수 있는 관련 JSON 파일들 정리
+                    const jsonPath = transcribeResult.wavPath + '.json';
+                    if (fs.existsSync(jsonPath)) {
+                        try {
+                            fs.unlinkSync(jsonPath);
+                            console.log('남은 JSON 파일 삭제:', jsonPath);
+                        } catch (e) { /* 무시 */ }
                     }
                 } else {
                     // 시뮬레이션 모드: 테스트용 텍스트 생성
@@ -4044,14 +4122,23 @@ const server = http.createServer(async (req, res) => {
                 console.log('음성 인식 완료');
                 updateProgress('🎙️ 음성 인식', 45, '완료');
 
-                // _converted.wav 임시 파일 정리
-                if (transcribeResult.wavPath && transcribeResult.wavPath.includes('_converted')) {
+                // 임시 WAV 파일 정리 (고유 ID가 포함된 파일)
+                if (transcribeResult.wavPath && transcribeResult.wavPath !== audioPath) {
                     try {
                         fs.unlinkSync(transcribeResult.wavPath);
                         console.log('임시 변환 파일 삭제:', transcribeResult.wavPath);
                     } catch (e) {
                         console.log('임시 파일 삭제 실패 (무시):', e.message);
                     }
+                }
+
+                // 혹시 남아있을 수 있는 관련 JSON 파일들 정리
+                const jsonPath = transcribeResult.wavPath + '.json';
+                if (fs.existsSync(jsonPath)) {
+                    try {
+                        fs.unlinkSync(jsonPath);
+                        console.log('남은 JSON 파일 삭제:', jsonPath);
+                    } catch (e) { /* 무시 */ }
                 }
 
                 // 규칙 기반 분석 (키워드 추출 등)

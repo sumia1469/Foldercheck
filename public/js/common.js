@@ -3169,8 +3169,9 @@ function renderRecordings(recordings) {
                             <input type="range" class="audio-seek-bar" min="0" max="100" value="0"
                                    onmousedown="isSeekingAudio=true"
                                    ontouchstart="isSeekingAudio=true"
-                                   onmouseup="isSeekingAudio=false; seekAudio(this, '${safeFilename}')"
-                                   ontouchend="isSeekingAudio=false; seekAudio(this, '${safeFilename}')"
+                                   onmouseup="seekAudio(this, '${safeFilename}')"
+                                   ontouchend="seekAudio(this, '${safeFilename}')"
+                                   onchange="seekAudio(this, '${safeFilename}')"
                                    oninput="updateSeekPreview(this, '${safeFilename}')">
                             <div class="audio-progress-bar"></div>
                         </div>
@@ -3403,7 +3404,9 @@ function updateAudioTimeDisplay() {
 
 // 시크바 드래그 중 미리보기 업데이트 (실제 재생 위치는 변경하지 않음)
 function updateSeekPreview(seekBar, filename) {
-    if (!currentPlayingAudio || currentPlayingFilename !== filename) return;
+    // HTML 엔티티 디코딩하여 원본 파일명과 비교
+    const decodedFilename = decodeHtmlEntities(filename);
+    if (!currentPlayingAudio || currentPlayingFilename !== decodedFilename) return;
 
     const controls = seekBar.closest('.audio-player-controls');
     if (!controls) return;
@@ -3424,9 +3427,19 @@ function updateSeekPreview(seekBar, filename) {
 
 // 오디오 위치 변경 (seek) - 드래그 완료 시 호출
 function seekAudio(seekBar, filename) {
-    if (!currentPlayingAudio || currentPlayingFilename !== filename) return;
+    // HTML 엔티티 디코딩하여 원본 파일명과 비교
+    const decodedFilename = decodeHtmlEntities(filename);
 
-    const seekTo = (seekBar.value / 100) * currentPlayingAudio.duration;
+    // seek 값을 먼저 저장 (isSeekingAudio 해제 전에)
+    const seekValue = parseFloat(seekBar.value);
+
+    if (!currentPlayingAudio || currentPlayingFilename !== decodedFilename) {
+        isSeekingAudio = false;
+        return;
+    }
+
+    const seekTo = (seekValue / 100) * currentPlayingAudio.duration;
+
     if (!isNaN(seekTo) && isFinite(seekTo)) {
         currentPlayingAudio.currentTime = seekTo;
 
@@ -3435,10 +3448,20 @@ function seekAudio(seekBar, filename) {
         if (controls) {
             const progressBar = controls.querySelector('.audio-progress-bar');
             if (progressBar) {
-                progressBar.style.width = `${seekBar.value}%`;
+                progressBar.style.width = `${seekValue}%`;
             }
         }
     }
+
+    // seek 완료 후 플래그 해제
+    isSeekingAudio = false;
+}
+
+// HTML 엔티티 디코딩 헬퍼 함수
+function decodeHtmlEntities(str) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = str;
+    return textarea.value;
 }
 
 // 녹음 파일 재생/일시정지 토글

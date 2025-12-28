@@ -335,7 +335,7 @@ function shouldProcessChange(filePath) {
 }
 
 // 파일이 사용 가능한지 확인 (저장 완료 대기)
-async function waitForFileReady(filePath, maxWait = 5000) {
+async function waitForFileReady(filePath, maxWait = 8000) {
     const start = Date.now();
     const checkInterval = 300;
     let lastSize = -1;
@@ -543,12 +543,15 @@ function startWatching(targetPath) {
                 let analysis = null;
                 try {
                     analysis = await quickChangeAnalysis(targetPath, action);
+                    console.log(`[분석 결과] ${targetPath}:`, analysis ? JSON.stringify(analysis).substring(0, 200) : 'null');
                 } catch (e) {
                     console.error('변경 분석 오류:', e.message);
                 }
 
-                // 첫 감지(기준 버전 저장)일 경우 로그에 기록하지 않음
+                // 첫 감지(기준 버전 저장)일 경우에만 로그에 기록하지 않음
+                // analysis가 null이 아니면 무조건 알림 발생
                 if (analysis === null) {
+                    console.log(`[알림 생략] ${targetPath} - analysis가 null`);
                     return;
                 }
 
@@ -745,6 +748,15 @@ async function quickChangeAnalysis(filePath, action) {
             if (currentContent && currentContent.text && previousVersion.content && previousVersion.content.text) {
                 const prevText = previousVersion.content.text;
                 const currText = currentContent.text;
+
+                // 실제 내용이 동일하면 알림 없이 종료 (파일 열기만 한 경우)
+                const prevNormalized = prevText.replace(/\s+/g, ' ').trim();
+                const currNormalized = currText.replace(/\s+/g, ' ').trim();
+                if (prevNormalized === currNormalized) {
+                    console.log(`[내용 동일] ${path.basename(filePath)} - 알림 생략`);
+                    return null;
+                }
+
                 let summaryParts = [];
                 let addedTexts = [];
                 let removedTexts = [];
@@ -812,28 +824,34 @@ async function quickChangeAnalysis(filePath, action) {
                     return hasKorean || hasEnglishWord;
                 };
 
-                // 실제 변경 내용 분석 (문장/단락 단위)
-                const prevParagraphs = prevText.split(/[\n\r]+/).filter(p => p.trim().length > 0 && isValidContent(p));
-                const currParagraphs = currText.split(/[\n\r]+/).filter(p => p.trim().length > 0 && isValidContent(p));
+                // 단어 단위로 비교하여 실제 변경된 부분만 추출
+                const prevWords = prevText.split(/\s+/).filter(w => w.length >= 2 && isValidContent(w));
+                const currWords = currText.split(/\s+/).filter(w => w.length >= 2 && isValidContent(w));
+                const prevWordSet = new Set(prevWords);
+                const currWordSet = new Set(currWords);
 
-                const prevSet = new Set(prevParagraphs.map(p => p.trim()));
-                const currSet = new Set(currParagraphs.map(p => p.trim()));
-
-                // 추가된 내용 찾기
-                for (const p of currParagraphs) {
-                    const trimmed = p.trim();
-                    if (trimmed.length > 5 && !prevSet.has(trimmed) && isValidContent(trimmed)) {
-                        addedTexts.push(trimmed.length > 100 ? trimmed.substring(0, 100) + '...' : trimmed);
+                // 추가된 단어/문구 찾기
+                for (const word of currWords) {
+                    if (!prevWordSet.has(word)) {
+                        addedTexts.push(word.length > 50 ? word.substring(0, 50) + '...' : word);
+                        if (addedTexts.length >= 10) break;
                     }
                 }
 
-                // 삭제된 내용 찾기
-                for (const p of prevParagraphs) {
-                    const trimmed = p.trim();
-                    if (trimmed.length > 5 && !currSet.has(trimmed) && isValidContent(trimmed)) {
-                        removedTexts.push(trimmed.length > 100 ? trimmed.substring(0, 100) + '...' : trimmed);
+                // 삭제된 단어/문구 찾기
+                for (const word of prevWords) {
+                    if (!currWordSet.has(word)) {
+                        removedTexts.push(word.length > 50 ? word.substring(0, 50) + '...' : word);
+                        if (removedTexts.length >= 10) break;
                     }
                 }
+
+                // 중복 제거
+                addedTexts = [...new Set(addedTexts)];
+                removedTexts = [...new Set(removedTexts)];
+
+                // 내용이 동일하면 이미 위에서 null 반환됨
+                // 여기까지 왔다면 실제 변경이 있는 것이므로 알림 발생
 
                 // 현재 버전 저장
                 documentHistory[fileKey] = {
@@ -906,10 +924,13 @@ async function quickChangeAnalysis(filePath, action) {
             }
         }
 
-        return null;
+        // 비교가 불가능한 경우에도 기본 알림 발생
+        console.log(`[비교 불가] ${path.basename(filePath)} - 기본 알림 발생`);
+        return { type: 'modified', summary: '파일 수정됨' };
     } catch (e) {
         console.error('빠른 변경 분석 오류:', e.message);
-        return null;
+        // 오류 시에도 기본 알림 발생
+        return { type: 'modified', summary: '파일 수정됨' };
     }
 }
 
@@ -1070,6 +1091,9 @@ function extractXlsxContent(filePath) {
 // PPTX 파일 내용 추출
 async function extractPptxContent(filePath) {
     try {
+        // 파일이 완전히 저장될 때까지 잠시 대기
+        await new Promise(r => setTimeout(r, 500));
+
         const slides = [];
         let fullText = '';
 

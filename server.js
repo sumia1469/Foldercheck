@@ -3460,6 +3460,109 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // API: 외부 AI API 설정 조회
+        if (pathname === '/api/ai/external-settings' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            // API 키는 마스킹하여 반환
+            res.end(JSON.stringify({
+                openai: {
+                    enabled: externalApiSettings.openai.enabled,
+                    hasKey: !!externalApiSettings.openai.apiKey,
+                    keyPreview: externalApiSettings.openai.apiKey ?
+                        `${externalApiSettings.openai.apiKey.slice(0, 8)}...` : ''
+                },
+                gemini: {
+                    enabled: externalApiSettings.gemini.enabled,
+                    hasKey: !!externalApiSettings.gemini.apiKey,
+                    keyPreview: externalApiSettings.gemini.apiKey ?
+                        `${externalApiSettings.gemini.apiKey.slice(0, 8)}...` : ''
+                }
+            }));
+            return;
+        }
+
+        // API: 외부 AI API 설정 저장
+        if (pathname === '/api/ai/external-settings' && req.method === 'POST') {
+            try {
+                const { provider, apiKey, enabled } = await parseBody(req);
+
+                if (!['openai', 'gemini'].includes(provider)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '지원하지 않는 AI 제공자입니다' }));
+                    return;
+                }
+
+                // 설정 업데이트
+                if (apiKey !== undefined) {
+                    externalApiSettings[provider].apiKey = apiKey;
+                }
+                if (enabled !== undefined) {
+                    externalApiSettings[provider].enabled = enabled;
+                }
+
+                // settings에 저장
+                settings.externalApi = externalApiSettings;
+                saveSettings();
+
+                console.log(`외부 AI 설정 저장: ${provider}`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    provider,
+                    enabled: externalApiSettings[provider].enabled,
+                    hasKey: !!externalApiSettings[provider].apiKey
+                }));
+            } catch (error) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: error.message }));
+            }
+            return;
+        }
+
+        // API: 외부 AI API 연결 테스트
+        if (pathname === '/api/ai/test-connection' && req.method === 'POST') {
+            try {
+                const { provider } = await parseBody(req);
+
+                if (!['openai', 'gemini'].includes(provider)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '지원하지 않는 AI 제공자입니다' }));
+                    return;
+                }
+
+                if (!externalApiSettings[provider].apiKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'API 키가 설정되지 않았습니다' }));
+                    return;
+                }
+
+                // 간단한 테스트 호출
+                const testPrompt = '안녕하세요. 테스트입니다.';
+                const testSystem = '한 문장으로 인사에 답해주세요.';
+
+                let response;
+                if (provider === 'openai') {
+                    response = await callOpenAI(testPrompt, testSystem, 'openai:gpt-4o-mini');
+                } else {
+                    response = await callGemini(testPrompt, testSystem, 'gemini:gemini-1.5-flash');
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    message: '연결 성공',
+                    response: response.slice(0, 100)
+                }));
+            } catch (error) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: error.message
+                }));
+            }
+            return;
+        }
+
         // API: 변경 내용 AI 분석
         if (pathname === '/api/analyze/change' && req.method === 'POST') {
             try {

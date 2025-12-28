@@ -444,7 +444,21 @@
                 </div>
 
                 <div class="folders-list-card">
-                    <h3>감시 중인 폴더</h3>
+                    <div class="card-header-flex">
+                        <h3>감시 중인 폴더</h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label class="select-all-checkbox" style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
+                                <input type="checkbox" id="selectAllFolders" onchange="toggleSelectAllFolders()" style="cursor: pointer;">
+                                전체선택
+                            </label>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSelectedFolders()" id="deleteSelectedFoldersBtn" disabled style="opacity: 0.5;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                                선택 삭제
+                            </button>
+                        </div>
+                    </div>
                     <ul id="folderList" class="folder-list">
                         <li class="empty-state">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

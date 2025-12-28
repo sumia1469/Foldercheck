@@ -121,6 +121,15 @@ function updateFolderCount() {
 
 // 폴더 목록 렌더링
 function renderFolders(folders) {
+    // 전체선택 체크박스 초기화
+    const selectAllFolders = document.getElementById('selectAllFolders');
+    const deleteSelectedFoldersBtn = document.getElementById('deleteSelectedFoldersBtn');
+    if (selectAllFolders) selectAllFolders.checked = false;
+    if (deleteSelectedFoldersBtn) {
+        deleteSelectedFoldersBtn.disabled = true;
+        deleteSelectedFoldersBtn.style.opacity = '0.5';
+    }
+
     if (folders.length === 0) {
         folderList.innerHTML = `
             <li class="empty-state">
@@ -135,7 +144,10 @@ function renderFolders(folders) {
 
     folderList.innerHTML = folders.map(folder => `
         <li>
-            <span class="folder-path">${escapeHtml(folder)}</span>
+            <label class="folder-checkbox-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" class="folder-checkbox" data-folder="${escapeHtml(folder)}" onchange="updateFolderSelectionState()" style="cursor: pointer;">
+                <span class="folder-path">${escapeHtml(folder)}</span>
+            </label>
             <div class="folder-actions">
                 <button class="btn btn-icon" onclick="openFolder('${escapeHtml(folder.replace(/\\/g, '\\\\').replace(/'/g, "\\'"))}')" title="폴더 열기">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -144,10 +156,81 @@ function renderFolders(folders) {
                         <line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
                 </button>
-                <button class="btn btn-danger" onclick="removeFolder('${escapeHtml(folder.replace(/\\/g, '\\\\'))}')">삭제</button>
+                <button class="btn btn-danger btn-sm" onclick="removeFolder('${escapeHtml(folder.replace(/\\/g, '\\\\'))}')">삭제</button>
             </div>
         </li>
     `).join('');
+}
+
+// 폴더 전체선택 토글
+function toggleSelectAllFolders() {
+    const selectAllFolders = document.getElementById('selectAllFolders');
+    const checkboxes = document.querySelectorAll('.folder-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAllFolders.checked);
+    updateFolderSelectionState();
+}
+
+// 폴더 선택 상태 업데이트
+function updateFolderSelectionState() {
+    const checkboxes = document.querySelectorAll('.folder-checkbox');
+    const checkedBoxes = document.querySelectorAll('.folder-checkbox:checked');
+    const selectAllFolders = document.getElementById('selectAllFolders');
+    const deleteSelectedFoldersBtn = document.getElementById('deleteSelectedFoldersBtn');
+
+    // 전체선택 체크박스 상태 업데이트
+    if (selectAllFolders) {
+        selectAllFolders.checked = checkboxes.length > 0 && checkboxes.length === checkedBoxes.length;
+    }
+
+    // 삭제 버튼 활성화/비활성화
+    if (deleteSelectedFoldersBtn) {
+        if (checkedBoxes.length > 0) {
+            deleteSelectedFoldersBtn.disabled = false;
+            deleteSelectedFoldersBtn.style.opacity = '1';
+        } else {
+            deleteSelectedFoldersBtn.disabled = true;
+            deleteSelectedFoldersBtn.style.opacity = '0.5';
+        }
+    }
+}
+
+// 선택한 폴더들 일괄 삭제
+async function deleteSelectedFolders() {
+    const checkedBoxes = document.querySelectorAll('.folder-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        alert('삭제할 폴더를 선택해주세요.');
+        return;
+    }
+
+    const count = checkedBoxes.length;
+    if (!confirm(`선택한 ${count}개의 폴더 감시를 중지하시겠습니까?`)) {
+        return;
+    }
+
+    const folders = Array.from(checkedBoxes).map(cb => cb.dataset.folder);
+
+    try {
+        // 순차적으로 삭제
+        for (const folder of folders) {
+            await fetch('/api/folders', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder })
+            });
+        }
+
+        // 목록 새로고침
+        loadFolders();
+
+        // 전체선택 체크박스 해제
+        const selectAllFolders = document.getElementById('selectAllFolders');
+        if (selectAllFolders) selectAllFolders.checked = false;
+
+    } catch (e) {
+        console.error('폴더 삭제 실패:', e);
+        alert('일부 폴더 삭제에 실패했습니다.');
+        loadFolders();
+    }
 }
 
 // 폴더 열기 (Finder/탐색기)

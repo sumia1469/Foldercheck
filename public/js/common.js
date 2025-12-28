@@ -554,6 +554,18 @@ function showChangeSummary(event, fileName, summaryData) {
         }
     }
 
+    // AI 분석 버튼 HTML (수정된 파일만 표시)
+    const aiAnalyzeHtml = (summary.type === 'modified' && summary.details &&
+        (summary.details.added?.length > 0 || summary.details.removed?.length > 0))
+        ? `<div class="popup-ai-analyze">
+            <button class="btn-ai-analyze" onclick="analyzeChangeWithAI('${encodeURIComponent(fileName)}', '${summaryData}')">
+                <span class="ai-icon">✨</span>
+                <span class="ai-text">AI로 변경 내용 분석하기</span>
+            </button>
+           </div>
+           <div id="aiAnalysisResult" class="ai-analysis-result" style="display: none;"></div>`
+        : '';
+
     // 팝업 생성
     const popup = document.createElement('div');
     popup.id = 'changeSummaryPopup';
@@ -569,6 +581,7 @@ function showChangeSummary(event, fileName, summaryData) {
             <div class="popup-type ${typeClass}">${typeText}</div>
             ${statsHtml}
             ${fileInfoHtml ? `<div class="popup-file-info">${fileInfoHtml}</div>` : ''}
+            ${aiAnalyzeHtml}
             ${changesHtml ? `<div class="popup-changes">${changesHtml}</div>` : ''}
         </div>
     `;
@@ -598,6 +611,112 @@ function closeChangeSummaryOnOutsideClick(event) {
     if (popup && !popup.contains(event.target)) {
         closeChangeSummaryPopup();
     }
+}
+
+// AI로 변경 내용 분석
+async function analyzeChangeWithAI(encodedFileName, summaryData) {
+    const fileName = decodeURIComponent(encodedFileName);
+    const summary = JSON.parse(decodeURIComponent(summaryData));
+    const resultDiv = document.getElementById('aiAnalysisResult');
+    const btn = document.querySelector('.btn-ai-analyze');
+
+    if (!resultDiv || !btn) return;
+
+    // 버튼 비활성화 및 로딩 표시
+    btn.disabled = true;
+    btn.innerHTML = `
+        <span class="ai-icon spinning">⏳</span>
+        <span class="ai-text">분석 중...</span>
+    `;
+
+    // 결과 영역 표시
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+        <div class="ai-loading">
+            <div class="ai-loading-spinner"></div>
+            <div class="ai-loading-text">AI가 변경 내용을 분석하고 있습니다...</div>
+        </div>
+    `;
+
+    try {
+        const res = await fetch('/api/analyze/change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fileName,
+                added: summary.details?.added || [],
+                removed: summary.details?.removed || [],
+                addedCount: summary.details?.addedCount || 0,
+                removedCount: summary.details?.removedCount || 0,
+                fileTypeInfo: summary.details?.fileTypeInfo || null
+            })
+        });
+
+        const result = await res.json();
+
+        if (result.success && result.analysis) {
+            // 분석 결과 표시
+            resultDiv.innerHTML = `
+                <div class="ai-analysis-header">
+                    <span class="ai-analysis-icon">💡</span>
+                    <span class="ai-analysis-title">변경 분석 결과</span>
+                </div>
+                <div class="ai-analysis-content">
+                    ${formatAIAnalysis(result.analysis)}
+                </div>
+            `;
+
+            // 버튼 숨기기
+            btn.style.display = 'none';
+        } else {
+            throw new Error(result.error || '분석에 실패했습니다.');
+        }
+    } catch (e) {
+        console.error('AI 분석 실패:', e);
+        resultDiv.innerHTML = `
+            <div class="ai-analysis-error">
+                <span>⚠️</span>
+                <span>${e.message}</span>
+            </div>
+        `;
+
+        // 버튼 복원
+        btn.disabled = false;
+        btn.innerHTML = `
+            <span class="ai-icon">✨</span>
+            <span class="ai-text">AI로 변경 내용 분석하기</span>
+        `;
+    }
+}
+
+// AI 분석 결과 포맷팅
+function formatAIAnalysis(analysis) {
+    // 분석 결과를 HTML로 변환
+    const lines = analysis.split('\n').filter(line => line.trim());
+    let html = '';
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+
+        // 위치/섹션 표시 (📍로 시작하거나 "위치:", "섹션:" 포함)
+        if (trimmed.startsWith('📍') || trimmed.includes('위치:') || trimmed.includes('섹션:')) {
+            html += `<div class="ai-location">${escapeHtml(trimmed)}</div>`;
+        }
+        // 변경 내용 표시 (→, ▶, • 로 시작)
+        else if (trimmed.startsWith('→') || trimmed.startsWith('▶') || trimmed.startsWith('•') || trimmed.startsWith('-')) {
+            html += `<div class="ai-change-item">${escapeHtml(trimmed)}</div>`;
+        }
+        // 숫자로 시작하는 항목
+        else if (/^\d+[.)]/.test(trimmed)) {
+            html += `<div class="ai-numbered-item">${escapeHtml(trimmed)}</div>`;
+        }
+        // 일반 텍스트
+        else if (trimmed.length > 0) {
+            html += `<div class="ai-text-line">${escapeHtml(trimmed)}</div>`;
+        }
+    }
+
+    return html || '<div class="ai-text-line">분석 결과가 없습니다.</div>';
 }
 
 // 로그 지우기

@@ -1747,6 +1747,79 @@ ${text}
     });
 }
 
+// 변경 내용 AI 분석
+async function analyzeChangeWithOllama(changeContent) {
+    const systemPrompt = `당신은 문서 변경 분석 전문가입니다. 변경 내용을 분석하여 핵심적인 변경 사항을 요약해주세요.
+
+[분석 규칙]
+1. 반드시 한국어로 응답
+2. 어느 부분(섹션/위치)에서 어떤 내용이 변경되었는지 명확히 설명
+3. 추가된 내용과 삭제된 내용을 비교하여 의미있는 변경사항 도출
+4. 숫자, 날짜, 금액 등의 변경은 구체적으로 명시 (예: "12/15 → 12/20으로 변경")
+5. 간결하고 핵심만 전달 (3-5개 항목)
+6. 각 항목은 "📍 위치:" 와 "→ 변경 내용:" 형식으로 작성`;
+
+    const prompt = `다음 문서의 변경 내용을 분석하여 핵심 변경 사항을 요약해주세요.
+
+${changeContent}
+
+[분석 결과]
+(각 변경 사항을 다음 형식으로 작성)
+📍 위치: (변경이 발생한 섹션/부분)
+→ 변경 내용: (구체적인 변경 설명)
+
+분석:`;
+
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
+            model: CURRENT_AI_MODEL,
+            prompt: prompt,
+            system: systemPrompt,
+            stream: false,
+            options: {
+                temperature: 0.3,
+                num_predict: 800,      // 간결한 분석
+                num_ctx: 2048,
+                num_thread: 4,
+                num_batch: 256
+            }
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    resolve(result.response || '분석 결과를 생성할 수 없습니다.');
+                } catch (e) {
+                    reject(new Error('응답 파싱 오류'));
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.setTimeout(60000, () => {  // 1분 타임아웃
+            req.destroy();
+            reject(new Error('분석 타임아웃'));
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
 // ========================================
 // 회의록 관련 함수
 // ========================================
@@ -2514,6 +2587,78 @@ const server = http.createServer(async (req, res) => {
                 currentModel: CURRENT_AI_MODEL,
                 availableModels: AVAILABLE_MODELS
             }));
+            return;
+        }
+
+        // API: 변경 내용 AI 분석
+        if (pathname === '/api/analyze/change' && req.method === 'POST') {
+            try {
+                const { fileName, added, removed, addedCount, removedCount, fileTypeInfo } = await parseBody(req);
+
+                // Ollama 상태 확인
+                const ollamaStatus = await checkOllamaStatus();
+                if (!ollamaStatus.ready) {
+                    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'AI 서버(Ollama)가 실행 중이 아닙니다.'
+                    }));
+                    return;
+                }
+
+                // 분석할 내용이 없으면 에러
+                if ((!added || added.length === 0) && (!removed || removed.length === 0)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: '분석할 변경 내용이 없습니다.'
+                    }));
+                    return;
+                }
+
+                // 변경 내용 구성
+                let changeContent = `파일: ${fileName}\n\n`;
+
+                if (fileTypeInfo) {
+                    if (fileTypeInfo.type === 'pptx') {
+                        changeContent += `파일 형식: PowerPoint (${fileTypeInfo.currSlides}장)\n`;
+                    } else if (fileTypeInfo.type === 'xlsx') {
+                        changeContent += `파일 형식: Excel (${fileTypeInfo.currSheets}개 시트)\n`;
+                    } else if (fileTypeInfo.type === 'text') {
+                        changeContent += `파일 형식: 텍스트 (${fileTypeInfo.currLines}줄)\n`;
+                    }
+                }
+
+                if (added && added.length > 0) {
+                    changeContent += `\n[추가된 내용 ${addedCount}개]\n`;
+                    added.forEach((item, i) => {
+                        changeContent += `${i + 1}. ${item}\n`;
+                    });
+                }
+
+                if (removed && removed.length > 0) {
+                    changeContent += `\n[삭제된 내용 ${removedCount}개]\n`;
+                    removed.forEach((item, i) => {
+                        changeContent += `${i + 1}. ${item}\n`;
+                    });
+                }
+
+                // AI 분석 요청
+                const analysis = await analyzeChangeWithOllama(changeContent);
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    analysis
+                }));
+            } catch (error) {
+                console.error('변경 분석 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: error.message || '분석 중 오류가 발생했습니다.'
+                }));
+            }
             return;
         }
 

@@ -60,7 +60,8 @@
       "Bash(ollama rm:*)",
       "Bash(ollama list:*)",
       "Bash(ffmpeg:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(xargs kill:*)"
     ]
   }
 }

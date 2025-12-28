@@ -1883,15 +1883,33 @@ function parseMultipart(req) {
 
         req.on('end', () => {
             try {
-                const parts = body.toString('binary').split('--' + boundary);
+                // boundary를 Buffer로 찾기
+                const boundaryBuffer = Buffer.from('--' + boundary);
+                const bodyStr = body.toString('binary');
+                const parts = bodyStr.split('--' + boundary);
+
                 for (const part of parts) {
                     if (part.includes('filename=')) {
-                        const filenameMatch = part.match(/filename="([^"]+)"/);
-                        const filename = filenameMatch ? filenameMatch[1] : 'audio.wav';
-
-                        // 헤더와 본문 분리
+                        // 헤더 부분만 UTF-8로 디코딩하여 파일명 추출
                         const headerEnd = part.indexOf('\r\n\r\n');
                         if (headerEnd > 0) {
+                            const headerPart = part.substring(0, headerEnd);
+                            // 헤더를 바이너리에서 버퍼로 변환 후 UTF-8로 디코딩
+                            const headerBuffer = Buffer.from(headerPart, 'binary');
+                            const headerStr = headerBuffer.toString('utf8');
+
+                            // filename 추출 (filename*=UTF-8'' 형식도 지원)
+                            let filename = 'audio.wav';
+                            const filenameStarMatch = headerStr.match(/filename\*=UTF-8''([^\r\n;]+)/i);
+                            if (filenameStarMatch) {
+                                filename = decodeURIComponent(filenameStarMatch[1]);
+                            } else {
+                                const filenameMatch = headerStr.match(/filename="([^"]+)"/);
+                                if (filenameMatch) {
+                                    filename = filenameMatch[1];
+                                }
+                            }
+
                             const fileContent = part.substring(headerEnd + 4);
                             // 끝의 \r\n-- 제거
                             const cleanContent = fileContent.replace(/\r\n--$/, '');

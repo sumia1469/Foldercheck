@@ -1429,6 +1429,32 @@ body {
     flex-wrap: wrap;
 }
 
+/* 회의록 체크박스 스타일 */
+.meeting-item-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex: 1;
+}
+
+.meeting-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding-top: 2px;
+}
+
+.meeting-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+.meeting-select-checkbox:checked + .meeting-info {
+    opacity: 0.8;
+}
+
 .meeting-summary-badge {
     display: inline-block;
     font-size: 11px;

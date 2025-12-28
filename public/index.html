@@ -658,7 +658,34 @@
                 </div>
 
                 <div class="settings-card">
-                    <h3>최근 회의록</h3>
+                    <div class="card-header-flex">
+                        <h3>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                            </svg>
+                            최근 회의록
+                        </h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label class="select-all-checkbox" style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
+                                <input type="checkbox" id="selectAllMeetings" onchange="toggleSelectAllMeetings()" style="cursor: pointer;">
+                                전체선택
+                            </label>
+                            <button class="btn btn-sm btn-secondary" onclick="loadMeetings()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                                </svg>
+                                새로고침
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSelectedMeetings()" id="deleteSelectedMeetingsBtn" disabled style="opacity: 0.5;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                                선택 삭제
+                            </button>
+                        </div>
+                    </div>
                     <div id="meetingList" class="meeting-list">
                         <div class="empty-state">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

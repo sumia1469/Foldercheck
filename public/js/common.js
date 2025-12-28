@@ -1961,10 +1961,15 @@ function renderMeetings(meetings) {
 
         return `
         <div class="meeting-item" id="meeting-${meeting.id}">
-            <div class="meeting-info">
-                <div class="meeting-title">${escapeHtml(meeting.title)}</div>
-                <div class="meeting-date">${new Date(meeting.createdAt).toLocaleString('ko-KR')}</div>
-                ${meeting.aiSummary ? `<div class="meeting-summary-badge">✨ AI 요약 완료</div>` : ''}
+            <div class="meeting-item-header">
+                <label class="meeting-checkbox" onclick="event.stopPropagation()">
+                    <input type="checkbox" class="meeting-select-checkbox" data-meeting-id="${meeting.id}" onchange="updateMeetingSelectionState()">
+                </label>
+                <div class="meeting-info">
+                    <div class="meeting-title">${escapeHtml(meeting.title)}</div>
+                    <div class="meeting-date">${new Date(meeting.createdAt).toLocaleString('ko-KR')}</div>
+                    ${meeting.aiSummary ? `<div class="meeting-summary-badge">✨ AI 요약 완료</div>` : ''}
+                </div>
             </div>
             <div class="meeting-actions">
                 <button class="btn btn-primary" onclick="summarizeMeeting('${meeting.id}')" ${meeting.aiSummary ? 'title="다시 요약"' : ''}>
@@ -2138,7 +2143,7 @@ async function deleteMeeting(id) {
 }
 
 // 요약 중 로딩 오버레이 표시
-function showSummarizingOverlay() {
+function showSummarizingOverlay(title = '✨ AI 요약 생성 중...', detail = '회의 내용을 분석하고 있습니다') {
     // 기존 오버레이 제거
     hideSummarizingOverlay();
 
@@ -2147,8 +2152,8 @@ function showSummarizingOverlay() {
     overlay.id = 'summarizingOverlay';
     overlay.innerHTML = `
         <div class="summarizing-spinner"></div>
-        <div class="summarizing-text">✨ AI 요약 생성 중...</div>
-        <div class="summarizing-detail" id="summarizingDetail">회의 내용을 분석하고 있습니다</div>
+        <div class="summarizing-text">${title}</div>
+        <div class="summarizing-detail" id="summarizingDetail">${detail}</div>
         <div class="summarizing-percent" id="summarizingPercent">0%</div>
         <div class="summarizing-progress">
             <div class="summarizing-progress-bar" id="summarizingProgressBar"></div>
@@ -2435,6 +2440,82 @@ async function deleteSelectedRecordings() {
     loadRecordings();
 }
 
+// ===== 회의록 선택 관련 함수들 =====
+
+// 회의록 전체 선택/해제
+function toggleSelectAllMeetings() {
+    const selectAllCheckbox = document.getElementById('selectAllMeetings');
+    const checkboxes = document.querySelectorAll('.meeting-select-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+    updateMeetingSelectionState();
+}
+
+// 회의록 선택 상태 업데이트
+function updateMeetingSelectionState() {
+    const checkboxes = document.querySelectorAll('.meeting-select-checkbox');
+    const checkedBoxes = document.querySelectorAll('.meeting-select-checkbox:checked');
+    const deleteBtn = document.getElementById('deleteSelectedMeetingsBtn');
+    const selectAllCheckbox = document.getElementById('selectAllMeetings');
+
+    if (deleteBtn) {
+        if (checkedBoxes.length > 0) {
+            deleteBtn.disabled = false;
+            deleteBtn.style.opacity = '1';
+        } else {
+            deleteBtn.disabled = true;
+            deleteBtn.style.opacity = '0.5';
+        }
+    }
+
+    // 전체선택 체크박스 상태 동기화
+    if (selectAllCheckbox && checkboxes.length > 0) {
+        selectAllCheckbox.checked = checkboxes.length === checkedBoxes.length;
+        selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < checkboxes.length;
+    }
+}
+
+// 선택된 회의록 삭제
+async function deleteSelectedMeetings() {
+    const checkboxes = document.querySelectorAll('.meeting-select-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('삭제할 회의록을 선택해주세요.');
+        return;
+    }
+
+    if (!confirm(`선택한 ${checkboxes.length}개의 회의록을 삭제하시겠습니까?`)) {
+        return;
+    }
+
+    const meetingIds = Array.from(checkboxes).map(cb => cb.dataset.meetingId);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const meetingId of meetingIds) {
+        try {
+            const res = await fetch(`/api/meeting/${meetingId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (e) {
+            failCount++;
+        }
+    }
+
+    if (failCount > 0) {
+        alert(`${successCount}개 삭제 완료, ${failCount}개 삭제 실패`);
+    }
+
+    // 전체선택 체크박스 초기화
+    const selectAllCheckbox = document.getElementById('selectAllMeetings');
+    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+
+    loadMeetings();
+}
+
 // 현재 재생 중인 오디오 관리
 let currentPlayingAudio = null;
 let currentPlayingButton = null;
@@ -2572,9 +2653,25 @@ async function deleteRecordingFile(filename) {
 async function transcribeRecording(filename) {
     if (!confirm(`이 녹음 파일로 회의록을 생성하시겠습니까?\n${filename}`)) return;
 
-    // 프로그래스 UI 표시
-    if (processingCard) processingCard.style.display = 'block';
-    updateProgress(10, '녹음 파일 처리 중...');
+    // 로딩 오버레이 표시 (화면 전체를 덮어서 다른 조작 차단)
+    showSummarizingOverlay('🎙️ 회의록 생성 중...', '녹음 파일을 분석하고 있습니다');
+    updateSummarizingOverlay('녹음 파일 로딩 중...', 5);
+
+    // 진행 상황 폴링
+    let progressInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/processing/progress');
+            const progress = await res.json();
+            if (progress.active) {
+                const text = progress.detail
+                    ? `${progress.stage} - ${progress.detail}`
+                    : progress.stage;
+                updateSummarizingOverlay(text, progress.percent);
+            }
+        } catch (e) {
+            // 폴링 실패는 무시
+        }
+    }, 500);
 
     try {
         const res = await fetch('/api/recording/transcribe', {
@@ -2585,20 +2682,22 @@ async function transcribeRecording(filename) {
 
         const result = await res.json();
 
+        clearInterval(progressInterval);
+
         if (result.success) {
-            updateProgress(100, '완료!');
+            updateSummarizingOverlay('완료!', 100);
             setTimeout(() => {
-                if (processingCard) processingCard.style.display = 'none';
+                hideSummarizingOverlay();
                 loadMeetings();
-                alert('회의록이 생성되었습니다!');
+                loadRecordings();
             }, 1000);
         } else {
             throw new Error(result.error || '회의록 생성 실패');
         }
     } catch (e) {
+        clearInterval(progressInterval);
         console.error('회의록 생성 실패:', e);
-        updateProgress(0, '오류 발생');
-        if (processingStatus) processingStatus.textContent = e.message;
+        hideSummarizingOverlay();
         alert('회의록 생성 실패: ' + e.message);
     }
 }

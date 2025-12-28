@@ -13,6 +13,9 @@ const { execSync, spawn } = require('child_process');
 // 라이선스 모듈
 const license = require('./license');
 
+// 개발 모드 (Pro 토글 버튼 등 개발용 기능 활성화)
+const DEV_MODE = process.env.NODE_ENV !== 'production';
+
 // FFmpeg 경로 설정
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -2314,16 +2317,34 @@ const server = http.createServer(async (req, res) => {
         }
 
         // API: Pro/Trial 토글 (개발용)
+        // API: 개발 모드 확인
+        if (pathname === '/api/dev-mode' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ devMode: DEV_MODE }));
+            return;
+        }
+
+        // API: Pro 라이선스 토글 (개발 모드에서만 사용 가능)
         if (pathname === '/api/license/toggle' && req.method === 'POST') {
+            if (!DEV_MODE) {
+                res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: '개발 모드에서만 사용 가능합니다' }));
+                return;
+            }
             const result = license.toggleLicenseType();
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify(result));
             return;
         }
 
-        // API: 테스트 라이선스 활성화 (개발용)
+        // API: 테스트 라이선스 활성화 (개발 모드에서만 사용 가능)
         // POST /api/license/activate-test { months: 3 } 또는 { days: 1 }
         if (pathname === '/api/license/activate-test' && req.method === 'POST') {
+            if (!DEV_MODE) {
+                res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: '개발 모드에서만 사용 가능합니다' }));
+                return;
+            }
             let body = '';
             req.on('data', chunk => body += chunk);
             req.on('end', () => {

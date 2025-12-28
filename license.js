@@ -382,11 +382,32 @@ function toggleLicenseType() {
 
         return {
             success: true,
+            newType: 'Trial',
             message: 'Trial 모드로 전환되었습니다.',
             license: getLicenseStatus()
         };
+    } else if (license.type === 'trial') {
+        // Trial → Free로 전환 (제한 버전)
+        license.type = 'free';
+        license.expiresAt = null;  // 만료 없음 (제한된 기능)
+        license.licenseKey = null;
+        license.signature = null;
+        license.testLicense = false;
+        license.features = {
+            documentMonitoring: true,  // 기본 모니터링만 가능
+            meetingTranscription: false,  // 회의록 변환 불가
+            aiSummary: false  // AI 요약 불가
+        };
+        saveLicense(license);
+
+        return {
+            success: true,
+            newType: 'Free',
+            message: 'Free 모드로 전환되었습니다. (제한된 기능)',
+            license: getLicenseStatus()
+        };
     } else {
-        // Trial → Pro로 전환 (3개월 테스트)
+        // Free → Pro로 전환 (3개월 테스트)
         const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
         license.type = 'pro';
         license.expiresAt = expiresAt.toISOString();
@@ -402,6 +423,7 @@ function toggleLicenseType() {
 
         return {
             success: true,
+            newType: 'Pro',
             message: 'Pro 모드로 전환되었습니다.',
             license: getLicenseStatus()
         };

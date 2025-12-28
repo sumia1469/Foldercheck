@@ -2660,6 +2660,45 @@ checkAppEnvironment();  // 앱 환경 확인 (웹 vs Electron)
 loadLicenseStatus();
 initLicenseTabs();
 initLicenseButtons();
+checkDevMode();  // 개발 모드 확인
+
+// 개발 모드 확인 및 UI 표시
+async function checkDevMode() {
+    try {
+        const res = await fetch('/api/dev-mode');
+        const data = await res.json();
+
+        if (data.devMode) {
+            const devControls = document.getElementById('devModeControls');
+            if (devControls) {
+                devControls.style.display = 'block';
+            }
+
+            // Pro 토글 버튼 이벤트
+            const toggleProBtn = document.getElementById('toggleProBtn');
+            if (toggleProBtn) {
+                toggleProBtn.addEventListener('click', async () => {
+                    try {
+                        const res = await fetch('/api/license/toggle', { method: 'POST' });
+                        const result = await res.json();
+
+                        if (result.success) {
+                            alert(`라이선스가 ${result.newType}으로 변경되었습니다.`);
+                            loadLicenseStatus();  // 라이선스 상태 새로고침
+                            location.reload();  // 페이지 새로고침하여 UI 갱신
+                        } else {
+                            alert('라이선스 변경 실패: ' + (result.error || '알 수 없는 오류'));
+                        }
+                    } catch (e) {
+                        alert('라이선스 변경 실패: ' + e.message);
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.log('개발 모드 확인 실패:', e.message);
+    }
+}
 
 // 커스텀 타이틀바 버튼 이벤트 (Electron 환경에서만 동작)
 function initTitlebarControls() {

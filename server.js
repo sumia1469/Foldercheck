@@ -1752,12 +1752,13 @@ async function analyzeChangeWithOllama(changeContent) {
     const systemPrompt = `당신은 문서 변경 분석 전문가입니다. 변경 내용을 분석하여 핵심적인 변경 사항을 요약해주세요.
 
 [분석 규칙]
-1. 반드시 한국어로 응답
+1. 반드시 한국어로 응답 (한자/중국어 문자 절대 사용 금지)
 2. 어느 부분(섹션/위치)에서 어떤 내용이 변경되었는지 명확히 설명
 3. 추가된 내용과 삭제된 내용을 비교하여 의미있는 변경사항 도출
 4. 숫자, 날짜, 금액 등의 변경은 구체적으로 명시 (예: "12/15 → 12/20으로 변경")
 5. 간결하고 핵심만 전달 (3-5개 항목)
-6. 각 항목은 "📍 위치:" 와 "→ 변경 내용:" 형식으로 작성`;
+6. 각 항목은 "📍 위치:" 와 "→ 변경 내용:" 형식으로 작성
+7. 중요: 한자(漢字)나 중국어 문자를 절대 사용하지 마세요. 모든 텍스트는 순수 한글과 영문/숫자만 사용하세요.`;
 
     const prompt = `다음 문서의 변경 내용을 분석하여 핵심 변경 사항을 요약해주세요.
 
@@ -1813,6 +1814,83 @@ ${changeContent}
         req.setTimeout(60000, () => {  // 1분 타임아웃
             req.destroy();
             reject(new Error('분석 타임아웃'));
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
+// LLM 채팅 함수
+async function chatWithOllama(message, history) {
+    const systemPrompt = `당신은 DocWatch의 AI 어시스턴트입니다. 사용자의 질문에 친절하고 도움이 되도록 답변해주세요.
+
+[응답 규칙]
+1. 반드시 한국어로 응답하세요 (한자/중국어 문자 절대 사용 금지)
+2. 간결하고 명확하게 답변하세요
+3. 기술적인 내용은 이해하기 쉽게 설명하세요
+4. 코드가 필요한 경우 백틱(\`\`\`)으로 감싸서 표시하세요
+5. 모르는 내용은 솔직히 모른다고 말하세요`;
+
+    // 대화 기록을 프롬프트로 변환
+    let conversationContext = '';
+    if (history && history.length > 0) {
+        history.forEach(msg => {
+            if (msg.role === 'user') {
+                conversationContext += `사용자: ${msg.content}\n`;
+            } else if (msg.role === 'assistant') {
+                conversationContext += `AI: ${msg.content}\n`;
+            }
+        });
+    }
+
+    const prompt = conversationContext
+        ? `${conversationContext}사용자: ${message}\n\nAI:`
+        : `사용자: ${message}\n\nAI:`;
+
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
+            model: CURRENT_AI_MODEL,
+            prompt: prompt,
+            system: systemPrompt,
+            stream: false,
+            options: {
+                temperature: 0.7,
+                num_predict: 2048,
+                num_ctx: 4096,
+                num_thread: 4,
+                num_batch: 256
+            }
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    resolve(result.response || '응답을 생성할 수 없습니다.');
+                } catch (e) {
+                    reject(new Error('응답 파싱 오류'));
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.setTimeout(120000, () => {  // 2분 타임아웃
+            req.destroy();
+            reject(new Error('응답 생성 타임아웃'));
         });
 
         req.write(postData);
@@ -2657,6 +2735,47 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({
                     success: false,
                     error: error.message || '분석 중 오류가 발생했습니다.'
+                }));
+            }
+            return;
+        }
+
+        // API: LLM 채팅
+        if (pathname === '/api/llm/chat' && req.method === 'POST') {
+            try {
+                const { message, history } = await parseBody(req);
+
+                if (!message) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '메시지가 없습니다.' }));
+                    return;
+                }
+
+                // Ollama 상태 확인
+                const ollamaStatus = await checkOllamaStatus();
+                if (!ollamaStatus.ready) {
+                    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'AI 서버(Ollama)가 실행 중이 아닙니다. brew services start ollama를 실행해주세요.'
+                    }));
+                    return;
+                }
+
+                // LLM 채팅 요청
+                const response = await chatWithOllama(message, history || []);
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    response
+                }));
+            } catch (error) {
+                console.error('LLM 채팅 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: false,
+                    error: error.message || '응답 생성 중 오류가 발생했습니다.'
                 }));
             }
             return;

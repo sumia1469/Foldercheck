@@ -12,6 +12,14 @@
     <div class="custom-titlebar">
         <div class="titlebar-drag-region"></div>
         <div class="titlebar-title">DocWatch</div>
+        <div class="titlebar-actions">
+            <button class="titlebar-action-btn" id="toggleRightPanelBtn" title="우측 패널 토글">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <line x1="15" y1="3" x2="15" y2="21"/>
+                </svg>
+            </button>
+        </div>
         <div class="titlebar-controls">
             <button class="titlebar-btn minimize" id="minimizeBtn" title="최소화">
                 <svg viewBox="0 0 12 12"><rect y="5" width="12" height="2" fill="currentColor"/></svg>
@@ -27,7 +35,13 @@
 
     <div class="app-container">
         <!-- 좌측 사이드바 -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
+            <!-- 사이드바 토글 버튼 -->
+            <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="사이드바 접기/펼치기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+            </button>
             <div class="sidebar-header">
                 <div class="logo">
                     <div class="logo-icon">
@@ -97,6 +111,17 @@
                         </svg>
                     </span>
                     <span class="nav-text">회의록</span>
+                </a>
+                <a href="#" class="nav-item" data-section="llm">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+                            <circle cx="8.5" cy="14.5" r="1.5"/>
+                            <circle cx="15.5" cy="14.5" r="1.5"/>
+                            <path d="M9 18h6"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">LLM</span>
                 </a>
             </nav>
 
@@ -869,7 +894,108 @@
                     </p>
                 </div>
             </section>
+
+            <!-- LLM 섹션 -->
+            <section id="llm" class="content-section">
+                <div class="section-header">
+                    <h1>LLM 대화</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" id="openInPanelBtn" title="우측 패널에서 열기">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <line x1="15" y1="3" x2="15" y2="21"/>
+                            </svg>
+                            패널에서 열기
+                        </button>
+                    </div>
+                </div>
+
+                <div class="llm-chat-container">
+                    <div class="llm-messages" id="llmMessages">
+                        <div class="llm-welcome">
+                            <div class="welcome-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+                                    <circle cx="8.5" cy="14.5" r="1.5"/>
+                                    <circle cx="15.5" cy="14.5" r="1.5"/>
+                                    <path d="M9 18h6"/>
+                                </svg>
+                            </div>
+                            <h3>로컬 AI 어시스턴트</h3>
+                            <p>무엇이든 물어보세요. 모든 처리는 로컬에서 진행됩니다.</p>
+                        </div>
+                    </div>
+                    <div class="llm-input-area">
+                        <textarea id="llmInput" placeholder="메시지를 입력하세요..." rows="3"></textarea>
+                        <div class="llm-input-actions">
+                            <span class="llm-model-info" id="llmModelInfo">모델: 로딩 중...</span>
+                            <button class="btn btn-primary" id="llmSendBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                                전송
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
+
+        <!-- 우측 패널 (VSCode 스타일) -->
+        <aside class="right-panel" id="rightPanel">
+            <div class="right-panel-header">
+                <div class="right-panel-tabs">
+                    <button class="panel-tab active" data-panel-tab="ai-info">AI 정보</button>
+                    <button class="panel-tab" data-panel-tab="llm-chat">LLM 대화</button>
+                </div>
+                <button class="right-panel-close" id="closeRightPanelBtn" title="패널 닫기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- AI 정보 탭 콘텐츠 -->
+            <div class="right-panel-content" id="panelAiInfo">
+                <div class="panel-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    <p>AI 분석 결과가 여기에 표시됩니다</p>
+                    <span class="panel-hint">모니터링에서 변경내용이나 요약 버튼을 클릭하세요</span>
+                </div>
+            </div>
+
+            <!-- LLM 대화 탭 콘텐츠 -->
+            <div class="right-panel-content" id="panelLlmChat" style="display: none;">
+                <div class="panel-llm-container">
+                    <div class="panel-llm-messages" id="panelLlmMessages">
+                        <div class="llm-welcome panel-welcome">
+                            <div class="welcome-icon small">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+                                    <circle cx="8.5" cy="14.5" r="1.5"/>
+                                    <circle cx="15.5" cy="14.5" r="1.5"/>
+                                    <path d="M9 18h6"/>
+                                </svg>
+                            </div>
+                            <p>무엇이든 물어보세요</p>
+                        </div>
+                    </div>
+                    <div class="panel-llm-input">
+                        <textarea id="panelLlmInput" placeholder="메시지 입력..." rows="2"></textarea>
+                        <button class="btn-panel-send" id="panelLlmSendBtn" title="전송">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"/>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 
     <!-- 알림 소리 -->

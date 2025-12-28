@@ -617,10 +617,9 @@ function closeChangeSummaryOnOutsideClick(event) {
 async function analyzeChangeWithAI(encodedFileName, summaryData) {
     const fileName = decodeURIComponent(encodedFileName);
     const summary = JSON.parse(decodeURIComponent(summaryData));
-    const resultDiv = document.getElementById('aiAnalysisResult');
     const btn = document.querySelector('.btn-ai-analyze');
 
-    if (!resultDiv || !btn) return;
+    if (!btn) return;
 
     // 버튼 비활성화 및 로딩 표시
     btn.disabled = true;
@@ -629,14 +628,44 @@ async function analyzeChangeWithAI(encodedFileName, summaryData) {
         <span class="ai-text">분석 중...</span>
     `;
 
-    // 결과 영역 표시
-    resultDiv.style.display = 'block';
-    resultDiv.innerHTML = `
-        <div class="ai-loading">
-            <div class="ai-loading-spinner"></div>
-            <div class="ai-loading-text">AI가 변경 내용을 분석하고 있습니다...</div>
-        </div>
-    `;
+    // 우측 패널 열기 및 로딩 표시
+    const rightPanel = document.getElementById('rightPanel');
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    const toggleBtn = document.getElementById('toggleRightPanelBtn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
+
+    if (rightPanel && panelAiInfo) {
+        rightPanel.classList.add('open');
+        if (toggleBtn) toggleBtn.classList.add('active');
+
+        // AI 정보 탭 활성화
+        panelTabs.forEach(t => {
+            t.classList.toggle('active', t.dataset.panelTab === 'ai-info');
+        });
+        panelAiInfo.style.display = 'flex';
+        document.getElementById('panelLlmChat').style.display = 'none';
+
+        // 로딩 표시
+        panelAiInfo.innerHTML = `
+            <div class="panel-ai-result" style="width: 100%;">
+                <div class="panel-ai-header">
+                    <span class="ai-icon">⏳</span>
+                    <h4>AI 분석 중...</h4>
+                </div>
+                <div class="panel-file-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                    </svg>
+                    <span>${fileName}</span>
+                </div>
+                <div style="text-align: center; padding: 40px;">
+                    <div class="ai-loading-spinner"></div>
+                    <p style="margin-top: 16px; color: var(--text-muted);">AI가 변경 내용을 분석하고 있습니다...</p>
+                </div>
+            </div>
+        `;
+    }
 
     try {
         const res = await fetch('/api/analyze/change', {
@@ -655,30 +684,35 @@ async function analyzeChangeWithAI(encodedFileName, summaryData) {
         const result = await res.json();
 
         if (result.success && result.analysis) {
-            // 분석 결과 표시
-            resultDiv.innerHTML = `
-                <div class="ai-analysis-header">
-                    <span class="ai-analysis-icon">💡</span>
-                    <span class="ai-analysis-title">변경 분석 결과</span>
-                </div>
-                <div class="ai-analysis-content">
-                    ${formatAIAnalysis(result.analysis)}
-                </div>
-            `;
+            // 우측 패널에 분석 결과 표시
+            showAIResultInPanel(encodedFileName, result.analysis);
 
-            // 버튼 숨기기
-            btn.style.display = 'none';
+            // 버튼 완료 상태로 변경
+            btn.innerHTML = `
+                <span class="ai-icon">✅</span>
+                <span class="ai-text">분석 완료 (우측 패널에서 확인)</span>
+            `;
+            btn.style.opacity = '0.7';
         } else {
             throw new Error(result.error || '분석에 실패했습니다.');
         }
     } catch (e) {
         console.error('AI 분석 실패:', e);
-        resultDiv.innerHTML = `
-            <div class="ai-analysis-error">
-                <span>⚠️</span>
-                <span>${e.message}</span>
-            </div>
-        `;
+
+        // 패널에 오류 표시
+        if (panelAiInfo) {
+            panelAiInfo.innerHTML = `
+                <div class="panel-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--danger);">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <p style="color: var(--danger);">분석 실패</p>
+                    <span class="panel-hint">${e.message}</span>
+                </div>
+            `;
+        }
 
         // 버튼 복원
         btn.disabled = false;
@@ -3392,3 +3426,294 @@ function initTitlebarControls() {
 }
 
 initTitlebarControls();
+
+// ========================================
+// 사이드바 접기/펼치기 기능
+// ========================================
+function initSidebarToggle() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarToggleBtn');
+
+    if (!sidebar || !toggleBtn) return;
+
+    // 로컬 스토리지에서 상태 복원
+    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (isCollapsed) {
+        sidebar.classList.add('collapsed');
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    });
+}
+
+initSidebarToggle();
+
+// ========================================
+// 우측 패널 기능
+// ========================================
+function initRightPanel() {
+    const rightPanel = document.getElementById('rightPanel');
+    const toggleBtn = document.getElementById('toggleRightPanelBtn');
+    const closeBtn = document.getElementById('closeRightPanelBtn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
+
+    if (!rightPanel) return;
+
+    // 패널 토글
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            rightPanel.classList.toggle('open');
+            toggleBtn.classList.toggle('active', rightPanel.classList.contains('open'));
+        });
+    }
+
+    // 패널 닫기
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            rightPanel.classList.remove('open');
+            if (toggleBtn) toggleBtn.classList.remove('active');
+        });
+    }
+
+    // 탭 전환
+    panelTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.panelTab;
+
+            // 탭 활성화
+            panelTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // 콘텐츠 전환
+            document.getElementById('panelAiInfo').style.display = tabName === 'ai-info' ? 'flex' : 'none';
+            document.getElementById('panelLlmChat').style.display = tabName === 'llm-chat' ? 'flex' : 'none';
+        });
+    });
+
+    // LLM 섹션에서 "패널에서 열기" 버튼
+    const openInPanelBtn = document.getElementById('openInPanelBtn');
+    if (openInPanelBtn) {
+        openInPanelBtn.addEventListener('click', () => {
+            rightPanel.classList.add('open');
+            if (toggleBtn) toggleBtn.classList.add('active');
+
+            // LLM 탭 활성화
+            panelTabs.forEach(t => {
+                t.classList.toggle('active', t.dataset.panelTab === 'llm-chat');
+            });
+            document.getElementById('panelAiInfo').style.display = 'none';
+            document.getElementById('panelLlmChat').style.display = 'flex';
+        });
+    }
+}
+
+initRightPanel();
+
+// ========================================
+// 우측 패널에 AI 분석 결과 표시
+// ========================================
+function showAIResultInPanel(fileName, analysis) {
+    const rightPanel = document.getElementById('rightPanel');
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    const toggleBtn = document.getElementById('toggleRightPanelBtn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
+
+    if (!rightPanel || !panelAiInfo) return;
+
+    // 패널 열기
+    rightPanel.classList.add('open');
+    if (toggleBtn) toggleBtn.classList.add('active');
+
+    // AI 정보 탭 활성화
+    panelTabs.forEach(t => {
+        t.classList.toggle('active', t.dataset.panelTab === 'ai-info');
+    });
+    document.getElementById('panelAiInfo').style.display = 'flex';
+    document.getElementById('panelLlmChat').style.display = 'none';
+
+    // 분석 결과 포맷팅
+    const formattedAnalysis = formatAIAnalysis(analysis);
+
+    // 콘텐츠 업데이트
+    panelAiInfo.innerHTML = `
+        <div class="panel-ai-result">
+            <div class="panel-ai-header">
+                <span class="ai-icon">✨</span>
+                <h4>AI 변경 분석</h4>
+            </div>
+            <div class="panel-file-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                </svg>
+                <span>${decodeURIComponent(fileName)}</span>
+            </div>
+            <div class="panel-ai-content">
+                ${formattedAnalysis}
+            </div>
+        </div>
+    `;
+}
+
+// ========================================
+// LLM 대화 기능
+// ========================================
+let llmConversationHistory = [];
+
+function initLLMChat() {
+    // 메인 LLM 섹션
+    const llmInput = document.getElementById('llmInput');
+    const llmSendBtn = document.getElementById('llmSendBtn');
+    const llmMessages = document.getElementById('llmMessages');
+
+    // 패널 LLM
+    const panelLlmInput = document.getElementById('panelLlmInput');
+    const panelLlmSendBtn = document.getElementById('panelLlmSendBtn');
+    const panelLlmMessages = document.getElementById('panelLlmMessages');
+
+    // 모델 정보 업데이트
+    updateLLMModelInfo();
+
+    // 메인 LLM 전송
+    if (llmSendBtn && llmInput) {
+        llmSendBtn.addEventListener('click', () => sendLLMMessage(llmInput, llmMessages, false));
+        llmInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendLLMMessage(llmInput, llmMessages, false);
+            }
+        });
+    }
+
+    // 패널 LLM 전송
+    if (panelLlmSendBtn && panelLlmInput) {
+        panelLlmSendBtn.addEventListener('click', () => sendLLMMessage(panelLlmInput, panelLlmMessages, true));
+        panelLlmInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendLLMMessage(panelLlmInput, panelLlmMessages, true);
+            }
+        });
+    }
+}
+
+async function updateLLMModelInfo() {
+    const llmModelInfo = document.getElementById('llmModelInfo');
+    if (!llmModelInfo) return;
+
+    try {
+        const response = await fetch('/api/ollama/status');
+        const data = await response.json();
+
+        if (data.ready && data.currentModel) {
+            llmModelInfo.textContent = `모델: ${data.currentModel}`;
+        } else {
+            llmModelInfo.textContent = '모델: 연결 안됨';
+            llmModelInfo.style.color = 'var(--danger)';
+        }
+    } catch (error) {
+        llmModelInfo.textContent = '모델: 오류';
+        llmModelInfo.style.color = 'var(--danger)';
+    }
+}
+
+async function sendLLMMessage(inputEl, messagesEl, isPanel) {
+    const message = inputEl.value.trim();
+    if (!message) return;
+
+    // 웰컴 메시지 제거
+    const welcomeEl = messagesEl.querySelector('.llm-welcome');
+    if (welcomeEl) welcomeEl.remove();
+
+    // 사용자 메시지 추가
+    addLLMMessage(messagesEl, message, 'user', isPanel);
+    inputEl.value = '';
+
+    // 대화 기록에 추가
+    llmConversationHistory.push({ role: 'user', content: message });
+
+    // 로딩 표시
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'llm-message assistant';
+    loadingEl.innerHTML = `
+        <div class="llm-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+            </svg>
+        </div>
+        <div class="llm-bubble">
+            <div class="llm-typing">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    `;
+    messagesEl.appendChild(loadingEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+        const response = await fetch('/api/llm/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message,
+                history: llmConversationHistory.slice(-10) // 최근 10개 대화만 전송
+            })
+        });
+
+        const data = await response.json();
+
+        // 로딩 제거
+        loadingEl.remove();
+
+        if (data.success) {
+            addLLMMessage(messagesEl, data.response, 'assistant', isPanel);
+            llmConversationHistory.push({ role: 'assistant', content: data.response });
+
+            // 양쪽 채팅 동기화
+            syncLLMMessages(messagesEl === document.getElementById('llmMessages') ? 'main' : 'panel');
+        } else {
+            addLLMMessage(messagesEl, '죄송합니다. 응답을 생성하는 중 오류가 발생했습니다: ' + (data.error || '알 수 없는 오류'), 'assistant', isPanel);
+        }
+    } catch (error) {
+        loadingEl.remove();
+        addLLMMessage(messagesEl, '서버 연결 오류: ' + error.message, 'assistant', isPanel);
+    }
+}
+
+function addLLMMessage(container, content, role, isPanel) {
+    const messageEl = document.createElement('div');
+    messageEl.className = `llm-message ${role}`;
+
+    const avatarIcon = role === 'user'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/></svg>';
+
+    // 마크다운 간단 처리
+    const formattedContent = content
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+
+    messageEl.innerHTML = `
+        <div class="llm-avatar">${avatarIcon}</div>
+        <div class="llm-bubble">${formattedContent}</div>
+    `;
+
+    container.appendChild(messageEl);
+    container.scrollTop = container.scrollHeight;
+}
+
+function syncLLMMessages(source) {
+    // 양쪽 채팅창 동기화 (선택적 기능)
+    const mainMessages = document.getElementById('llmMessages');
+    const panelMessages = document.getElementById('panelLlmMessages');
+
+    if (!mainMessages || !panelMessages) return;
+
+    // 현재는 개별 관리, 필요시 동기화 로직 추가 가능
+}
+
+initLLMChat();

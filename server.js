@@ -950,6 +950,68 @@ async function quickChangeAnalysis(filePath, action) {
                 addedTexts = [...new Set(addedTexts)];
                 removedTexts = [...new Set(removedTexts)];
 
+                // 토큰 비교로 변경을 감지하지 못한 경우, 문자 단위 diff 수행
+                // charDiff === 0이어도 내용이 다를 수 있음 (대체의 경우)
+                if (addedTexts.length === 0 && removedTexts.length === 0) {
+                    // 간단한 문자 단위 diff: 변경된 부분 찾기
+                    const findCharDiff = (prev, curr) => {
+                        const changes = { added: [], removed: [] };
+                        const prevChars = [...prev];
+                        const currChars = [...curr];
+
+                        // 앞에서부터 동일한 부분 찾기
+                        let startSame = 0;
+                        while (startSame < prevChars.length && startSame < currChars.length &&
+                               prevChars[startSame] === currChars[startSame]) {
+                            startSame++;
+                        }
+
+                        // 뒤에서부터 동일한 부분 찾기
+                        let endSamePrev = prevChars.length - 1;
+                        let endSameCurr = currChars.length - 1;
+                        while (endSamePrev > startSame && endSameCurr > startSame &&
+                               prevChars[endSamePrev] === currChars[endSameCurr]) {
+                            endSamePrev--;
+                            endSameCurr--;
+                        }
+
+                        // 삭제된 부분
+                        if (endSamePrev >= startSame) {
+                            const removed = prevChars.slice(startSame, endSamePrev + 1).join('');
+                            if (removed.trim()) {
+                                changes.removed.push(removed.length > 30 ? removed.substring(0, 30) + '...' : removed);
+                            }
+                        }
+
+                        // 추가된 부분
+                        if (endSameCurr >= startSame) {
+                            const added = currChars.slice(startSame, endSameCurr + 1).join('');
+                            if (added.trim()) {
+                                changes.added.push(added.length > 30 ? added.substring(0, 30) + '...' : added);
+                            }
+                        }
+
+                        return changes;
+                    };
+
+                    const charChanges = findCharDiff(prevText, currText);
+                    if (charChanges.added.length > 0) {
+                        addedTexts.push(...charChanges.added);
+                    }
+                    if (charChanges.removed.length > 0) {
+                        removedTexts.push(...charChanges.removed);
+                    }
+                }
+
+                // 그래도 감지 못했으면 글자수 변화만 표시
+                if (addedTexts.length === 0 && removedTexts.length === 0 && charDiff !== 0) {
+                    if (charDiff > 0) {
+                        addedTexts.push(`(${charDiff}자 추가됨)`);
+                    } else {
+                        removedTexts.push(`(${Math.abs(charDiff)}자 삭제됨)`);
+                    }
+                }
+
                 // 내용이 동일하면 이미 위에서 null 반환됨
                 // 여기까지 왔다면 실제 변경이 있는 것이므로 알림 발생
 

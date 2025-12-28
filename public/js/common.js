@@ -2227,6 +2227,9 @@ async function loadRecordings() {
 function renderRecordings(recordings) {
     if (!recordingList) return;
 
+    // 삭제 버튼 표시/숨김
+    const deleteSelectedBtn = document.getElementById('deleteSelectedRecordingsBtn');
+
     if (recordings.length === 0) {
         recordingList.innerHTML = `
             <div class="empty-state">
@@ -2238,8 +2241,11 @@ function renderRecordings(recordings) {
                 <p>저장된 녹음 파일이 없습니다</p>
             </div>
         `;
+        if (deleteSelectedBtn) deleteSelectedBtn.style.display = 'none';
         return;
     }
+
+    if (deleteSelectedBtn) deleteSelectedBtn.style.display = '';
 
     recordingList.innerHTML = recordings.map(recording => {
         const ext = recording.filename.split('.').pop().toUpperCase();
@@ -2248,6 +2254,10 @@ function renderRecordings(recordings) {
 
         return `
             <div class="recording-item">
+                <label class="recording-checkbox">
+                    <input type="checkbox" class="recording-select" data-filename="${escapeHtml(recording.filename)}" onchange="updateDeleteButtonState()">
+                    <span class="checkmark"></span>
+                </label>
                 <div class="recording-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 18V5l12-2v13"/>
@@ -2277,15 +2287,78 @@ function renderRecordings(recordings) {
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteRecordingFile('${escapeHtml(recording.filename)}')" title="삭제">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                        </svg>
-                    </button>
                 </div>
             </div>
         `;
     }).join('');
+
+    updateDeleteButtonState();
+}
+
+// 선택된 항목에 따라 삭제 버튼 상태 업데이트
+function updateDeleteButtonState() {
+    const deleteBtn = document.getElementById('deleteSelectedRecordingsBtn');
+    const checkboxes = document.querySelectorAll('.recording-select:checked');
+    const allCheckboxes = document.querySelectorAll('.recording-select');
+    const selectAllCheckbox = document.getElementById('selectAllRecordings');
+
+    if (deleteBtn) {
+        const hasSelection = checkboxes.length > 0;
+        deleteBtn.disabled = !hasSelection;
+        deleteBtn.style.opacity = hasSelection ? '1' : '0.5';
+    }
+
+    // 전체선택 체크박스 상태 동기화
+    if (selectAllCheckbox && allCheckboxes.length > 0) {
+        selectAllCheckbox.checked = checkboxes.length === allCheckboxes.length;
+        selectAllCheckbox.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
+    }
+}
+
+// 전체 선택/해제
+function toggleSelectAllRecordings() {
+    const selectAllCheckbox = document.getElementById('selectAllRecordings');
+    const checkboxes = document.querySelectorAll('.recording-select');
+    checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+    updateDeleteButtonState();
+}
+
+// 선택된 녹음 파일 삭제
+async function deleteSelectedRecordings() {
+    const checkboxes = document.querySelectorAll('.recording-select:checked');
+    if (checkboxes.length === 0) {
+        alert('삭제할 파일을 선택해주세요.');
+        return;
+    }
+
+    if (!confirm(`선택한 ${checkboxes.length}개의 녹음 파일을 삭제하시겠습니까?`)) {
+        return;
+    }
+
+    const filenames = Array.from(checkboxes).map(cb => cb.dataset.filename);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const filename of filenames) {
+        try {
+            const res = await fetch(`/api/recording/${encodeURIComponent(filename)}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (e) {
+            failCount++;
+        }
+    }
+
+    if (failCount > 0) {
+        alert(`${successCount}개 삭제 완료, ${failCount}개 삭제 실패`);
+    }
+
+    loadRecordings();
 }
 
 // 파일 크기 포맷

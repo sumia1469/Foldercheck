@@ -65,9 +65,11 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist"
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": {
+        "teamId": "UF9B4Q43XH"
+      }
     },
-    "afterSign": "notarize.js",
     "dmg": {
       "contents": [
         {

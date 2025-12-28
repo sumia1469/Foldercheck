@@ -803,6 +803,8 @@ async function loadAiModelStatus() {
         const status = await res.json();
 
         const ollamaStatus = document.getElementById('ollamaStatus');
+        const aiModelSelect = document.getElementById('aiModelSelect');
+        const aiModelDescription = document.getElementById('aiModelDescription');
 
         if (ollamaStatus) {
             if (status.ready) {
@@ -813,6 +815,25 @@ async function loadAiModelStatus() {
                 ollamaStatus.style.color = 'var(--danger)';
             }
         }
+
+        // 모델 선택 드롭다운 업데이트
+        if (aiModelSelect && status.availableModels) {
+            aiModelSelect.innerHTML = '';
+            for (const [modelId, modelInfo] of Object.entries(status.availableModels)) {
+                const option = document.createElement('option');
+                option.value = modelId;
+                option.textContent = `${modelInfo.name} (${modelInfo.size})`;
+                if (modelId === status.model) {
+                    option.selected = true;
+                }
+                aiModelSelect.appendChild(option);
+            }
+
+            // 현재 모델 설명 업데이트
+            if (aiModelDescription && status.model && status.availableModels[status.model]) {
+                aiModelDescription.textContent = status.availableModels[status.model].description;
+            }
+        }
     } catch (e) {
         console.error('AI 상태 확인 실패:', e);
         const ollamaStatus = document.getElementById('ollamaStatus');
@@ -820,6 +841,37 @@ async function loadAiModelStatus() {
             ollamaStatus.textContent = '확인 실패';
             ollamaStatus.style.color = 'var(--danger)';
         }
+    }
+}
+
+// AI 모델 변경
+async function changeAIModel(modelId) {
+    if (!modelId) return;
+
+    try {
+        const res = await fetch('/api/ollama/model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: modelId })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            // 모델 설명 업데이트
+            const aiModelDescription = document.getElementById('aiModelDescription');
+            if (aiModelDescription && result.modelInfo) {
+                aiModelDescription.textContent = result.modelInfo.description;
+            }
+
+            // 성공 메시지
+            showToast(`AI 모델이 ${result.modelInfo?.name || modelId}(으)로 변경되었습니다.`, 'success');
+        } else {
+            showToast(result.error || '모델 변경에 실패했습니다.', 'error');
+        }
+    } catch (e) {
+        console.error('AI 모델 변경 실패:', e);
+        showToast('AI 모델 변경에 실패했습니다.', 'error');
     }
 }
 

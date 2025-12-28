@@ -13,6 +13,28 @@ const { execSync, spawn } = require('child_process');
 // 라이선스 모듈
 const license = require('./license');
 
+// 패키징 여부 확인 (asar 내부인지 체크)
+const isPackaged = __dirname.includes('app.asar');
+
+// 사용자 데이터 디렉토리 (패키징 시 쓰기 가능한 경로)
+let USER_DATA_DIR;
+if (isPackaged) {
+    // main.js에서 설정한 환경변수 또는 process.resourcesPath 상위 경로 사용
+    // macOS: ~/Library/Application Support/docwatch
+    // Windows: %APPDATA%/docwatch
+    const os = require('os');
+    const appName = 'docwatch';
+    if (process.platform === 'darwin') {
+        USER_DATA_DIR = path.join(os.homedir(), 'Library', 'Application Support', appName);
+    } else if (process.platform === 'win32') {
+        USER_DATA_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), appName);
+    } else {
+        USER_DATA_DIR = path.join(os.homedir(), '.config', appName);
+    }
+} else {
+    USER_DATA_DIR = __dirname;
+}
+
 // 개발 모드 (Pro 토글 버튼 등 개발용 기능 활성화)
 const DEV_MODE = process.env.NODE_ENV !== 'production';
 
@@ -28,18 +50,41 @@ const OLLAMA_HOST = 'http://localhost:11434';
 
 // 사용 가능한 AI 모델 목록
 const AVAILABLE_MODELS = {
-    'qwen2.5:3b': { name: 'Qwen 2.5 (3B)', description: '알리바바 Qwen2.5 - 한국어 고품질 요약 (1.9GB)' }
+    'qwen2.5:3b': {
+        name: 'Qwen 2.5 (3B)',
+        description: '알리바바 Qwen2.5 3B - 빠른 속도, 가벼운 모델 (1.9GB)',
+        size: '1.9GB'
+    },
+    'qwen2.5:7b-instruct-q4_K_M': {
+        name: 'Qwen 2.5 (7B Q4_K_M)',
+        description: '알리바바 Qwen2.5 7B - 높은 품질, 균형잡힌 성능 (4.7GB)',
+        size: '4.7GB'
+    }
 };
 
-// 기본 AI 모델 (품질 개선된 Qwen2.5로 변경)
+// 기본 AI 모델
 let CURRENT_AI_MODEL = 'qwen2.5:3b';
 
 const PORT = 4400;
-const CONFIG_FILE = 'folderList.json';
-const SETTINGS_FILE = 'settings.json';
-const MEETINGS_FILE = 'meetings.json';
-const MEETINGS_DIR = path.join(__dirname, 'meetings');
-const TEMPLATES_DIR = path.join(__dirname, 'templates');
+
+// 설정 파일들은 userData 디렉토리에 저장
+const CONFIG_FILE = path.join(USER_DATA_DIR, 'folderList.json');
+const SETTINGS_FILE = path.join(USER_DATA_DIR, 'settings.json');
+const MEETINGS_FILE = path.join(USER_DATA_DIR, 'meetings.json');
+
+// 패키징 환경에서는 userData 디렉토리 사용, 개발 환경에서는 프로젝트 디렉토리 사용
+const MEETINGS_DIR = path.join(USER_DATA_DIR, 'meetings');
+const TEMPLATES_DIR = path.join(USER_DATA_DIR, 'templates');
+
+console.log('isPackaged:', isPackaged);
+console.log('USER_DATA_DIR:', USER_DATA_DIR);
+console.log('MEETINGS_DIR:', MEETINGS_DIR);
+console.log('TEMPLATES_DIR:', TEMPLATES_DIR);
+
+// userData 디렉토리 초기화 (패키징 환경에서 필수)
+if (!fs.existsSync(USER_DATA_DIR)) {
+    fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+}
 
 // 디렉토리 초기화
 if (!fs.existsSync(MEETINGS_DIR)) {
@@ -972,7 +1017,7 @@ function generateCSV(logs) {
 
 // 문서 변경 이력 저장소
 let documentHistory = {};
-const DOC_HISTORY_FILE = 'docHistory.json';
+const DOC_HISTORY_FILE = path.join(USER_DATA_DIR, 'docHistory.json');
 
 // 문서 이력 로드
 function loadDocHistory() {

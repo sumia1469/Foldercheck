@@ -2,6 +2,7 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { execSync } = require('child_process');
 const net = require('net');
 
@@ -9,9 +10,24 @@ let mainWindow;
 let tray;
 const PORT = 4400;
 
+// 패키징 여부 확인 (asar 내부인지 체크 - app.isPackaged보다 먼저 사용 가능)
+const isPackaged = __dirname.includes('app.asar');
+
+// 사용자 데이터 디렉토리 계산
+function getUserDataDir() {
+    const appName = 'docwatch';
+    if (process.platform === 'darwin') {
+        return path.join(os.homedir(), 'Library', 'Application Support', appName);
+    } else if (process.platform === 'win32') {
+        return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), appName);
+    } else {
+        return path.join(os.homedir(), '.config', appName);
+    }
+}
+
 // 로그 파일 설정
-const LOG_DIR = app.isPackaged
-    ? path.join(app.getPath('userData'), 'logs')
+const LOG_DIR = isPackaged
+    ? path.join(getUserDataDir(), 'logs')
     : path.join(__dirname, 'logs');
 
 if (!fs.existsSync(LOG_DIR)) {
@@ -27,7 +43,11 @@ const originalConsoleError = console.error.bind(console);
 function writeLog(level, message) {
     const timestamp = new Date().toISOString();
     const logLine = `[${timestamp}] [${level}] ${message}`;
-    fs.appendFileSync(LOG_FILE, logLine + '\n');
+    try {
+        fs.appendFileSync(LOG_FILE, logLine + '\n');
+    } catch (e) {
+        // 로그 쓰기 실패 시 무시
+    }
 
     // 원본 콘솔에도 출력
     if (level === 'ERROR') {
@@ -47,7 +67,7 @@ console.error = (...args) => {
 
 console.log('=== DocWatch 시작 ===');
 console.log(`로그 파일: ${LOG_FILE}`);
-console.log(`앱 패키징 여부: ${app.isPackaged}`);
+console.log(`앱 패키징 여부: ${isPackaged}`);
 
 // 포트 사용 중인 프로세스 종료 (크로스 플랫폼)
 function killProcessOnPort(port) {
@@ -229,10 +249,25 @@ if (!gotTheLock) {
 
     app.whenReady().then(async () => {
         console.log('App ready, starting server...');
+        console.log('__dirname:', __dirname);
+        console.log('process.resourcesPath:', process.resourcesPath);
+
         await ensurePortAvailable();
 
         // 서버 모듈 로드
-        require('./server.js');
+        try {
+            console.log('Loading server.js...');
+            require('./server.js');
+            console.log('server.js loaded successfully');
+        } catch (err) {
+            console.error('Failed to load server.js:', err.message);
+            console.error('Stack:', err.stack);
+
+            // 오류 발생 시에도 기본 창은 표시
+            const { dialog } = require('electron');
+            dialog.showErrorBox('서버 시작 오류', `서버를 시작할 수 없습니다.\n\n${err.message}`);
+            return;
+        }
 
         // 서버가 완전히 시작될 때까지 대기
         console.log('Waiting for server to be ready...');

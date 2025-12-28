@@ -2015,6 +2015,46 @@ body {
     color: var(--danger);
 }
 
+/* AI 모델 선택 드롭다운 */
+.ai-model-select {
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 180px;
+    transition: all 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 32px;
+}
+
+.ai-model-select:hover {
+    border-color: var(--accent-primary);
+}
+
+.ai-model-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.ai-model-select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+.ai-model-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* ========================================
    문서 분석 모달 스타일
    ======================================== */

@@ -345,9 +345,12 @@ function renderLogs() {
             </button>
         ` : '';
 
-        // 변경 요약 아이콘 (클릭 시 팝업)
+        // Free 버전 여부 확인
+        const isFreeVersion = currentLicenseStatus && currentLicenseStatus.type === 'free';
+
+        // 변경 요약 아이콘 (클릭 시 팝업) - Free 버전에서는 숨김
         let changeSummaryBtn = '';
-        if (log.changeSummary && log.changeSummary.summary) {
+        if (!isFreeVersion && log.changeSummary && log.changeSummary.summary) {
             const summaryClass = log.changeSummary.type === 'new' ? 'summary-new' :
                                 log.changeSummary.type === 'deleted' ? 'summary-deleted' : 'summary-modified';
             const summaryData = encodeURIComponent(JSON.stringify(log.changeSummary));
@@ -363,6 +366,30 @@ function renderLogs() {
             `;
         }
 
+        // 폴더/파일 열기 버튼 - Free 버전에서는 숨김
+        let fileOpenBtn = '';
+        let folderOpenBtn = '';
+        if (!isFreeVersion) {
+            fileOpenBtn = `
+                <button class="btn btn-icon" onclick="openFile('${escapedFullPath}')" title="파일 위치 열기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                    </svg>
+                </button>
+            `;
+            folderOpenBtn = `
+                <button class="btn btn-icon" onclick="openFolder('${escapedFolder}')" title="폴더 열기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                    </svg>
+                </button>
+            `;
+        }
+
+        // Free 버전에서는 요약 버튼도 숨김
+        const analyzeBtnFinal = isFreeVersion ? '' : analyzeBtn;
+
         return `
             <div class="log-entry">
                 <span class="log-time">${time}</span>
@@ -373,18 +400,9 @@ function renderLogs() {
                 </div>
                 <div class="log-actions">
                     ${changeSummaryBtn}
-                    <button class="btn btn-icon" onclick="openFile('${escapedFullPath}')" title="파일 위치 열기">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                            <path d="M14 2v6h6"/>
-                        </svg>
-                    </button>
-                    <button class="btn btn-icon" onclick="openFolder('${escapedFolder}')" title="폴더 열기">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                        </svg>
-                    </button>
-                    ${analyzeBtn}
+                    ${fileOpenBtn}
+                    ${folderOpenBtn}
+                    ${analyzeBtnFinal}
                 </div>
             </div>
         `;
@@ -409,9 +427,12 @@ function updateHeaderStats() {
 // 알림 표시
 function showNotification(log) {
     if (settings.notifications?.desktop && Notification.permission === 'granted') {
-        // 변경 요약이 있으면 알림에 포함
+        // Free 버전 여부 확인
+        const isFreeVersion = currentLicenseStatus && currentLicenseStatus.type === 'free';
+
+        // 변경 요약이 있으면 알림에 포함 (Free 버전에서는 제외)
         let body = log.file;
-        if (log.changeSummary && log.changeSummary.summary) {
+        if (!isFreeVersion && log.changeSummary && log.changeSummary.summary) {
             body += `\n📊 ${log.changeSummary.summary}`;
         }
         body += `\n📂 ${log.folder}`;
@@ -1305,8 +1326,22 @@ async function startRecording() {
             }
         };
 
-        mediaRecorder.onstop = () => {
+        mediaRecorder.onstop = async () => {
             recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+            // 서버에 녹음 파일 저장
+            try {
+                const title = meetingTitleInput?.value || '회의녹음';
+                const saved = await saveRecordingToServer(recordedBlob, title);
+                if (saved) {
+                    console.log('녹음 파일 서버 저장 완료:', saved.filename);
+                    // 녹음 파일 목록 새로고침
+                    loadRecordings();
+                }
+            } catch (e) {
+                console.error('녹음 파일 서버 저장 실패:', e);
+            }
+
             showRecordingComplete();
         };
 
@@ -1496,6 +1531,29 @@ function resetRecording() {
     }
 
     updateRecordingUI('ready');
+}
+
+// 녹음 파일을 서버에 저장
+async function saveRecordingToServer(blob, title) {
+    try {
+        const formData = new FormData();
+        const filename = `${title || '회의녹음'}.webm`;
+        formData.append('file', blob, filename);
+
+        const res = await fetch('/api/recordings', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!res.ok) {
+            throw new Error('서버 저장 실패');
+        }
+
+        return await res.json();
+    } catch (e) {
+        console.error('녹음 파일 서버 저장 오류:', e);
+        return null;
+    }
 }
 
 // 녹음 파일 다운로드 (WAV로 변환)
@@ -2469,15 +2527,25 @@ function updateLicenseUI(status) {
         }
         if (proStatus) proStatus.style.display = 'none';
         if (activationUI) activationUI.style.display = 'block';
+    } else if (status.type === 'free') {
+        // Free 버전
+        licenseType.textContent = 'Free (제한 버전)';
+        licenseType.style.color = 'var(--text-muted)';
+        if (proStatus) proStatus.style.display = 'none';
+        if (activationUI) activationUI.style.display = 'block';
     }
 
     // 만료일 표시
     if (status.expiresAt) {
         licenseExpiry.textContent = new Date(status.expiresAt).toLocaleDateString('ko-KR');
+    } else if (status.type === 'free') {
+        licenseExpiry.textContent = '만료 없음';
+    } else {
+        licenseExpiry.textContent = '-';
     }
 
     // 남은 일수
-    if (status.daysRemaining > 0 && !status.isPro) {
+    if (status.daysRemaining > 0 && !status.isPro && status.type !== 'free') {
         licenseDaysRow.style.display = 'flex';
         licenseDays.textContent = `${status.daysRemaining}일`;
         if (status.daysRemaining <= 3) {
@@ -2494,15 +2562,50 @@ function updateLicenseUI(status) {
 function applyFeatureRestrictions(status) {
     const recordingCard = document.querySelector('.recording-card');
     const recordingList = document.getElementById('recordingList')?.closest('.settings-card');
+    const meetingNavItem = document.querySelector('.nav-item[data-section="meeting"]');
+    const meetingSection = document.getElementById('meeting');
+    const whisperSettingsCard = document.getElementById('whisperStatusSettings')?.closest('.settings-card');
+    const aiModelSettingsCard = document.getElementById('aiModelStatusSettings')?.closest('.settings-card');
 
     if (!status.features.meetingTranscription) {
-        // 회의 녹음 기능 제한
+        // 회의 녹음 기능 제한 - 메뉴 숨김
+        if (meetingNavItem) {
+            meetingNavItem.style.display = 'none';
+        }
+        if (meetingSection) {
+            meetingSection.style.display = 'none';
+        }
         if (recordingCard) {
             recordingCard.classList.add('feature-locked');
         }
+        // 음성 인식 설정 숨김
+        if (whisperSettingsCard) {
+            whisperSettingsCard.style.display = 'none';
+        }
     } else {
+        // 기능 활성화 - 메뉴 표시
+        if (meetingNavItem) {
+            meetingNavItem.style.display = '';
+        }
+        if (meetingSection) {
+            meetingSection.style.display = '';
+        }
         if (recordingCard) {
             recordingCard.classList.remove('feature-locked');
+        }
+        if (whisperSettingsCard) {
+            whisperSettingsCard.style.display = '';
+        }
+    }
+
+    if (!status.features.aiSummary) {
+        // AI 요약 기능 제한 - 설정 숨김
+        if (aiModelSettingsCard) {
+            aiModelSettingsCard.style.display = 'none';
+        }
+    } else {
+        if (aiModelSettingsCard) {
+            aiModelSettingsCard.style.display = '';
         }
     }
 }

@@ -19,9 +19,11 @@ models/*.bin
 *.wav
 *.mp3
 *.m4a
+*.webm
 meetings/*.wav
 meetings/*.mp3
 meetings/*.m4a
+meetings/*.webm
 
 # Meeting transcripts (회의록)
 meetings/transcript_*.txt

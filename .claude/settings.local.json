@@ -59,7 +59,8 @@
       "Bash(/usr/bin/head:*)",
       "Bash(ollama rm:*)",
       "Bash(ollama list:*)",
-      "Bash(ffmpeg:*)"
+      "Bash(ffmpeg:*)",
+      "Bash(python3:*)"
     ]
   }
 }

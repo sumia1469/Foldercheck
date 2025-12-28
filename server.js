@@ -1939,6 +1939,15 @@ function getContentType(ext) {
     return types[ext] || 'text/plain; charset=utf-8';
 }
 
+// 파일 크기 포맷
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 // JSON 바디 파싱
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -2527,6 +2536,45 @@ const server = http.createServer(async (req, res) => {
             } catch (e) {
                 console.error('AI 요약 오류:', e);
                 clearProgress();
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+            return;
+        }
+
+        // API: 녹음 파일 저장 (브라우저에서 녹음한 파일 업로드)
+        if (pathname === '/api/recordings' && req.method === 'POST') {
+            try {
+                const fileData = await parseMultipart(req);
+
+                if (!fileData || !fileData.content) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: '파일이 없습니다' }));
+                    return;
+                }
+
+                // 파일명 생성
+                const date = new Date().toISOString().slice(0, 10);
+                const time = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
+                const originalName = fileData.filename || 'recording.webm';
+                const ext = path.extname(originalName) || '.webm';
+                const baseName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9가-힣_-]/g, '_');
+                const newFilename = `${baseName}_${date}_${time}${ext}`;
+                const filePath = path.join(MEETINGS_DIR, newFilename);
+
+                // 파일 저장
+                fs.writeFileSync(filePath, fileData.content);
+                console.log(`녹음 파일 저장: ${newFilename} (${fileData.content.length} bytes)`);
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    filename: newFilename,
+                    path: filePath,
+                    size: fileData.content.length
+                }));
+            } catch (e) {
+                console.error('녹음 파일 저장 오류:', e);
                 res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: e.message }));
             }

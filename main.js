@@ -9,6 +9,46 @@ let mainWindow;
 let tray;
 const PORT = 4400;
 
+// 로그 파일 설정
+const LOG_DIR = app.isPackaged
+    ? path.join(app.getPath('userData'), 'logs')
+    : path.join(__dirname, 'logs');
+
+if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+}
+
+const LOG_FILE = path.join(LOG_DIR, `docwatch-${new Date().toISOString().slice(0, 10)}.log`);
+
+// 기존 console 함수 저장
+const originalConsoleLog = console.log.bind(console);
+const originalConsoleError = console.error.bind(console);
+
+function writeLog(level, message) {
+    const timestamp = new Date().toISOString();
+    const logLine = `[${timestamp}] [${level}] ${message}`;
+    fs.appendFileSync(LOG_FILE, logLine + '\n');
+
+    // 원본 콘솔에도 출력
+    if (level === 'ERROR') {
+        originalConsoleError(logLine);
+    } else {
+        originalConsoleLog(logLine);
+    }
+}
+
+// console 함수 래핑
+console.log = (...args) => {
+    writeLog('INFO', args.join(' '));
+};
+console.error = (...args) => {
+    writeLog('ERROR', args.join(' '));
+};
+
+console.log('=== DocWatch 시작 ===');
+console.log(`로그 파일: ${LOG_FILE}`);
+console.log(`앱 패키징 여부: ${app.isPackaged}`);
+
 // 포트 사용 중인 프로세스 종료 (크로스 플랫폼)
 function killProcessOnPort(port) {
     try {

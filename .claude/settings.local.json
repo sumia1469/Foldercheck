@@ -61,7 +61,11 @@
       "Bash(ollama list:*)",
       "Bash(ffmpeg:*)",
       "Bash(python3:*)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(# 현재 실행 중인 DocWatch 프로세스 종료 pkill -f \"\"DocWatch\"\" lsof -ti:4400)",
+      "Bash(__NEW_LINE__ echo \"\")",
+      "Bash(grep -i doc echo \"\" echo \"=== 포트 4400 상태 ===\" lsof -i:4400)",
+      "Bash(# 앱 직접 실행하고 출력 캡처 echo \"\"=== DocWatch 앱 직접 실행 ===\"\" /Users/ibyeonghyeon/docwatch/docwatch/dist/mac-arm64/DocWatch.app/Contents/MacOS/DocWatch 2>&1 & PID=$! # 3초 대기 /bin/sleep 3 # 프로세스 상태 확인 if kill -0 $PID ; then echo \"\"앱이 실행 중입니다 \\(PID: $PID\\)\"\" else echo \"\"앱이 종료되었습니다\"\" fi # 포트 확인 echo \"\"\"\" echo \"\"=== 포트 4400 ===\"\" lsof -i:4400)"
     ]
   }
 }

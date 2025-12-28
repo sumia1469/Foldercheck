@@ -4535,9 +4535,6 @@ function initLLMChat() {
     const panelLlmSendBtn = document.getElementById('panelLlmSendBtn');
     const panelLlmMessages = document.getElementById('panelLlmMessages');
 
-    // 모델 정보 업데이트
-    updateLLMModelInfo();
-
     // 메인 LLM 전송
     if (llmSendBtn && llmInput) {
         llmSendBtn.addEventListener('click', () => sendLLMMessage(llmInput, llmMessages, false));
@@ -4565,32 +4562,6 @@ function initLLMChat() {
     }
 }
 
-async function updateLLMModelInfo() {
-    const llmModelInfo = document.getElementById('llmModelInfo');
-    if (!llmModelInfo) return;
-
-    try {
-        const response = await fetch('/api/ollama/status');
-        const data = await response.json();
-
-        // model 필드가 현재 선택된 모델
-        const currentModel = data.model || data.currentModel;
-
-        if (data.ready && currentModel) {
-            // availableModels에서 친화적 이름 가져오기
-            const modelInfo = data.availableModels?.[currentModel];
-            const displayName = modelInfo ? modelInfo.name : currentModel;
-            llmModelInfo.textContent = `모델: ${displayName}`;
-            llmModelInfo.style.color = '';
-        } else {
-            llmModelInfo.textContent = '모델: 연결 안됨';
-            llmModelInfo.style.color = 'var(--danger)';
-        }
-    } catch (error) {
-        llmModelInfo.textContent = '모델: 오류';
-        llmModelInfo.style.color = 'var(--danger)';
-    }
-}
 
 async function sendLLMMessage(inputEl, messagesEl, isPanel) {
     const message = inputEl.value.trim();

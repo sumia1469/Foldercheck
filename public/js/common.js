@@ -4624,8 +4624,15 @@ async function updateLLMModelInfo() {
         const response = await fetch('/api/ollama/status');
         const data = await response.json();
 
-        if (data.ready && data.currentModel) {
-            llmModelInfo.textContent = `모델: ${data.currentModel}`;
+        // model 필드가 현재 선택된 모델
+        const currentModel = data.model || data.currentModel;
+
+        if (data.ready && currentModel) {
+            // availableModels에서 친화적 이름 가져오기
+            const modelInfo = data.availableModels?.[currentModel];
+            const displayName = modelInfo ? modelInfo.name : currentModel;
+            llmModelInfo.textContent = `모델: ${displayName}`;
+            llmModelInfo.style.color = '';
         } else {
             llmModelInfo.textContent = '모델: 연결 안됨';
             llmModelInfo.style.color = 'var(--danger)';

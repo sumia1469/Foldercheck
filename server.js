@@ -48,17 +48,61 @@ const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
 // Ollama 설정 (로컬 LLM)
 const OLLAMA_HOST = 'http://localhost:11434';
 
-// 사용 가능한 AI 모델 목록
+// 사용 가능한 AI 모델 목록 (로컬 + 외부 API)
 const AVAILABLE_MODELS = {
+    // 로컬 모델 (Ollama)
     'qwen2.5:3b': {
         name: 'Qwen 2.5 (3B)',
         description: '알리바바 Qwen2.5 3B - 빠른 속도, 가벼운 모델 (1.9GB)',
-        size: '1.9GB'
+        size: '1.9GB',
+        type: 'local'
     },
     'qwen2.5:7b-instruct-q4_K_M': {
         name: 'Qwen 2.5 (7B Q4_K_M)',
         description: '알리바바 Qwen2.5 7B - 높은 품질, 균형잡힌 성능 (4.7GB)',
-        size: '4.7GB'
+        size: '4.7GB',
+        type: 'local'
+    },
+    // 외부 API 모델
+    'openai:gpt-4o-mini': {
+        name: 'GPT-4o Mini (OpenAI)',
+        description: 'OpenAI GPT-4o Mini - 빠르고 경제적인 모델 (API 키 필요)',
+        size: '온라인',
+        type: 'openai',
+        apiModel: 'gpt-4o-mini'
+    },
+    'openai:gpt-4o': {
+        name: 'GPT-4o (OpenAI)',
+        description: 'OpenAI GPT-4o - 고성능 멀티모달 모델 (API 키 필요)',
+        size: '온라인',
+        type: 'openai',
+        apiModel: 'gpt-4o'
+    },
+    'gemini:gemini-1.5-flash': {
+        name: 'Gemini 1.5 Flash (Google)',
+        description: 'Google Gemini 1.5 Flash - 빠르고 효율적인 모델 (API 키 필요)',
+        size: '온라인',
+        type: 'gemini',
+        apiModel: 'gemini-1.5-flash'
+    },
+    'gemini:gemini-1.5-pro': {
+        name: 'Gemini 1.5 Pro (Google)',
+        description: 'Google Gemini 1.5 Pro - 고성능 모델 (API 키 필요)',
+        size: '온라인',
+        type: 'gemini',
+        apiModel: 'gemini-1.5-pro'
+    }
+};
+
+// 외부 API 설정
+let externalApiSettings = {
+    openai: {
+        apiKey: '',
+        enabled: false
+    },
+    gemini: {
+        apiKey: '',
+        enabled: false
     }
 };
 
@@ -310,6 +354,11 @@ function loadSettings() {
             if (settings.aiModel && AVAILABLE_MODELS[settings.aiModel]) {
                 CURRENT_AI_MODEL = settings.aiModel;
                 console.log(`AI 모델 설정 로드: ${CURRENT_AI_MODEL}`);
+            }
+            // 외부 API 설정 로드
+            if (settings.externalApi) {
+                externalApiSettings = { ...externalApiSettings, ...settings.externalApi };
+                console.log('외부 API 설정 로드 완료');
             }
             console.log('고급 설정 로드 완료');
         }
@@ -1586,6 +1635,202 @@ function generateDocumentOverview(content, ext) {
         .map(([word, count]) => ({ word, count }));
 
     return overview;
+}
+
+// ========================================
+// 외부 AI API 호출 함수
+// ========================================
+
+// OpenAI API 호출
+async function callOpenAI(prompt, systemPrompt, modelId) {
+    const modelInfo = AVAILABLE_MODELS[modelId];
+    if (!modelInfo || !externalApiSettings.openai.apiKey) {
+        throw new Error('OpenAI API 키가 설정되지 않았습니다');
+    }
+
+    const https = require('https');
+    const postData = JSON.stringify({
+        model: modelInfo.apiModel,
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 2000
+    });
+
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'api.openai.com',
+            port: 443,
+            path: '/v1/chat/completions',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${externalApiSettings.openai.apiKey}`,
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    if (result.error) {
+                        reject(new Error(result.error.message));
+                    } else {
+                        resolve(result.choices[0].message.content);
+                    }
+                } catch (e) {
+                    reject(new Error('OpenAI 응답 파싱 오류'));
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.setTimeout(120000, () => {
+            req.destroy();
+            reject(new Error('OpenAI API 타임아웃'));
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
+// Google Gemini API 호출
+async function callGemini(prompt, systemPrompt, modelId) {
+    const modelInfo = AVAILABLE_MODELS[modelId];
+    if (!modelInfo || !externalApiSettings.gemini.apiKey) {
+        throw new Error('Gemini API 키가 설정되지 않았습니다');
+    }
+
+    const https = require('https');
+    const postData = JSON.stringify({
+        contents: [{
+            parts: [{ text: `${systemPrompt}\n\n${prompt}` }]
+        }],
+        generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2000
+        }
+    });
+
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'generativelanguage.googleapis.com',
+            port: 443,
+            path: `/v1beta/models/${modelInfo.apiModel}:generateContent?key=${externalApiSettings.gemini.apiKey}`,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    if (result.error) {
+                        reject(new Error(result.error.message));
+                    } else if (result.candidates && result.candidates[0]) {
+                        resolve(result.candidates[0].content.parts[0].text);
+                    } else {
+                        reject(new Error('Gemini 응답이 비어 있습니다'));
+                    }
+                } catch (e) {
+                    reject(new Error('Gemini 응답 파싱 오류'));
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.setTimeout(120000, () => {
+            req.destroy();
+            reject(new Error('Gemini API 타임아웃'));
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
+// 통합 AI 호출 함수 (모델 타입에 따라 적절한 API 호출)
+async function callAI(prompt, systemPrompt, numPredict = 2000) {
+    const modelInfo = AVAILABLE_MODELS[CURRENT_AI_MODEL];
+    if (!modelInfo) {
+        throw new Error('알 수 없는 AI 모델입니다');
+    }
+
+    const modelType = modelInfo.type || 'local';
+
+    switch (modelType) {
+        case 'openai':
+            return await callOpenAI(prompt, systemPrompt, CURRENT_AI_MODEL);
+        case 'gemini':
+            return await callGemini(prompt, systemPrompt, CURRENT_AI_MODEL);
+        case 'local':
+        default:
+            // 기존 Ollama 호출 (로컬)
+            return await callLocalOllama(prompt, systemPrompt, numPredict);
+    }
+}
+
+// 로컬 Ollama 호출
+async function callLocalOllama(prompt, systemPrompt, numPredict = 2000) {
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
+            model: CURRENT_AI_MODEL,
+            prompt: prompt,
+            system: systemPrompt,
+            stream: false,
+            options: {
+                temperature: 0.3,
+                num_predict: numPredict,
+                num_ctx: 4096,
+                num_thread: 4,
+                num_batch: 256
+            }
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    resolve(result.response || '응답 생성 실패');
+                } catch (e) {
+                    reject(new Error('응답 파싱 오류'));
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.setTimeout(600000, () => {
+            req.destroy();
+            reject(new Error('AI 응답 타임아웃 (10분)'));
+        });
+
+        req.write(postData);
+        req.end();
+    });
 }
 
 // ========================================

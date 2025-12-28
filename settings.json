@@ -1,0 +1,14 @@
+{
+  "filters": [],
+  "excludePatterns": [],
+  "notifications": {
+    "desktop": true,
+    "sound": true
+  },
+  "telegram": {
+    "enabled": false,
+    "botToken": "",
+    "chatId": ""
+  },
+  "aiModel": "qwen2.5:7b-instruct-q4_K_M"
+}

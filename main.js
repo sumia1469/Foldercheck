@@ -3,12 +3,14 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, systemPref
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const net = require('net');
 
 let mainWindow;
 let tray;
+let ollamaProcess = null; // 내장 Ollama 프로세스
 const PORT = 4400;
+const OLLAMA_PORT = 11434;
 
 // 패키징 여부 확인 (asar 내부인지 체크 - app.isPackaged보다 먼저 사용 가능)
 const isPackaged = __dirname.includes('app.asar');
@@ -68,6 +70,165 @@ console.error = (...args) => {
 console.log('=== DocWatch 시작 ===');
 console.log(`로그 파일: ${LOG_FILE}`);
 console.log(`앱 패키징 여부: ${isPackaged}`);
+
+// ===== 내장 Ollama 관련 함수 =====
+
+// 내장 Ollama 경로 반환
+function getEmbeddedOllamaPath() {
+    if (isPackaged) {
+        // 패키징된 앱: resources/ollama 폴더
+        return path.join(process.resourcesPath, 'ollama');
+    } else {
+        // 개발 모드: 프로젝트 폴더의 resources/ollama
+        return path.join(__dirname, 'resources', 'ollama');
+    }
+}
+
+// Ollama 모델 디렉토리 설정 (내장 모델 사용)
+function getOllamaModelsPath() {
+    const ollamaDir = getEmbeddedOllamaPath();
+    const modelsPath = path.join(ollamaDir, 'models');
+
+    // 내장 모델이 있으면 사용, 없으면 기본 경로
+    if (fs.existsSync(modelsPath)) {
+        return modelsPath;
+    }
+    return path.join(os.homedir(), '.ollama', 'models');
+}
+
+// Ollama가 실행 중인지 확인
+async function isOllamaRunning() {
+    return new Promise((resolve) => {
+        const http = require('http');
+        const req = http.get(`http://localhost:${OLLAMA_PORT}/api/tags`, (res) => {
+            resolve(true);
+        });
+        req.on('error', () => resolve(false));
+        req.setTimeout(2000, () => {
+            req.destroy();
+            resolve(false);
+        });
+    });
+}
+
+// 시스템 Ollama 찾기
+function findSystemOllama() {
+    try {
+        if (process.platform === 'win32') {
+            const result = execSync('where ollama', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+            return result.trim().split('\n')[0];
+        } else {
+            const result = execSync('which ollama', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+            return result.trim();
+        }
+    } catch (e) {
+        return null;
+    }
+}
+
+// 내장 Ollama 실행
+async function startEmbeddedOllama() {
+    // 이미 Ollama가 실행 중이면 스킵
+    if (await isOllamaRunning()) {
+        console.log('Ollama가 이미 실행 중입니다.');
+        return true;
+    }
+
+    const ollamaDir = getEmbeddedOllamaPath();
+    const ollamaBinary = path.join(ollamaDir, process.platform === 'win32' ? 'ollama.exe' : 'ollama');
+
+    // 내장 Ollama 존재 확인
+    if (!fs.existsSync(ollamaBinary)) {
+        console.log('내장 Ollama를 찾을 수 없습니다:', ollamaBinary);
+
+        // 시스템 Ollama 확인
+        const systemOllama = findSystemOllama();
+        if (systemOllama) {
+            console.log('시스템 Ollama 사용:', systemOllama);
+            return true; // 시스템 Ollama가 있으면 사용
+        }
+
+        return false;
+    }
+
+    console.log('내장 Ollama 실행 중...', ollamaBinary);
+
+    // 환경 변수 설정 (모델 경로)
+    const env = {
+        ...process.env,
+        OLLAMA_MODELS: getOllamaModelsPath(),
+        OLLAMA_HOST: `localhost:${OLLAMA_PORT}`
+    };
+
+    return new Promise((resolve) => {
+        try {
+            // Ollama serve 실행
+            ollamaProcess = spawn(ollamaBinary, ['serve'], {
+                env,
+                stdio: ['ignore', 'pipe', 'pipe'],
+                detached: false
+            });
+
+            ollamaProcess.stdout.on('data', (data) => {
+                console.log('[Ollama]', data.toString().trim());
+            });
+
+            ollamaProcess.stderr.on('data', (data) => {
+                console.log('[Ollama]', data.toString().trim());
+            });
+
+            ollamaProcess.on('error', (err) => {
+                console.error('Ollama 실행 오류:', err.message);
+                resolve(false);
+            });
+
+            ollamaProcess.on('exit', (code) => {
+                console.log('Ollama 종료됨, 코드:', code);
+                ollamaProcess = null;
+            });
+
+            // Ollama가 준비될 때까지 대기
+            let retries = 0;
+            const maxRetries = 30;
+
+            const checkReady = async () => {
+                if (await isOllamaRunning()) {
+                    console.log('내장 Ollama 시작 완료!');
+                    resolve(true);
+                } else if (retries < maxRetries) {
+                    retries++;
+                    setTimeout(checkReady, 1000);
+                } else {
+                    console.log('Ollama 시작 시간 초과');
+                    resolve(false);
+                }
+            };
+
+            setTimeout(checkReady, 2000);
+
+        } catch (err) {
+            console.error('Ollama 실행 실패:', err.message);
+            resolve(false);
+        }
+    });
+}
+
+// 내장 Ollama 종료
+function stopEmbeddedOllama() {
+    if (ollamaProcess) {
+        console.log('내장 Ollama 종료 중...');
+        try {
+            if (process.platform === 'win32') {
+                execSync(`taskkill /F /PID ${ollamaProcess.pid}`, { stdio: 'ignore' });
+            } else {
+                ollamaProcess.kill('SIGTERM');
+            }
+        } catch (e) {
+            console.log('Ollama 종료 오류:', e.message);
+        }
+        ollamaProcess = null;
+    }
+}
 
 // 포트 사용 중인 프로세스 종료 (크로스 플랫폼)
 function killProcessOnPort(port) {
@@ -264,6 +425,15 @@ if (!gotTheLock) {
             }
         }
 
+        // 내장 Ollama 시작
+        console.log('내장 AI 엔진 시작 중...');
+        const ollamaStarted = await startEmbeddedOllama();
+        if (ollamaStarted) {
+            console.log('AI 엔진 준비 완료');
+        } else {
+            console.log('AI 엔진을 시작할 수 없습니다. 일부 기능이 제한됩니다.');
+        }
+
         await ensurePortAvailable();
 
         // 서버 모듈 로드
@@ -294,6 +464,7 @@ if (!gotTheLock) {
 // 앱 종료 전 처리
 app.on('before-quit', () => {
     app.isQuitting = true;
+    stopEmbeddedOllama(); // 내장 Ollama 종료
 });
 
 app.on('window-all-closed', () => {

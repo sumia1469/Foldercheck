@@ -15,6 +15,10 @@ dist-ssr
 # Large AI model files
 models/*.bin
 
+# Embedded Ollama (내장 AI - 용량이 큼)
+resources/ollama/
+offline-install/
+
 # Audio files (회의 녹음)
 *.wav
 *.mp3

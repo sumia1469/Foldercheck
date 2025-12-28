@@ -50,9 +50,20 @@
       "settings.json",
       "docHistory.json",
       "templates/**/*",
-      "resources/**/*",
       "meetings/**/*",
+      "models/**/*",
       "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/ollama",
+        "to": "ollama",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "resources/ollama/**/*"
     ],
     "mac": {
       "target": [

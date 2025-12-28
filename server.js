@@ -1822,14 +1822,350 @@ ${changeContent}
 }
 
 // LLM 채팅 함수
+// LLM 데이터 검색 함수들
+function searchDocHistory(query) {
+    const results = [];
+    const lowerQuery = query.toLowerCase();
+
+    for (const [key, value] of Object.entries(docHistory)) {
+        const fileName = value.fileName || key;
+        const content = value.content?.text || JSON.stringify(value.content);
+        const changes = value.changes || [];
+
+        // 파일명 또는 내용에서 검색
+        if (fileName.toLowerCase().includes(lowerQuery) ||
+            content.toLowerCase().includes(lowerQuery)) {
+            results.push({
+                type: 'document',
+                fileName: fileName,
+                analyzedAt: value.analyzedAt,
+                preview: content.substring(0, 200) + '...',
+                changeCount: changes.length
+            });
+        }
+
+        // 변경 내역에서 검색
+        changes.forEach((change, idx) => {
+            const changeSummary = change.aiSummary || change.summary || '';
+            const changeImprovement = change.improvement || '';
+            if (changeSummary.toLowerCase().includes(lowerQuery) ||
+                changeImprovement.toLowerCase().includes(lowerQuery)) {
+                results.push({
+                    type: 'change',
+                    fileName: fileName,
+                    changeIndex: idx + 1,
+                    timestamp: change.timestamp,
+                    summary: changeSummary.substring(0, 150),
+                    improvement: changeImprovement.substring(0, 150)
+                });
+            }
+        });
+    }
+
+    return results.slice(0, 10); // 최대 10개 결과
+}
+
+function searchMeetings(query) {
+    const results = [];
+    const lowerQuery = query.toLowerCase();
+
+    meetings.forEach(meeting => {
+        const title = meeting.title || '';
+        const transcript = meeting.transcript || '';
+        const summary = meeting.summary || '';
+
+        if (title.toLowerCase().includes(lowerQuery) ||
+            transcript.toLowerCase().includes(lowerQuery) ||
+            summary.toLowerCase().includes(lowerQuery)) {
+            results.push({
+                id: meeting.id,
+                title: meeting.title,
+                createdAt: meeting.createdAt,
+                duration: meeting.duration,
+                hasSummary: !!meeting.summary,
+                preview: (transcript || summary).substring(0, 200) + '...'
+            });
+        }
+    });
+
+    return results.slice(0, 10);
+}
+
+function getRecentDocuments(limit = 5) {
+    const docs = Object.entries(docHistory)
+        .map(([key, value]) => ({
+            fileName: value.fileName || key,
+            analyzedAt: value.analyzedAt,
+            changeCount: (value.changes || []).length
+        }))
+        .sort((a, b) => new Date(b.analyzedAt) - new Date(a.analyzedAt))
+        .slice(0, limit);
+    return docs;
+}
+
+function getRecentMeetings(limit = 5) {
+    return meetings
+        .slice(0, limit)
+        .map(m => ({
+            id: m.id,
+            title: m.title,
+            createdAt: m.createdAt,
+            duration: m.duration,
+            hasSummary: !!m.summary
+        }));
+}
+
+function getMeetingDetails(meetingId) {
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) return null;
+    return {
+        id: meeting.id,
+        title: meeting.title,
+        createdAt: meeting.createdAt,
+        duration: meeting.duration,
+        transcript: meeting.transcript,
+        summary: meeting.summary
+    };
+}
+
+function getDocumentChanges(fileName) {
+    for (const [key, value] of Object.entries(docHistory)) {
+        if ((value.fileName || key).includes(fileName)) {
+            return {
+                fileName: value.fileName || key,
+                changes: (value.changes || []).map((c, idx) => ({
+                    index: idx + 1,
+                    timestamp: c.timestamp,
+                    summary: c.aiSummary || c.summary,
+                    improvement: c.improvement
+                }))
+            };
+        }
+    }
+    return null;
+}
+
+// LLM 명령어 파싱 및 실행
+function parseLLMCommand(message) {
+    const lowerMsg = message.toLowerCase();
+
+    // 검색 명령어
+    if (lowerMsg.includes('검색') || lowerMsg.includes('찾아')) {
+        // 문서/모니터링 검색
+        if (lowerMsg.includes('문서') || lowerMsg.includes('모니터링') || lowerMsg.includes('파일')) {
+            const searchTermMatch = message.match(/['""]([^'""]+)['""]/);
+            if (searchTermMatch) {
+                return { action: 'search_docs', query: searchTermMatch[1] };
+            }
+            // 따옴표 없이 검색어 추출 시도
+            const words = message.replace(/문서|모니터링|파일|검색|찾아|줘|해|봐/g, '').trim();
+            if (words.length > 0) {
+                return { action: 'search_docs', query: words };
+            }
+        }
+        // 회의록 검색
+        if (lowerMsg.includes('회의') || lowerMsg.includes('회의록')) {
+            const searchTermMatch = message.match(/['""]([^'""]+)['""]/);
+            if (searchTermMatch) {
+                return { action: 'search_meetings', query: searchTermMatch[1] };
+            }
+            const words = message.replace(/회의록|회의|검색|찾아|줘|해|봐/g, '').trim();
+            if (words.length > 0) {
+                return { action: 'search_meetings', query: words };
+            }
+        }
+    }
+
+    // 최근 항목 조회
+    if (lowerMsg.includes('최근') || lowerMsg.includes('리스트') || lowerMsg.includes('목록')) {
+        if (lowerMsg.includes('문서') || lowerMsg.includes('모니터링') || lowerMsg.includes('파일')) {
+            return { action: 'list_recent_docs' };
+        }
+        if (lowerMsg.includes('회의') || lowerMsg.includes('회의록')) {
+            return { action: 'list_recent_meetings' };
+        }
+    }
+
+    // 회의록 상세 조회
+    if (lowerMsg.includes('회의록') && (lowerMsg.includes('보여') || lowerMsg.includes('내용'))) {
+        const idMatch = message.match(/meeting_\d+/);
+        if (idMatch) {
+            return { action: 'get_meeting', meetingId: idMatch[0] };
+        }
+    }
+
+    // 문서 변경 내역 조회
+    if ((lowerMsg.includes('변경') || lowerMsg.includes('수정')) &&
+        (lowerMsg.includes('내역') || lowerMsg.includes('기록') || lowerMsg.includes('히스토리'))) {
+        const fileMatch = message.match(/['""]([^'""]+)['""]/);
+        if (fileMatch) {
+            return { action: 'get_doc_changes', fileName: fileMatch[1] };
+        }
+    }
+
+    // 회의 녹음 시작 명령
+    if (lowerMsg.includes('녹음') && (lowerMsg.includes('시작') || lowerMsg.includes('해줘'))) {
+        return { action: 'start_recording' };
+    }
+
+    // 회의록 생성/요약 명령
+    if (lowerMsg.includes('회의록') && (lowerMsg.includes('생성') || lowerMsg.includes('만들어') || lowerMsg.includes('작성'))) {
+        return { action: 'create_meeting' };
+    }
+
+    // 요약 명령
+    if (lowerMsg.includes('요약') && lowerMsg.includes('회의')) {
+        const idMatch = message.match(/meeting_\d+/);
+        if (idMatch) {
+            return { action: 'summarize_meeting', meetingId: idMatch[0] };
+        }
+    }
+
+    return null;
+}
+
+// 명령 실행 결과를 LLM 컨텍스트에 추가
+function executeCommand(command) {
+    switch (command.action) {
+        case 'search_docs': {
+            const results = searchDocHistory(command.query);
+            if (results.length === 0) {
+                return `"${command.query}"에 대한 문서 검색 결과가 없습니다.`;
+            }
+            let response = `"${command.query}" 검색 결과 (${results.length}건):\n\n`;
+            results.forEach((r, i) => {
+                if (r.type === 'document') {
+                    response += `${i+1}. [문서] ${r.fileName}\n   - 분석일시: ${new Date(r.analyzedAt).toLocaleString('ko-KR')}\n   - 변경 횟수: ${r.changeCount}회\n\n`;
+                } else {
+                    response += `${i+1}. [변경] ${r.fileName} (${r.changeIndex}번째 변경)\n   - 요약: ${r.summary}\n\n`;
+                }
+            });
+            return response;
+        }
+
+        case 'search_meetings': {
+            const results = searchMeetings(command.query);
+            if (results.length === 0) {
+                return `"${command.query}"에 대한 회의록 검색 결과가 없습니다.`;
+            }
+            let response = `"${command.query}" 회의록 검색 결과 (${results.length}건):\n\n`;
+            results.forEach((r, i) => {
+                response += `${i+1}. ${r.title || '제목 없음'}\n   - ID: ${r.id}\n   - 일시: ${new Date(r.createdAt).toLocaleString('ko-KR')}\n   - 요약 여부: ${r.hasSummary ? '있음' : '없음'}\n\n`;
+            });
+            return response;
+        }
+
+        case 'list_recent_docs': {
+            const docs = getRecentDocuments(5);
+            if (docs.length === 0) {
+                return '저장된 문서가 없습니다.';
+            }
+            let response = '최근 문서 목록:\n\n';
+            docs.forEach((d, i) => {
+                response += `${i+1}. ${d.fileName}\n   - 분석일시: ${new Date(d.analyzedAt).toLocaleString('ko-KR')}\n   - 변경 횟수: ${d.changeCount}회\n\n`;
+            });
+            return response;
+        }
+
+        case 'list_recent_meetings': {
+            const mtgs = getRecentMeetings(5);
+            if (mtgs.length === 0) {
+                return '저장된 회의록이 없습니다.';
+            }
+            let response = '최근 회의록 목록:\n\n';
+            mtgs.forEach((m, i) => {
+                response += `${i+1}. ${m.title || '제목 없음'}\n   - ID: ${m.id}\n   - 일시: ${new Date(m.createdAt).toLocaleString('ko-KR')}\n   - 녹음 시간: ${m.duration || '알 수 없음'}\n   - 요약: ${m.hasSummary ? '있음' : '없음'}\n\n`;
+            });
+            return response;
+        }
+
+        case 'get_meeting': {
+            const meeting = getMeetingDetails(command.meetingId);
+            if (!meeting) {
+                return `회의록 ${command.meetingId}를 찾을 수 없습니다.`;
+            }
+            let response = `회의록 상세 정보:\n\n`;
+            response += `제목: ${meeting.title || '제목 없음'}\n`;
+            response += `ID: ${meeting.id}\n`;
+            response += `일시: ${new Date(meeting.createdAt).toLocaleString('ko-KR')}\n`;
+            response += `녹음 시간: ${meeting.duration || '알 수 없음'}\n\n`;
+            if (meeting.summary) {
+                response += `[요약]\n${meeting.summary}\n\n`;
+            }
+            if (meeting.transcript) {
+                response += `[녹취록]\n${meeting.transcript.substring(0, 500)}${meeting.transcript.length > 500 ? '...(생략)' : ''}\n`;
+            }
+            return response;
+        }
+
+        case 'get_doc_changes': {
+            const doc = getDocumentChanges(command.fileName);
+            if (!doc) {
+                return `"${command.fileName}" 문서를 찾을 수 없습니다.`;
+            }
+            let response = `${doc.fileName} 변경 내역:\n\n`;
+            if (doc.changes.length === 0) {
+                response += '변경 내역이 없습니다.';
+            } else {
+                doc.changes.forEach(c => {
+                    response += `[${c.index}번째 변경] ${new Date(c.timestamp).toLocaleString('ko-KR')}\n`;
+                    if (c.summary) response += `요약: ${c.summary.substring(0, 200)}\n`;
+                    if (c.improvement) response += `개선점: ${c.improvement.substring(0, 200)}\n`;
+                    response += '\n';
+                });
+            }
+            return response;
+        }
+
+        case 'start_recording':
+            return '[명령] 회의 녹음을 시작하려면 화면 상단의 "회의록" 메뉴를 클릭하고 "새 회의 녹음" 버튼을 눌러주세요.\n\n녹음이 시작되면 실시간으로 음성이 텍스트로 변환됩니다.';
+
+        case 'create_meeting':
+            return '[명령] 새 회의록을 생성하려면 화면 상단의 "회의록" 메뉴에서 "새 회의 녹음" 버튼을 클릭해주세요.\n\n녹음 완료 후 AI가 자동으로 요약을 생성할 수 있습니다.';
+
+        case 'summarize_meeting':
+            return `[명령] 회의록 ${command.meetingId}의 요약을 요청하셨습니다.\n\n회의록 상세 화면에서 "AI 요약" 버튼을 클릭하면 AI가 회의 내용을 요약해줍니다.`;
+
+        default:
+            return null;
+    }
+}
+
 async function chatWithOllama(message, history) {
-    const systemPrompt = `당신은 DocWatch의 AI 어시스턴트입니다. 사용자의 질문에 친절하고 도움이 되도록 답변해주세요.
+    // 먼저 명령어 파싱 시도
+    const command = parseLLMCommand(message);
+    let dataContext = '';
+
+    if (command) {
+        const commandResult = executeCommand(command);
+        if (commandResult) {
+            dataContext = `\n\n[시스템 데이터]\n${commandResult}\n\n위 데이터를 바탕으로 사용자에게 친절하게 답변해주세요.`;
+        }
+    }
+
+    const systemPrompt = `당신은 DocWatch의 스마트 어시스트입니다. DocWatch는 문서 모니터링과 회의록 관리를 도와주는 로컬 업무 자동화 도구입니다.
+
+[당신의 역할]
+1. 사용자의 문서 모니터링 관련 질문에 답변
+2. 회의록 검색 및 관리 도움
+3. 문서 변경 내역 확인 및 요약 제공
+4. 업무 효율화 조언
+
+[사용 가능한 기능 안내]
+- 문서 검색: "문서에서 '키워드' 검색해줘"
+- 회의록 검색: "회의록에서 '키워드' 검색해줘"
+- 최근 문서 목록: "최근 문서 목록 보여줘"
+- 최근 회의록 목록: "최근 회의록 보여줘"
+- 회의록 상세: "meeting_123456 회의록 내용 보여줘"
+- 문서 변경 내역: "'파일명' 변경 내역 보여줘"
+- 녹음 시작: "회의 녹음 시작해줘"
+- 회의록 생성: "새 회의록 만들어줘"
 
 [응답 규칙]
 1. 반드시 한국어로 응답하세요 (한자/중국어 문자 절대 사용 금지)
 2. 간결하고 명확하게 답변하세요
-3. 기술적인 내용은 이해하기 쉽게 설명하세요
-4. 코드가 필요한 경우 백틱(\`\`\`)으로 감싸서 표시하세요
+3. 데이터가 제공되면 그 데이터를 기반으로 답변하세요
+4. 기능 사용법을 친절하게 안내하세요
 5. 모르는 내용은 솔직히 모른다고 말하세요`;
 
     // 대화 기록을 프롬프트로 변환
@@ -1845,8 +2181,8 @@ async function chatWithOllama(message, history) {
     }
 
     const prompt = conversationContext
-        ? `${conversationContext}사용자: ${message}\n\nAI:`
-        : `사용자: ${message}\n\nAI:`;
+        ? `${conversationContext}사용자: ${message}${dataContext}\n\nAI:`
+        : `사용자: ${message}${dataContext}\n\nAI:`;
 
     return new Promise((resolve, reject) => {
         const postData = JSON.stringify({

@@ -11,8 +11,25 @@
     <!-- 커스텀 타이틀바 (macOS 스타일) -->
     <div class="custom-titlebar">
         <div class="titlebar-drag-region"></div>
+        <!-- 좌측 사이드바 토글 버튼 -->
+        <div class="titlebar-left-actions">
+            <button class="titlebar-action-btn" id="sidebarToggleBtn" title="사이드바 토글">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <line x1="9" y1="3" x2="9" y2="21"/>
+                </svg>
+            </button>
+        </div>
         <div class="titlebar-title">DocWatch</div>
         <div class="titlebar-actions">
+            <!-- 하단 패널 토글 -->
+            <button class="titlebar-action-btn" id="toggleBottomPanelBtn" title="하단 패널 토글">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <line x1="3" y1="15" x2="21" y2="15"/>
+                </svg>
+            </button>
+            <!-- 우측 패널 토글 -->
             <button class="titlebar-action-btn" id="toggleRightPanelBtn" title="우측 패널 토글">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -36,12 +53,6 @@
     <div class="app-container">
         <!-- 좌측 사이드바 -->
         <aside class="sidebar" id="sidebar">
-            <!-- 사이드바 토글 버튼 -->
-            <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="사이드바 접기/펼치기">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="15 18 9 12 15 6"/>
-                </svg>
-            </button>
             <div class="sidebar-header">
                 <div class="logo">
                     <div class="logo-icon">
@@ -121,7 +132,7 @@
                             <path d="M9 18h6"/>
                         </svg>
                     </span>
-                    <span class="nav-text">LLM</span>
+                    <span class="nav-text">스마트 어시스트</span>
                 </a>
             </nav>
 
@@ -895,10 +906,10 @@
                 </div>
             </section>
 
-            <!-- LLM 섹션 -->
+            <!-- 스마트 어시스트 섹션 -->
             <section id="llm" class="content-section">
                 <div class="section-header">
-                    <h1>LLM 대화</h1>
+                    <h1>스마트 어시스트</h1>
                     <div class="header-actions">
                         <button class="btn btn-secondary" id="openInPanelBtn" title="우측 패널에서 열기">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
@@ -921,7 +932,7 @@
                                     <path d="M9 18h6"/>
                                 </svg>
                             </div>
-                            <h3>로컬 AI 어시스턴트</h3>
+                            <h3>스마트 어시스트</h3>
                             <p>무엇이든 물어보세요. 모든 처리는 로컬에서 진행됩니다.</p>
                         </div>
                     </div>
@@ -942,12 +953,15 @@
             </section>
         </main>
 
+        <!-- 우측 패널 리사이즈 핸들 -->
+        <div class="right-panel-resize-handle" id="rightPanelResizeHandle"></div>
+
         <!-- 우측 패널 (VSCode 스타일) -->
         <aside class="right-panel" id="rightPanel">
             <div class="right-panel-header">
                 <div class="right-panel-tabs">
                     <button class="panel-tab active" data-panel-tab="ai-info">AI 정보</button>
-                    <button class="panel-tab" data-panel-tab="llm-chat">LLM 대화</button>
+                    <button class="panel-tab" data-panel-tab="llm-chat">스마트 어시스트</button>
                 </div>
                 <button class="right-panel-close" id="closeRightPanelBtn" title="패널 닫기">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -968,7 +982,7 @@
                 </div>
             </div>
 
-            <!-- LLM 대화 탭 콘텐츠 -->
+            <!-- 스마트 어시스트 대화 탭 콘텐츠 -->
             <div class="right-panel-content" id="panelLlmChat" style="display: none;">
                 <div class="panel-llm-container">
                     <div class="panel-llm-messages" id="panelLlmMessages">
@@ -993,6 +1007,44 @@
                             </svg>
                         </button>
                     </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 하단 패널 -->
+        <aside class="bottom-panel" id="bottomPanel">
+            <div class="bottom-panel-header">
+                <div class="bottom-panel-tabs">
+                    <button class="panel-tab active" data-bottom-tab="terminal">터미널</button>
+                    <button class="panel-tab" data-bottom-tab="output">출력</button>
+                    <button class="panel-tab" data-bottom-tab="problems">문제</button>
+                </div>
+                <button class="bottom-panel-close" id="closeBottomPanelBtn" title="패널 닫기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="bottom-panel-content" id="bottomTerminal">
+                <div class="terminal-output" id="terminalOutput">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-text">DocWatch 터미널이 준비되었습니다.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-panel-content" id="bottomOutput" style="display: none;">
+                <div class="output-empty">
+                    <p>출력 내용이 없습니다.</p>
+                </div>
+            </div>
+            <div class="bottom-panel-content" id="bottomProblems" style="display: none;">
+                <div class="problems-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <p>문제가 발견되지 않았습니다.</p>
                 </div>
             </div>
         </aside>

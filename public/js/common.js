@@ -3440,10 +3440,12 @@ function initSidebarToggle() {
     const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
     if (isCollapsed) {
         sidebar.classList.add('collapsed');
+        toggleBtn.classList.add('active');
     }
 
     toggleBtn.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
+        toggleBtn.classList.toggle('active', sidebar.classList.contains('collapsed'));
         localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
     });
 }
@@ -3510,6 +3512,179 @@ function initRightPanel() {
 }
 
 initRightPanel();
+
+// ========================================
+// 우측 패널 리사이즈 기능
+// ========================================
+function initRightPanelResize() {
+    const rightPanel = document.getElementById('rightPanel');
+    const resizeHandle = document.getElementById('rightPanelResizeHandle');
+    const mainContent = document.querySelector('.main-content');
+
+    if (!rightPanel || !resizeHandle) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    const MIN_WIDTH = 280;
+    const MAX_WIDTH = 800;
+    const DEFAULT_WIDTH = 380;
+
+    // 핸들 위치 업데이트
+    function updateHandlePosition() {
+        if (rightPanel.classList.contains('open')) {
+            const panelWidth = rightPanel.offsetWidth;
+            resizeHandle.style.right = `${panelWidth - 2}px`;
+            resizeHandle.classList.add('visible');
+        } else {
+            resizeHandle.classList.remove('visible');
+        }
+    }
+
+    // 패널 크기 설정
+    function setPanelWidth(width) {
+        const clampedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
+        document.documentElement.style.setProperty('--right-panel-width', `${clampedWidth}px`);
+        updateHandlePosition();
+    }
+
+    // 마우스 다운 - 리사이즈 시작
+    resizeHandle.addEventListener('mousedown', (e) => {
+        if (!rightPanel.classList.contains('open')) return;
+
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = rightPanel.offsetWidth;
+
+        rightPanel.classList.add('resizing');
+        resizeHandle.classList.add('dragging');
+        document.body.classList.add('resizing-right-panel');
+
+        e.preventDefault();
+    });
+
+    // 마우스 이동 - 리사이즈 중
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const deltaX = startX - e.clientX;
+        const newWidth = startWidth + deltaX;
+        setPanelWidth(newWidth);
+    });
+
+    // 마우스 업 - 리사이즈 종료
+    document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+
+        isResizing = false;
+        rightPanel.classList.remove('resizing');
+        resizeHandle.classList.remove('dragging');
+        document.body.classList.remove('resizing-right-panel');
+
+        // 저장된 크기를 localStorage에 저장
+        const currentWidth = rightPanel.offsetWidth;
+        localStorage.setItem('rightPanelWidth', currentWidth);
+    });
+
+    // 패널 열림/닫힘 감지
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                setTimeout(updateHandlePosition, 350); // transition 완료 후
+            }
+        });
+    });
+
+    observer.observe(rightPanel, { attributes: true });
+
+    // 저장된 크기 복원
+    const savedWidth = localStorage.getItem('rightPanelWidth');
+    if (savedWidth) {
+        setPanelWidth(parseInt(savedWidth, 10));
+    }
+
+    // 초기 위치 설정
+    setTimeout(updateHandlePosition, 100);
+
+    // 윈도우 리사이즈 시 핸들 위치 업데이트
+    window.addEventListener('resize', updateHandlePosition);
+}
+
+initRightPanelResize();
+
+// ========================================
+// 하단 패널 기능
+// ========================================
+function initBottomPanel() {
+    const bottomPanel = document.getElementById('bottomPanel');
+    const toggleBtn = document.getElementById('toggleBottomPanelBtn');
+    const closeBtn = document.getElementById('closeBottomPanelBtn');
+    const panelTabs = document.querySelectorAll('.bottom-panel-tabs .panel-tab');
+    const mainContent = document.querySelector('.main-content');
+
+    if (!bottomPanel) return;
+
+    // 패널 토글
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            bottomPanel.classList.toggle('open');
+            toggleBtn.classList.toggle('active', bottomPanel.classList.contains('open'));
+            if (mainContent) {
+                mainContent.classList.toggle('with-bottom-panel', bottomPanel.classList.contains('open'));
+            }
+        });
+    }
+
+    // 패널 닫기
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            bottomPanel.classList.remove('open');
+            if (toggleBtn) toggleBtn.classList.remove('active');
+            if (mainContent) {
+                mainContent.classList.remove('with-bottom-panel');
+            }
+        });
+    }
+
+    // 탭 전환
+    panelTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.bottomTab;
+
+            // 탭 활성화 상태 변경
+            panelTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // 콘텐츠 전환
+            document.getElementById('bottomTerminal').style.display = tabName === 'terminal' ? 'block' : 'none';
+            document.getElementById('bottomOutput').style.display = tabName === 'output' ? 'block' : 'none';
+            document.getElementById('bottomProblems').style.display = tabName === 'problems' ? 'block' : 'none';
+        });
+    });
+}
+
+initBottomPanel();
+
+// 터미널에 메시지 추가 함수
+function addTerminalLine(text, type = 'info') {
+    const terminalOutput = document.getElementById('terminalOutput');
+    if (!terminalOutput) return;
+
+    const line = document.createElement('div');
+    line.className = 'terminal-line';
+
+    const prompt = type === 'error' ? '!' : '$';
+    const color = type === 'error' ? 'var(--error)' : 'var(--accent-primary)';
+
+    line.innerHTML = `
+        <span class="terminal-prompt" style="color: ${color}">${prompt}</span>
+        <span class="terminal-text">${text}</span>
+    `;
+
+    terminalOutput.appendChild(line);
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
 
 // ========================================
 // 우측 패널에 AI 분석 결과 표시
@@ -3697,13 +3872,134 @@ function addLLMMessage(container, content, role, isPanel) {
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
 
+    // 액션 버튼 생성 (assistant 응답에만)
+    let actionButtons = '';
+    if (role === 'assistant') {
+        actionButtons = getLLMActionButtons(content);
+    }
+
     messageEl.innerHTML = `
         <div class="llm-avatar">${avatarIcon}</div>
-        <div class="llm-bubble">${formattedContent}</div>
+        <div class="llm-bubble">
+            ${formattedContent}
+            ${actionButtons}
+        </div>
     `;
+
+    // 액션 버튼 이벤트 바인딩
+    if (role === 'assistant') {
+        bindLLMActionEvents(messageEl);
+    }
 
     container.appendChild(messageEl);
     container.scrollTop = container.scrollHeight;
+}
+
+// LLM 응답 내용에 따라 액션 버튼 생성
+function getLLMActionButtons(content) {
+    const buttons = [];
+    const lowerContent = content.toLowerCase();
+
+    // 녹음 관련 명령
+    if (lowerContent.includes('녹음') && (lowerContent.includes('시작') || lowerContent.includes('새 회의'))) {
+        buttons.push({
+            action: 'start-recording',
+            label: '🎙️ 녹음 시작',
+            class: 'primary'
+        });
+    }
+
+    // 회의록 메뉴 이동
+    if (lowerContent.includes('회의록') && (lowerContent.includes('메뉴') || lowerContent.includes('클릭'))) {
+        buttons.push({
+            action: 'goto-meeting',
+            label: '📝 회의록 메뉴로 이동',
+            class: 'secondary'
+        });
+    }
+
+    // 모니터링 메뉴 이동
+    if (lowerContent.includes('모니터링') || (lowerContent.includes('문서') && lowerContent.includes('목록'))) {
+        buttons.push({
+            action: 'goto-monitoring',
+            label: '📂 모니터링으로 이동',
+            class: 'secondary'
+        });
+    }
+
+    // meeting_ID가 있는 경우 해당 회의록 보기 버튼
+    const meetingIdMatch = content.match(/meeting_\d+/g);
+    if (meetingIdMatch && meetingIdMatch.length > 0) {
+        // 중복 제거
+        const uniqueIds = [...new Set(meetingIdMatch)];
+        uniqueIds.slice(0, 3).forEach(id => {
+            buttons.push({
+                action: 'view-meeting',
+                data: id,
+                label: `📋 ${id} 보기`,
+                class: 'secondary'
+            });
+        });
+    }
+
+    if (buttons.length === 0) return '';
+
+    let html = '<div class="llm-action-buttons">';
+    buttons.forEach(btn => {
+        html += `<button class="llm-action-btn ${btn.class}" data-action="${btn.action}" ${btn.data ? `data-id="${btn.data}"` : ''}>${btn.label}</button>`;
+    });
+    html += '</div>';
+    return html;
+}
+
+// LLM 액션 버튼 이벤트 바인딩
+function bindLLMActionEvents(messageEl) {
+    const actionBtns = messageEl.querySelectorAll('.llm-action-btn');
+    actionBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            const id = btn.dataset.id;
+
+            switch (action) {
+                case 'start-recording':
+                    // 회의록 메뉴로 이동 후 녹음 시작
+                    showSection('meeting');
+                    // 약간의 딜레이 후 녹음 팝업 열기
+                    setTimeout(() => {
+                        const recordBtn = document.querySelector('.meeting-record-btn, [onclick*="openRecordingModal"]');
+                        if (recordBtn) {
+                            recordBtn.click();
+                        } else if (typeof openRecordingModal === 'function') {
+                            openRecordingModal();
+                        }
+                    }, 300);
+                    break;
+
+                case 'goto-meeting':
+                    showSection('meeting');
+                    break;
+
+                case 'goto-monitoring':
+                    showSection('monitoring');
+                    break;
+
+                case 'view-meeting':
+                    if (id) {
+                        showSection('meeting');
+                        setTimeout(() => {
+                            // 회의록 상세 보기 시도
+                            const meetingCard = document.querySelector(`[data-meeting-id="${id}"]`);
+                            if (meetingCard) {
+                                meetingCard.click();
+                            } else if (typeof viewMeetingDetail === 'function') {
+                                viewMeetingDetail(id);
+                            }
+                        }, 300);
+                    }
+                    break;
+            }
+        });
+    });
 }
 
 function syncLLMMessages(source) {

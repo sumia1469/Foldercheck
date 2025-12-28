@@ -3282,38 +3282,12 @@ body:has(.web-warning) .app-container {
     margin: 0 5px;
 }
 
-/* 사이드바 토글 버튼 */
-.sidebar-toggle-btn {
-    position: absolute;
-    top: 50%;
-    right: -12px;
-    transform: translateY(-50%);
-    width: 24px;
-    height: 48px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 0 8px 8px 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    z-index: 101;
-    transition: all 0.2s;
+/* 사이드바 토글 버튼 - 좌측 titlebar에서 처리 */
+#sidebarToggleBtn svg {
+    transition: transform 0.3s ease;
 }
 
-.sidebar-toggle-btn:hover {
-    background: var(--bg-hover);
-    color: var(--accent-primary);
-}
-
-.sidebar-toggle-btn svg {
-    width: 14px;
-    height: 14px;
-    transition: transform 0.3s;
-}
-
-.sidebar.collapsed .sidebar-toggle-btn svg {
+#sidebarToggleBtn.active svg {
     transform: rotate(180deg);
 }
 
@@ -3329,9 +3303,20 @@ body:has(.web-warning) .app-container {
 /* ========================================
    타이틀바 액션 버튼
 ======================================== */
+.titlebar-left-actions {
+    position: absolute;
+    left: 80px;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    -webkit-app-region: no-drag;
+}
+
 .titlebar-actions {
     position: absolute;
-    right: 140px;
+    right: 8px;
     top: 0;
     height: 100%;
     display: flex;
@@ -3388,9 +3373,53 @@ body:has(.web-warning) .app-container {
     transition: width 0.3s ease, min-width 0.3s ease;
 }
 
+/* 우측 패널 리사이즈 핸들 */
+.right-panel-resize-handle {
+    position: fixed;
+    top: var(--titlebar-height);
+    width: 5px;
+    height: calc(100vh - var(--titlebar-height));
+    background: transparent;
+    cursor: col-resize;
+    z-index: 101;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.right-panel-resize-handle.visible {
+    pointer-events: auto;
+}
+
+.right-panel-resize-handle:hover,
+.right-panel-resize-handle.dragging {
+    opacity: 1;
+    background: var(--primary);
+}
+
+/* 드래그 중 전체 영역 커서 변경 */
+body.resizing-right-panel {
+    cursor: col-resize !important;
+    user-select: none;
+}
+
+body.resizing-right-panel * {
+    cursor: col-resize !important;
+}
+
 .right-panel.open {
     width: var(--right-panel-width);
     min-width: var(--right-panel-width);
+}
+
+/* 리사이즈 중에는 transition 비활성화 */
+.right-panel.resizing {
+    transition: none;
+}
+
+.right-panel.resizing ~ .main-content,
+body.resizing-right-panel .main-content {
+    transition: none;
 }
 
 .right-panel-header {
@@ -3681,6 +3710,51 @@ body:has(.web-warning) .app-container {
     border-bottom-left-radius: 4px;
 }
 
+/* LLM 액션 버튼 */
+.llm-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.llm-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.llm-action-btn.primary {
+    background: var(--info);
+    color: white;
+}
+
+.llm-action-btn.primary:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.llm-action-btn.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.llm-action-btn.secondary:hover {
+    background: var(--bg-primary);
+    border-color: var(--info);
+    color: var(--info);
+}
+
 .llm-input-area {
     padding: 16px;
     border-top: 1px solid var(--border-color);
@@ -3830,4 +3904,151 @@ body:has(.web-warning) .app-container {
 @keyframes typing {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ========================================
+   하단 패널 (VSCode 스타일)
+======================================== */
+.bottom-panel {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    height: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 99;
+    overflow: hidden;
+    transition: height 0.3s ease;
+}
+
+.bottom-panel.open {
+    height: 250px;
+}
+
+.sidebar.collapsed ~ .bottom-panel {
+    left: var(--sidebar-collapsed-width);
+}
+
+.bottom-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    height: 35px;
+    min-height: 35px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.bottom-panel-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.bottom-panel-tabs .panel-tab {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.bottom-panel-tabs .panel-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.bottom-panel-tabs .panel-tab.active {
+    color: var(--accent-primary);
+    background: rgba(0, 212, 170, 0.1);
+}
+
+.bottom-panel-close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.bottom-panel-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.bottom-panel-close svg {
+    width: 14px;
+    height: 14px;
+}
+
+.bottom-panel-content {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+}
+
+/* 터미널 스타일 */
+.terminal-output {
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 150px;
+}
+
+.terminal-line {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.terminal-prompt {
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.terminal-text {
+    color: var(--text-secondary);
+}
+
+/* 출력 및 문제 빈 상태 */
+.output-empty,
+.problems-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 150px;
+    color: var(--text-muted);
+    gap: 12px;
+}
+
+.problems-empty svg {
+    width: 32px;
+    height: 32px;
+    color: var(--success);
+}
+
+/* 하단 패널 열릴 때 메인 콘텐츠 조정 */
+.main-content.with-bottom-panel {
+    height: calc(100vh - var(--titlebar-height) - 250px);
+}
+
+/* 우측 패널이 열렸을 때 하단 패널 조정 */
+.right-panel.open ~ .bottom-panel {
+    right: var(--right-panel-width);
 }

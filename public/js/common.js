@@ -1137,16 +1137,15 @@ async function loadWhisperStatus() {
     }
 }
 
-// AI 상태 로드 (로컬 전용 - 폐쇄망 환경)
+// 내장 AI 상태 로드 (로컬 전용 - 폐쇄망 환경)
 async function loadAiModelStatus() {
     try {
         const statusRes = await fetch('/api/ollama/status');
         const status = await statusRes.json();
 
         const aiStatusEl = document.getElementById('ollamaStatus');
-        const aiModelDescription = document.getElementById('aiModelDescription');
 
-        // 로컬 AI 상태 표시
+        // 내장 AI 상태 표시
         if (aiStatusEl) {
             if (status.ready) {
                 aiStatusEl.textContent = '동작 중 ✓';
@@ -1156,18 +1155,12 @@ async function loadAiModelStatus() {
                 aiStatusEl.style.color = 'var(--danger)';
             }
         }
-
-        // 현재 모델 정보 표시
-        if (aiModelDescription && status.model && status.availableModels[status.model]) {
-            const modelInfo = status.availableModels[status.model];
-            aiModelDescription.textContent = `${modelInfo.name} - ${modelInfo.description}`;
-        }
     } catch (e) {
-        console.error('AI 상태 확인 실패:', e);
-        const ollamaStatus = document.getElementById('ollamaStatus');
-        if (ollamaStatus) {
-            ollamaStatus.textContent = '확인 실패';
-            ollamaStatus.style.color = 'var(--danger)';
+        console.error('내장 AI 상태 확인 실패:', e);
+        const aiStatusEl = document.getElementById('ollamaStatus');
+        if (aiStatusEl) {
+            aiStatusEl.textContent = '확인 실패';
+            aiStatusEl.style.color = 'var(--danger)';
         }
     }
 }

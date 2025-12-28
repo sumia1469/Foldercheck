@@ -1525,7 +1525,7 @@ async function analyzeDocument(filePath, forceReanalyze = false) {
             const aiSummary = await summarizeWithOllama(textToSummarize, 'document');
             summary.aiSummary = aiSummary;
         } else if (!ollamaStatus.ready) {
-            summary.aiSummary = 'AI 요약을 사용하려면 Ollama가 실행 중이어야 합니다.';
+            summary.aiSummary = '내장 AI가 준비되지 않았습니다.';
         }
     } catch (e) {
         console.log('AI 요약 생성 실패:', e.message);
@@ -1661,7 +1661,7 @@ async function checkOllamaStatus() {
                 }
             });
         });
-        req.on('error', () => resolve({ ready: false, error: 'Ollama 서버 연결 실패' }));
+        req.on('error', () => resolve({ ready: false, error: '내장 AI 연결 실패' }));
         req.setTimeout(3000, () => {
             req.destroy();
             resolve({ ready: false, error: '타임아웃' });
@@ -3154,7 +3154,7 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         success: false,
-                        error: 'AI 서버(Ollama)가 실행 중이 아닙니다.'
+                        error: '내장 AI가 실행 중이 아닙니다.'
                     }));
                     return;
                 }
@@ -3232,7 +3232,7 @@ const server = http.createServer(async (req, res) => {
                     res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         success: false,
-                        error: 'AI 서버(Ollama)가 실행 중이 아닙니다. brew services start ollama를 실행해주세요.'
+                        error: '내장 AI가 실행 중이 아닙니다.'
                     }));
                     return;
                 }
@@ -3280,13 +3280,13 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 // Ollama 상태 확인
-                updateProgress('🔍 AI 준비', 10, 'Ollama 상태 확인 중...');
+                updateProgress('🔍 AI 준비', 10, '내장 AI 확인 중...');
                 const ollamaStatus = await checkOllamaStatus();
                 if (!ollamaStatus.ready) {
                     clearProgress();
                     res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
-                        error: 'Ollama 서버가 실행 중이 아닙니다. brew services start ollama를 실행해주세요.',
+                        error: '내장 AI가 실행 중이 아닙니다.',
                         details: ollamaStatus.error
                     }));
                     return;

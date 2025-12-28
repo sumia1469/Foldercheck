@@ -68,6 +68,7 @@ const PORT = 4400;
 const CONFIG_FILE = path.join(USER_DATA_DIR, 'folderList.json');
 const SETTINGS_FILE = path.join(USER_DATA_DIR, 'settings.json');
 const MEETINGS_FILE = path.join(USER_DATA_DIR, 'meetings.json');
+const CONVERSATIONS_FILE = path.join(USER_DATA_DIR, 'conversations.json');
 
 // 패키징 환경에서는 userData 디렉토리 사용, 개발 환경에서는 프로젝트 디렉토리 사용
 const MEETINGS_DIR = path.join(USER_DATA_DIR, 'meetings');
@@ -93,6 +94,80 @@ if (!fs.existsSync(TEMPLATES_DIR)) {
 
 // 회의록 저장소
 let meetings = [];
+
+// 대화 주제 저장소
+let conversations = [];
+
+// 대화 로드
+function loadConversations() {
+    try {
+        if (fs.existsSync(CONVERSATIONS_FILE)) {
+            const data = fs.readFileSync(CONVERSATIONS_FILE, 'utf8');
+            conversations = JSON.parse(data);
+        }
+    } catch (err) {
+        console.error('대화 로드 오류:', err);
+        conversations = [];
+    }
+    return conversations;
+}
+
+// 대화 저장
+function saveConversations() {
+    try {
+        fs.writeFileSync(CONVERSATIONS_FILE, JSON.stringify(conversations, null, 2), 'utf8');
+    } catch (err) {
+        console.error('대화 저장 오류:', err);
+    }
+}
+
+// 새 대화 생성
+function createConversation(title = null) {
+    const now = new Date();
+    const id = `conv_${Date.now()}`;
+    const conversation = {
+        id,
+        title: title || `새 대화 ${now.toLocaleDateString('ko-KR')} ${now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`,
+        messages: [],
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString()
+    };
+    conversations.unshift(conversation);
+    saveConversations();
+    return conversation;
+}
+
+// 대화에 메시지 추가
+function addMessageToConversation(conversationId, role, content) {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (conv) {
+        conv.messages.push({
+            role,
+            content,
+            timestamp: new Date().toISOString()
+        });
+        conv.updatedAt = new Date().toISOString();
+
+        // 첫 사용자 메시지로 제목 자동 설정
+        if (role === 'user' && conv.messages.filter(m => m.role === 'user').length === 1) {
+            conv.title = content.substring(0, 30) + (content.length > 30 ? '...' : '');
+        }
+
+        saveConversations();
+    }
+    return conv;
+}
+
+// 대화 삭제
+function deleteConversation(conversationId) {
+    const index = conversations.findIndex(c => c.id === conversationId);
+    if (index !== -1) {
+        conversations.splice(index, 1);
+        saveConversations();
+        return true;
+    }
+    return false;
+}
 
 // Whisper 상태
 let whisperReady = false;
@@ -3454,10 +3529,99 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        // API: LLM 채팅
+        // API: 대화 목록 조회
+        if (pathname === '/api/conversations' && req.method === 'GET') {
+            try {
+                loadConversations();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    conversations: conversations.map(c => ({
+                        id: c.id,
+                        title: c.title,
+                        messageCount: c.messages.length,
+                        createdAt: c.createdAt,
+                        updatedAt: c.updatedAt
+                    }))
+                }));
+            } catch (error) {
+                console.error('대화 목록 조회 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: error.message }));
+            }
+            return;
+        }
+
+        // API: 새 대화 생성
+        if (pathname === '/api/conversations' && req.method === 'POST') {
+            try {
+                const { title } = await parseBody(req);
+                const conversation = createConversation(title);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    conversation
+                }));
+            } catch (error) {
+                console.error('대화 생성 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: error.message }));
+            }
+            return;
+        }
+
+        // API: 대화 상세 조회
+        if (pathname.startsWith('/api/conversations/') && req.method === 'GET') {
+            try {
+                const conversationId = pathname.split('/').pop();
+                loadConversations();
+                const conversation = conversations.find(c => c.id === conversationId);
+
+                if (!conversation) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '대화를 찾을 수 없습니다.' }));
+                    return;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    conversation
+                }));
+            } catch (error) {
+                console.error('대화 조회 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: error.message }));
+            }
+            return;
+        }
+
+        // API: 대화 삭제
+        if (pathname.startsWith('/api/conversations/') && req.method === 'DELETE') {
+            try {
+                const conversationId = pathname.split('/').pop();
+                const deleted = deleteConversation(conversationId);
+
+                if (!deleted) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: false, error: '대화를 찾을 수 없습니다.' }));
+                    return;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (error) {
+                console.error('대화 삭제 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: error.message }));
+            }
+            return;
+        }
+
+        // API: LLM 채팅 (대화 ID 지원)
         if (pathname === '/api/llm/chat' && req.method === 'POST') {
             try {
-                const { message, history } = await parseBody(req);
+                const { message, history, conversationId } = await parseBody(req);
 
                 if (!message) {
                     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -3476,13 +3640,26 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
+                // 대화 ID가 있으면 해당 대화에 메시지 저장
+                let currentConversationId = conversationId;
+                if (currentConversationId) {
+                    loadConversations();
+                    addMessageToConversation(currentConversationId, 'user', message);
+                }
+
                 // LLM 채팅 요청
                 const response = await chatWithOllama(message, history || []);
+
+                // 응답도 대화에 저장
+                if (currentConversationId) {
+                    addMessageToConversation(currentConversationId, 'assistant', response);
+                }
 
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({
                     success: true,
-                    response
+                    response,
+                    conversationId: currentConversationId
                 }));
             } catch (error) {
                 console.error('LLM 채팅 오류:', error);

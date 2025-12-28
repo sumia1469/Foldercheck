@@ -1,0 +1,60 @@
+[
+  {
+    "id": "conv_1766927948338",
+    "title": "감시 중인 폴더 보여줘",
+    "messages": [
+      {
+        "role": "user",
+        "content": "감시 중인 폴더 보여줘",
+        "timestamp": "2025-12-28T13:19:08.358Z"
+      },
+      {
+        "role": "assistant",
+        "content": "감시 중인 폴더는 다음과 같습니다:\n\n- 01 CMS공통_시스템설계서.pptx (경로: /Users/ibyeonghyeon/Downloads/)\n- 01 CMS공통_시스템설계서.xlsx (경로: /Users/ibyeonghyeon/Downloads/)\n- 104. 정보보호 서약서(협력업체용)_LG헬로비전.doc (경로: /Users/ibyeonghyeon/Downloads/)",
+        "timestamp": "2025-12-28T13:19:18.510Z"
+      },
+      {
+        "role": "user",
+        "content": "현재 상태 알려줘",
+        "timestamp": "2025-12-28T13:19:24.159Z"
+      },
+      {
+        "role": "user",
+        "content": "오늘 변경된 문서 보여줘",
+        "timestamp": "2025-12-28T13:19:35.652Z"
+      },
+      {
+        "role": "assistant",
+        "content": "현재 감시 중인 폴더에 대한 정보입니다:\n\n- 01 CMS공통_시스템설계서.pptx (경로: /Users/ibyeonghyeon/Downloads/)\n- 01 CMS공통_시스템설계서.xlsx (경로: /Users/ibyeonghyeon/Downloads/)\n- 104. 정보보호 서약서(협력업체용)_LG헬로비전.doc (경로: /Users/ibyeonghyeon/Downloads/)\n\n오늘 변경된 문서가 없습니다.",
+        "timestamp": "2025-12-28T13:19:39.984Z"
+      },
+      {
+        "role": "user",
+        "content": "최근 문서 목록 보여줘",
+        "timestamp": "2025-12-28T13:19:49.173Z"
+      },
+      {
+        "role": "user",
+        "content": "도움말",
+        "timestamp": "2025-12-28T13:19:57.889Z"
+      },
+      {
+        "role": "assistant",
+        "content": "현재 감시 중인 폴더는 다음과 같습니다:\n\n- 01 CMS공통_시스템설계서.pptx (경로: /Users/ibyeonghyeon/Downloads/)\n- 01 CMS공통_시스템설계서.xlsx (경로: /Users/ibyeonghyeon/Downloads/)\n- 104. 정보보호 서약서(협력업체용)_LG헬로비전.doc (경로: /Users/ibyeonghyeon/Downloads/)\n\n오늘 변경된 문서가 없습니다.\n\n문서 모니터링과 회의록 관리를 위한 사용법에 대한 도움말을 드리겠습니다:\n\n**문서 모니터링**\n• \"감시 중인 폴더 보여줘\" - 현재 감시 중인 폴더 목록 확인\n• \"현재 상태 알려줘\" - DocWatch 전체 현황 확인\n• \"오늘 변경된 문서 보여줘\" - 오늘 변경된 문서 목록 확인\n• \"'파일명' 변경 내역 보여줘\" - 특정 파일의 변경 이력 확인\n\n**회의록**\n• \"최근 회의록 보여줘\" - 최근 회의록 목록 확인\n• \"회의록 제목 '키워드' 검색해줘\" - 회의명으로 검색\n• \"회의록에서 '키워드' 검색해줘\" - 회의 내용 검색\n• \"meeting_123456 회의록 내용 보여줘\" - 특정 회의록 상세 확인\n\n위 기능을 통해 문서와 회의록 관리를 쉽게 할 수 있습니다. 사용자님에게 도움이 되는 정보를 제공해드릴게요! 추가로 궁금한 점이나 질문 있으시면 언제든지 말씀해주세요.",
+        "timestamp": "2025-12-28T13:20:12.635Z"
+      },
+      {
+        "role": "user",
+        "content": "최근 회의록 보여줘",
+        "timestamp": "2025-12-28T13:20:44.717Z"
+      },
+      {
+        "role": "assistant",
+        "content": "최근 회의록 목록이 없습니다. 현재 감시 중인 폴더에 대한 정보는 다음과 같습니다:\n\n- 01 CMS공통_시스템설계서.pptx (경로: /Users/ibyeonghyeon/Downloads/)\n- 01 CMS공통_시스템설계서.xlsx (경로: /Users/ibyeonghyeon/Downloads/)\n- 104. 정보보호 서약서(협력업체용)_LG헬로비전.doc (경로: /Users/ibyeonghyeon/Downloads/)\n\n최근 회의록을 검색하려면, 특정 회의 이름이나 ID를 알려주시면 더 정확한 정보를 제공해 드리겠습니다.",
+        "timestamp": "2025-12-28T13:20:51.980Z"
+      }
+    ],
+    "createdAt": "2025-12-28T13:19:08.338Z",
+    "updatedAt": "2025-12-28T13:20:51.980Z"
+  }
+]

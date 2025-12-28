@@ -964,7 +964,29 @@
                     </div>
                 </div>
 
-                <div class="llm-chat-container">
+                <div class="llm-main-layout">
+                    <!-- 대화 목록 사이드바 -->
+                    <div class="llm-sidebar" id="llmSidebar">
+                        <div class="llm-sidebar-header">
+                            <button class="btn btn-primary btn-new-chat" id="newChatBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                새 대화
+                            </button>
+                        </div>
+                        <div class="llm-conversation-list" id="conversationList">
+                            <!-- 대화 목록이 여기에 동적으로 추가됨 -->
+                            <div class="conversation-empty">
+                                <p>대화 내역이 없습니다</p>
+                                <p class="hint">새 대화를 시작해보세요!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 채팅 영역 -->
+                    <div class="llm-chat-container">
                     <div class="llm-messages" id="llmMessages">
                         <div class="llm-welcome">
                             <div class="welcome-icon">
@@ -980,6 +1002,33 @@
                         </div>
                     </div>
                     <div class="llm-input-area">
+                        <!-- 퀵 명령어 버튼 (카카오 스타일) -->
+                        <div class="llm-quick-commands" id="llmQuickCommands">
+                            <button class="quick-cmd-btn" data-cmd="감시 중인 폴더 보여줘">
+                                <span class="cmd-icon">📁</span>
+                                <span class="cmd-text">감시 폴더</span>
+                            </button>
+                            <button class="quick-cmd-btn" data-cmd="현재 상태 알려줘">
+                                <span class="cmd-icon">📊</span>
+                                <span class="cmd-text">현재 상태</span>
+                            </button>
+                            <button class="quick-cmd-btn" data-cmd="오늘 변경된 문서 보여줘">
+                                <span class="cmd-icon">📅</span>
+                                <span class="cmd-text">오늘 변경</span>
+                            </button>
+                            <button class="quick-cmd-btn" data-cmd="최근 문서 목록 보여줘">
+                                <span class="cmd-icon">📄</span>
+                                <span class="cmd-text">최근 문서</span>
+                            </button>
+                            <button class="quick-cmd-btn" data-cmd="최근 회의록 보여줘">
+                                <span class="cmd-icon">🎤</span>
+                                <span class="cmd-text">최근 회의록</span>
+                            </button>
+                            <button class="quick-cmd-btn" data-cmd="도움말">
+                                <span class="cmd-icon">❓</span>
+                                <span class="cmd-text">도움말</span>
+                            </button>
+                        </div>
                         <textarea id="llmInput" placeholder="메시지를 입력하세요..." rows="3"></textarea>
                         <div class="llm-input-actions">
                             <button class="btn btn-primary" id="llmSendBtn">
@@ -990,6 +1039,7 @@
                                 전송
                             </button>
                         </div>
+                    </div>
                     </div>
                 </div>
             </section>
@@ -1039,6 +1089,15 @@
                             </div>
                             <p>무엇이든 물어보세요</p>
                         </div>
+                    </div>
+                    <!-- 패널용 퀵 명령어 버튼 -->
+                    <div class="panel-quick-commands" id="panelQuickCommands">
+                        <button class="quick-cmd-btn small" data-cmd="감시 중인 폴더 보여줘" title="감시 폴더">📁</button>
+                        <button class="quick-cmd-btn small" data-cmd="현재 상태 알려줘" title="현재 상태">📊</button>
+                        <button class="quick-cmd-btn small" data-cmd="오늘 변경된 문서 보여줘" title="오늘 변경">📅</button>
+                        <button class="quick-cmd-btn small" data-cmd="최근 문서 목록 보여줘" title="최근 문서">📄</button>
+                        <button class="quick-cmd-btn small" data-cmd="최근 회의록 보여줘" title="최근 회의록">🎤</button>
+                        <button class="quick-cmd-btn small" data-cmd="도움말" title="도움말">❓</button>
                     </div>
                     <div class="panel-llm-input">
                         <textarea id="panelLlmInput" placeholder="메시지 입력..." rows="2"></textarea>

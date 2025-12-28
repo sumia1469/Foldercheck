@@ -4633,12 +4633,200 @@ body.resizing-right-panel .main-content {
 /* ========================================
    LLM 섹션 스타일
 ======================================== */
-.llm-chat-container {
+
+/* ChatGPT 스타일 메인 레이아웃 */
+.llm-main-layout {
+    display: flex;
+    height: calc(100vh - var(--titlebar-height) - 120px);
+    gap: 0;
+}
+
+/* 대화 목록 사이드바 */
+.llm-sidebar {
+    width: 260px;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--titlebar-height) - 120px);
+    border-radius: 12px 0 0 12px;
+    overflow: hidden;
+}
+
+.llm-sidebar-header {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.btn-new-chat {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.btn-new-chat svg {
+    flex-shrink: 0;
+}
+
+.llm-conversation-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.conversation-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+}
+
+.conversation-empty p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.conversation-empty .hint {
+    font-size: 12px;
+    margin-top: 4px;
+    opacity: 0.7;
+}
+
+/* 대화 아이템 */
+.conversation-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.conversation-item:hover {
     background: var(--bg-tertiary);
-    border-radius: 12px;
+}
+
+.conversation-item.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.conversation-item.active .conversation-date {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.conversation-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.conversation-item.active .conversation-icon {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.conversation-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: var(--text-secondary);
+}
+
+.conversation-item.active .conversation-icon svg {
+    stroke: white;
+}
+
+.conversation-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.conversation-title {
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.conversation-date {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.conversation-actions {
+    display: none;
+    margin-left: 8px;
+}
+
+.conversation-item:hover .conversation-actions {
+    display: flex;
+}
+
+.conversation-item.active .conversation-actions {
+    display: flex;
+}
+
+.conversation-delete-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+}
+
+.conversation-delete-btn:hover {
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff4444;
+}
+
+.conversation-item.active .conversation-delete-btn {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.conversation-item.active .conversation-delete-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.conversation-delete-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 채팅 컨테이너 */
+.llm-chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg-tertiary);
+    border-radius: 0 12px 12px 0;
     overflow: hidden;
 }
 
@@ -4801,6 +4989,71 @@ body.resizing-right-panel .main-content {
     padding: 16px;
     border-top: 1px solid var(--border-color);
     background: var(--bg-secondary);
+}
+
+/* 퀵 명령어 버튼 (카카오 스타일) */
+.llm-quick-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.quick-cmd-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quick-cmd-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    transform: translateY(-1px);
+}
+
+.quick-cmd-btn:active {
+    transform: translateY(0);
+}
+
+.quick-cmd-btn .cmd-icon {
+    font-size: 14px;
+}
+
+.quick-cmd-btn .cmd-text {
+    font-weight: 500;
+}
+
+/* 패널용 퀵 명령어 (컴팩트) */
+.panel-quick-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.quick-cmd-btn.small {
+    padding: 6px 10px;
+    font-size: 16px;
+    border-radius: 8px;
+    min-width: 36px;
+    justify-content: center;
+}
+
+.quick-cmd-btn.small:hover {
+    transform: scale(1.1);
 }
 
 .llm-input-area textarea {

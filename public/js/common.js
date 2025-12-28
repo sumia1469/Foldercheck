@@ -4520,11 +4520,239 @@ function showAIResultInPanel(fileName, analysis) {
 }
 
 // ========================================
-// LLM 대화 기능
+// LLM 대화 기능 (ChatGPT 스타일 주제별 대화)
 // ========================================
 let llmConversationHistory = [];
+let currentConversationId = null;
+let conversationsList = [];
+
+// 대화 목록 로드
+async function loadConversationsList() {
+    try {
+        const response = await fetch('/api/conversations');
+        const data = await response.json();
+        if (data.success) {
+            conversationsList = data.conversations;
+            renderConversationsList();
+        }
+    } catch (err) {
+        console.error('대화 목록 로드 실패:', err);
+    }
+}
+
+// 대화 목록 렌더링
+function renderConversationsList() {
+    const listEl = document.getElementById('conversationList');
+    if (!listEl) return;
+
+    if (conversationsList.length === 0) {
+        listEl.innerHTML = `
+            <div class="conversation-empty">
+                <p>대화 내역이 없습니다</p>
+                <p class="hint">새 대화를 시작해보세요!</p>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = conversationsList.map(conv => `
+        <div class="conversation-item ${conv.id === currentConversationId ? 'active' : ''}" data-id="${conv.id}">
+            <div class="conversation-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+            <div class="conversation-info">
+                <div class="conversation-title">${escapeHtml(conv.title)}</div>
+                <div class="conversation-date">${formatConversationDate(conv.updatedAt)}</div>
+            </div>
+            <div class="conversation-actions">
+                <button class="conversation-delete-btn" data-id="${conv.id}" title="삭제">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // 대화 항목 클릭 이벤트
+    listEl.querySelectorAll('.conversation-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.conversation-delete-btn')) return;
+            const id = item.getAttribute('data-id');
+            selectConversation(id);
+        });
+    });
+
+    // 삭제 버튼 클릭 이벤트
+    listEl.querySelectorAll('.conversation-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            if (confirm('이 대화를 삭제하시겠습니까?')) {
+                await deleteConversation(id);
+            }
+        });
+    });
+}
+
+// 날짜 포맷
+function formatConversationDate(dateStr) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (days === 0) {
+        return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    } else if (days === 1) {
+        return '어제';
+    } else if (days < 7) {
+        return `${days}일 전`;
+    } else {
+        return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+    }
+}
+
+// 새 대화 생성
+async function createNewConversation() {
+    try {
+        const response = await fetch('/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await response.json();
+        if (data.success) {
+            currentConversationId = data.conversation.id;
+            llmConversationHistory = [];
+            await loadConversationsList();
+            clearChatMessages();
+            return data.conversation;
+        }
+    } catch (err) {
+        console.error('새 대화 생성 실패:', err);
+    }
+    return null;
+}
+
+// 대화 선택
+async function selectConversation(id) {
+    try {
+        const response = await fetch(`/api/conversations/${id}`);
+        const data = await response.json();
+        if (data.success) {
+            currentConversationId = id;
+            llmConversationHistory = data.conversation.messages.map(m => ({
+                role: m.role,
+                content: m.content
+            }));
+            renderConversationMessages(data.conversation.messages);
+            renderConversationsList();
+        }
+    } catch (err) {
+        console.error('대화 로드 실패:', err);
+    }
+}
+
+// 대화 메시지 렌더링
+function renderConversationMessages(messages) {
+    const messagesEl = document.getElementById('llmMessages');
+    if (!messagesEl) return;
+
+    if (messages.length === 0) {
+        messagesEl.innerHTML = `
+            <div class="llm-welcome">
+                <div class="welcome-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+                        <circle cx="8.5" cy="14.5" r="1.5"/>
+                        <circle cx="15.5" cy="14.5" r="1.5"/>
+                        <path d="M9 18h6"/>
+                    </svg>
+                </div>
+                <h3>스마트 어시스트</h3>
+                <p>무엇이든 물어보세요. 모든 처리는 로컬에서 진행됩니다.</p>
+            </div>
+        `;
+        return;
+    }
+
+    messagesEl.innerHTML = messages.map(m => {
+        if (m.role === 'user') {
+            return `
+                <div class="llm-message user">
+                    <div class="llm-bubble">${escapeHtml(m.content)}</div>
+                    <div class="llm-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                    </div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="llm-message assistant">
+                    <div class="llm-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+                        </svg>
+                    </div>
+                    <div class="llm-bubble">${formatLLMResponse(m.content)}</div>
+                </div>
+            `;
+        }
+    }).join('');
+
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// 대화 삭제
+async function deleteConversation(id) {
+    try {
+        const response = await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            if (currentConversationId === id) {
+                currentConversationId = null;
+                llmConversationHistory = [];
+                clearChatMessages();
+            }
+            await loadConversationsList();
+        }
+    } catch (err) {
+        console.error('대화 삭제 실패:', err);
+    }
+}
+
+// 채팅 메시지 초기화
+function clearChatMessages() {
+    const messagesEl = document.getElementById('llmMessages');
+    if (messagesEl) {
+        messagesEl.innerHTML = `
+            <div class="llm-welcome">
+                <div class="welcome-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2z"/>
+                        <circle cx="8.5" cy="14.5" r="1.5"/>
+                        <circle cx="15.5" cy="14.5" r="1.5"/>
+                        <path d="M9 18h6"/>
+                    </svg>
+                </div>
+                <h3>스마트 어시스트</h3>
+                <p>무엇이든 물어보세요. 모든 처리는 로컬에서 진행됩니다.</p>
+            </div>
+        `;
+    }
+}
 
 function initLLMChat() {
+    // 대화 목록 로드
+    loadConversationsList();
+
     // 메인 LLM 섹션
     const llmInput = document.getElementById('llmInput');
     const llmSendBtn = document.getElementById('llmSendBtn');
@@ -4534,6 +4762,14 @@ function initLLMChat() {
     const panelLlmInput = document.getElementById('panelLlmInput');
     const panelLlmSendBtn = document.getElementById('panelLlmSendBtn');
     const panelLlmMessages = document.getElementById('panelLlmMessages');
+
+    // 새 대화 버튼
+    const newChatBtn = document.getElementById('newChatBtn');
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', async () => {
+            await createNewConversation();
+        });
+    }
 
     // 메인 LLM 전송
     if (llmSendBtn && llmInput) {
@@ -4560,12 +4796,41 @@ function initLLMChat() {
             }
         });
     }
+
+    // 퀵 명령어 버튼 이벤트 (메인)
+    const quickCmdBtns = document.querySelectorAll('#llmQuickCommands .quick-cmd-btn');
+    quickCmdBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cmd = btn.getAttribute('data-cmd');
+            if (cmd && llmInput) {
+                llmInput.value = cmd;
+                sendLLMMessage(llmInput, llmMessages, false);
+            }
+        });
+    });
+
+    // 퀵 명령어 버튼 이벤트 (패널)
+    const panelQuickCmdBtns = document.querySelectorAll('#panelQuickCommands .quick-cmd-btn');
+    panelQuickCmdBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cmd = btn.getAttribute('data-cmd');
+            if (cmd && panelLlmInput) {
+                panelLlmInput.value = cmd;
+                sendLLMMessage(panelLlmInput, panelLlmMessages, true);
+            }
+        });
+    });
 }
 
 
 async function sendLLMMessage(inputEl, messagesEl, isPanel) {
     const message = inputEl.value.trim();
     if (!message) return;
+
+    // 메인 채팅이고 대화 ID가 없으면 새 대화 생성
+    if (!isPanel && !currentConversationId) {
+        await createNewConversation();
+    }
 
     // 웰컴 메시지 제거
     const welcomeEl = messagesEl.querySelector('.llm-welcome');
@@ -4602,7 +4867,8 @@ async function sendLLMMessage(inputEl, messagesEl, isPanel) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message,
-                history: llmConversationHistory.slice(-10) // 최근 10개 대화만 전송
+                history: llmConversationHistory.slice(-10), // 최근 10개 대화만 전송
+                conversationId: isPanel ? null : currentConversationId // 메인만 대화 저장
             })
         });
 
@@ -4614,6 +4880,11 @@ async function sendLLMMessage(inputEl, messagesEl, isPanel) {
         if (data.success) {
             addLLMMessage(messagesEl, data.response, 'assistant', isPanel);
             llmConversationHistory.push({ role: 'assistant', content: data.response });
+
+            // 메인 채팅이면 대화 목록 갱신 (제목 업데이트 반영)
+            if (!isPanel) {
+                await loadConversationsList();
+            }
 
             // 양쪽 채팅 동기화
             syncLLMMessages(messagesEl === document.getElementById('llmMessages') ? 'main' : 'panel');

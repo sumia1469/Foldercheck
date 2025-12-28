@@ -3402,6 +3402,7 @@ let currentPlayingAudio = null;
 let currentPlayingButton = null;
 let currentPlayingFilename = null;
 let audioTimeUpdateInterval = null;
+let isSeekingAudio = false;
 
 // 시간 포맷 함수 (초 -> M:SS 또는 H:MM:SS)
 function formatAudioTime(seconds) {
@@ -3419,6 +3420,8 @@ function formatAudioTime(seconds) {
 // 오디오 시간 업데이트
 function updateAudioTimeDisplay() {
     if (!currentPlayingAudio || !currentPlayingFilename) return;
+    // 드래그 중에는 업데이트 하지 않음
+    if (isSeekingAudio) return;
 
     const seekBarId = `seekbar-${currentPlayingFilename.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const controls = document.getElementById(seekBarId);

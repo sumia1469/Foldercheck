@@ -4033,39 +4033,43 @@ body.resizing-right-panel .main-content {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    padding: 12px;
-    background: var(--bg-tertiary);
-    border-radius: 8px;
-    margin-bottom: 16px;
+    gap: 10px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    flex-wrap: nowrap;
+    min-width: 0;
 }
 
 .panel-summary-nav .nav-btn {
-    padding: 6px 14px;
+    padding: 5px 12px;
     font-size: 12px;
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .panel-summary-nav .nav-btn:hover:not(:disabled) {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
 }
 
 .panel-summary-nav .nav-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 
 .panel-summary-nav .nav-indicator {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* 회의록 패널 빈 요약 상태 */
@@ -4074,24 +4078,22 @@ body.resizing-right-panel .main-content {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 40px 20px;
+    padding: 30px 16px;
     text-align: center;
-    background: var(--bg-tertiary);
-    border-radius: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .panel-empty-summary svg {
-    width: 48px;
-    height: 48px;
+    width: 36px;
+    height: 36px;
     color: var(--text-muted);
-    margin-bottom: 12px;
-    opacity: 0.5;
+    margin-bottom: 10px;
+    opacity: 0.4;
 }
 
 .panel-empty-summary p {
-    color: var(--text-secondary);
-    font-size: 14px;
+    color: var(--text-muted);
+    font-size: 13px;
     margin: 0;
 }
 
@@ -4413,59 +4415,21 @@ body.resizing-right-panel .main-content {
 }
 
 .panel-analysis-section {
-    margin-bottom: 16px;
-    padding: 14px 16px;
-    background: var(--bg-tertiary);
-    border-radius: 10px;
-    border: 1px solid var(--border-color);
-    transition: all 0.2s ease;
-}
-
-.panel-analysis-section:hover {
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 12px;
 }
 
 .panel-analysis-section h5 {
-    margin: 0 0 12px 0;
-    font-size: 14px;
+    margin: 0 0 8px 0;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
 .panel-analysis-section.ai-summary {
-    background: linear-gradient(135deg, rgba(0, 212, 170, 0.15), rgba(0, 184, 148, 0.1));
-    border: 2px solid rgba(0, 212, 170, 0.4);
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 4px 20px rgba(0, 212, 170, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    position: relative;
-    overflow: visible;
-}
-
-.panel-analysis-section.ai-summary::before {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: 20px;
-    right: 20px;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
-    border-radius: 2px;
-}
-
-.panel-analysis-section.ai-summary h5 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--accent-primary);
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    /* 단순한 스타일 */
 }
 
 .panel-ai-summary-content {
@@ -4475,16 +4439,14 @@ body.resizing-right-panel .main-content {
 
 .panel-ai-summary-content pre {
     margin: 0;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-primary);
     white-space: pre-wrap;
     word-break: break-word;
     font-family: inherit;
-    line-height: 1.8;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 14px 16px;
-    border-radius: 8px;
-    border-left: 4px solid var(--accent-primary);
+    line-height: 1.7;
+    background: transparent;
+    padding: 0;
 }
 
 .panel-analysis-list {

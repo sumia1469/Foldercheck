@@ -2353,6 +2353,34 @@ body {
     margin: 0;
 }
 
+/* 재생 버튼 스타일 */
+.btn-play {
+    background: var(--accent-primary);
+    border: 1px solid var(--accent-primary);
+    color: white;
+    transition: all 0.2s;
+}
+
+.btn-play:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-play.playing {
+    background: var(--warning);
+    border-color: var(--warning);
+    animation: pulse-play 1.5s infinite;
+}
+
+@keyframes pulse-play {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
 /* 반응형 녹음 파일 목록 */
 @media (max-width: 768px) {
     .recording-item {
@@ -2883,6 +2911,42 @@ body:has(.web-warning) .app-container {
 
 .copy-icon {
     font-size: 14px;
+}
+
+/* 요약 접기/펼치기 토글 */
+.meeting-summary-content.collapsed .summary-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.meeting-summary-content.expanded .summary-body {
+    overflow: hidden;
+    transition: max-height 0.3s ease-in;
+}
+
+.meeting-summary-content .summary-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.meeting-summary-content .summary-header:hover {
+    background: var(--bg-hover);
+    margin: -8px;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.summary-toggle-icon {
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    display: inline-block;
+    width: 12px;
+}
+
+.summary-body {
+    margin-top: 10px;
 }
 
 /* 폴더 목록 스타일 */

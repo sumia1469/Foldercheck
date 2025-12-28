@@ -2554,13 +2554,21 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 // 파일명 생성
-                const date = new Date().toISOString().slice(0, 10);
-                const time = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
-                const originalName = fileData.filename || 'recording.webm';
-                const ext = path.extname(originalName) || '.webm';
-                const baseName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9가-힣_-]/g, '_');
-                const newFilename = `${baseName}_${date}_${time}${ext}`;
-                const filePath = path.join(MEETINGS_DIR, newFilename);
+                const originalName = fileData.filename || 'recording.wav';
+                const ext = path.extname(originalName) || '.wav';
+                const baseName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9가-힣_\- ]/g, '_');
+
+                // 기본 파일명으로 먼저 시도
+                let newFilename = `${baseName}${ext}`;
+                let filePath = path.join(MEETINGS_DIR, newFilename);
+
+                // 같은 이름의 파일이 존재하면 타임스탬프 추가
+                if (fs.existsSync(filePath)) {
+                    const date = new Date().toISOString().slice(0, 10);
+                    const time = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
+                    newFilename = `${baseName}_${date}_${time}${ext}`;
+                    filePath = path.join(MEETINGS_DIR, newFilename);
+                }
 
                 // 파일 저장
                 fs.writeFileSync(filePath, fileData.content);

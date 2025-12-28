@@ -1294,6 +1294,14 @@ const qualitySettings = {
 // 녹음 시작
 async function startRecording() {
     try {
+        // 제목이 비어있으면 자동 생성
+        if (meetingTitleInput && !meetingTitleInput.value.trim()) {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+            const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+            meetingTitleInput.value = `${dateStr} ${timeStr} 회의`;
+        }
+
         // 마이크 권한 요청
         audioStream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -1327,19 +1335,31 @@ async function startRecording() {
         };
 
         mediaRecorder.onstop = async () => {
-            recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const webmBlob = new Blob(audioChunks, { type: 'audio/webm' });
 
-            // 서버에 녹음 파일 저장
+            // WebM을 WAV로 변환하여 저장
             try {
                 const title = meetingTitleInput?.value || '회의녹음';
+                console.log('WAV 변환 시작...');
+                recordedBlob = await convertToWav(webmBlob);
+                console.log('WAV 변환 완료');
+
                 const saved = await saveRecordingToServer(recordedBlob, title);
                 if (saved) {
                     console.log('녹음 파일 서버 저장 완료:', saved.filename);
-                    // 녹음 파일 목록 새로고침
                     loadRecordings();
                 }
             } catch (e) {
-                console.error('녹음 파일 서버 저장 실패:', e);
+                console.error('WAV 변환/저장 실패:', e);
+                // 변환 실패 시 원본 webm으로 저장 시도
+                recordedBlob = webmBlob;
+                try {
+                    const title = meetingTitleInput?.value || '회의녹음';
+                    await saveRecordingToServer(recordedBlob, title, true);
+                    loadRecordings();
+                } catch (e2) {
+                    console.error('원본 저장도 실패:', e2);
+                }
             }
 
             showRecordingComplete();
@@ -1534,10 +1554,13 @@ function resetRecording() {
 }
 
 // 녹음 파일을 서버에 저장
-async function saveRecordingToServer(blob, title) {
+async function saveRecordingToServer(blob, title, isWebm = false) {
     try {
         const formData = new FormData();
-        const filename = `${title || '회의녹음'}.webm`;
+        const ext = isWebm ? 'webm' : 'wav';
+        // 제목 정리: 공백 제거, 파일명에 사용할 수 없는 문자 제거
+        const cleanTitle = (title || '').trim().replace(/[\\/:*?"<>|]/g, '_') || '회의녹음';
+        const filename = `${cleanTitle}.${ext}`;
         formData.append('file', blob, filename);
 
         const res = await fetch('/api/recordings', {
@@ -1556,14 +1579,29 @@ async function saveRecordingToServer(blob, title) {
     }
 }
 
-// 녹음 파일 다운로드 (WAV로 변환)
+// 녹음 파일 다운로드 (WAV)
 async function downloadRecording() {
     if (!recordedBlob) return;
 
     const title = meetingTitleInput?.value || '회의녹음';
     const date = new Date().toISOString().slice(0, 10);
+    const isWav = recordedBlob.type === 'audio/wav' || recordedBlob.type === 'audio/wave';
 
-    // WebM을 WAV로 변환
+    // 이미 WAV인 경우 바로 다운로드
+    if (isWav) {
+        const filename = `${title}_${date}.wav`;
+        const url = URL.createObjectURL(recordedBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+    }
+
+    // WebM인 경우 WAV로 변환 시도
     try {
         const wavBlob = await convertWebmToWav(recordedBlob);
         const filename = `${title}_${date}.wav`;
@@ -1576,17 +1614,8 @@ async function downloadRecording() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     } catch (error) {
-        console.error('WAV 변환 실패, WebM으로 다운로드:', error);
-        // 변환 실패 시 원본 WebM 다운로드
-        const filename = `${title}_${date}.webm`;
-        const url = URL.createObjectURL(recordedBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        console.error('WAV 변환 실패:', error);
+        alert('WAV 변환에 실패했습니다.');
     }
 }
 
@@ -1662,12 +1691,19 @@ function writeString(view, offset, string) {
     }
 }
 
+// convertToWav 별칭 (convertWebmToWav와 동일)
+const convertToWav = convertWebmToWav;
+
 // 녹음 파일로 회의록 생성
 async function generateMinutesFromRecording() {
     if (!recordedBlob) return;
 
     const title = meetingTitleInput?.value || '회의녹음';
-    const file = new File([recordedBlob], `${title}.webm`, { type: 'audio/webm' });
+    // recordedBlob은 이미 WAV로 변환된 상태
+    const isWav = recordedBlob.type === 'audio/wav' || recordedBlob.type === 'audio/wave';
+    const ext = isWav ? 'wav' : 'webm';
+    const mimeType = isWav ? 'audio/wav' : 'audio/webm';
+    const file = new File([recordedBlob], `${title}.${ext}`, { type: mimeType });
 
     // 기존 handleAudioFile 함수 호출
     handleAudioFile(file);
@@ -1935,13 +1971,14 @@ function renderMeetings(meetings) {
                 <button class="btn btn-danger" onclick="deleteMeeting('${meeting.id}')">삭제</button>
             </div>
             ${meeting.aiSummary ? `
-                <div class="meeting-summary-content" data-meeting-id="${meeting.id}">
-                    <div class="summary-header">
+                <div class="meeting-summary-content collapsed" data-meeting-id="${meeting.id}">
+                    <div class="summary-header" onclick="toggleSummary('${meeting.id}')">
                         <div class="summary-header-left">
+                            <span class="summary-toggle-icon" id="toggleIcon-${meeting.id}">▶</span>
                             <strong>📝 AI 요약</strong>
                             <span class="summary-date" id="summaryDate-${meeting.id}">${meeting.summarizedAt ? new Date(meeting.summarizedAt).toLocaleString('ko-KR') : ''}</span>
                         </div>
-                        <div class="summary-header-right">
+                        <div class="summary-header-right" onclick="event.stopPropagation()">
                             ${historyLen > 1 ? `
                                 <div class="summary-nav">
                                     <button class="nav-btn" onclick="navigateSummary('${meeting.id}', -1)" ${currentIdx <= 0 ? 'disabled' : ''}>‹</button>
@@ -1954,11 +1991,36 @@ function renderMeetings(meetings) {
                             </button>
                         </div>
                     </div>
-                    <pre class="summary-text" id="summaryText-${meeting.id}">${escapeHtml(meeting.aiSummary)}</pre>
+                    <div class="summary-body" id="summaryBody-${meeting.id}">
+                        <pre class="summary-text" id="summaryText-${meeting.id}">${escapeHtml(meeting.aiSummary)}</pre>
+                    </div>
                 </div>
             ` : ''}
         </div>
     `}).join('');
+}
+
+// 요약 접기/펼치기 토글
+function toggleSummary(meetingId) {
+    const container = document.querySelector(`[data-meeting-id="${meetingId}"]`);
+    const toggleIcon = document.getElementById(`toggleIcon-${meetingId}`);
+    const summaryBody = document.getElementById(`summaryBody-${meetingId}`);
+
+    if (!container || !summaryBody) return;
+
+    const isCollapsed = container.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        if (toggleIcon) toggleIcon.textContent = '▼';
+        summaryBody.style.maxHeight = summaryBody.scrollHeight + 'px';
+    } else {
+        container.classList.remove('expanded');
+        container.classList.add('collapsed');
+        if (toggleIcon) toggleIcon.textContent = '▶';
+        summaryBody.style.maxHeight = '0';
+    }
 }
 
 // 요약 복사 함수
@@ -2274,6 +2336,15 @@ function renderRecordings(recordings) {
                     </div>
                 </div>
                 <div class="recording-actions">
+                    <button class="btn btn-sm btn-play" onclick="togglePlayRecording('${escapeHtml(recording.filename)}', this)" title="재생" data-playing="false">
+                        <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width: 14px; height: 14px;">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width: 14px; height: 14px; display: none;">
+                            <rect x="6" y="4" width="4" height="16"/>
+                            <rect x="14" y="4" width="4" height="16"/>
+                        </svg>
+                    </button>
                     <button class="btn btn-sm btn-primary" onclick="transcribeRecording('${escapeHtml(recording.filename)}')" title="회의록 생성">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -2359,6 +2430,82 @@ async function deleteSelectedRecordings() {
     }
 
     loadRecordings();
+}
+
+// 현재 재생 중인 오디오 관리
+let currentPlayingAudio = null;
+let currentPlayingButton = null;
+
+// 녹음 파일 재생/일시정지 토글
+function togglePlayRecording(filename, button) {
+    const playIcon = button.querySelector('.play-icon');
+    const pauseIcon = button.querySelector('.pause-icon');
+    const isPlaying = button.dataset.playing === 'true';
+
+    // 다른 파일이 재생 중이면 먼저 중지
+    if (currentPlayingAudio && currentPlayingButton !== button) {
+        stopCurrentPlayback();
+    }
+
+    if (isPlaying) {
+        // 일시정지
+        if (currentPlayingAudio) {
+            currentPlayingAudio.pause();
+        }
+        button.dataset.playing = 'false';
+        playIcon.style.display = '';
+        pauseIcon.style.display = 'none';
+        button.classList.remove('playing');
+    } else {
+        // 재생 시작
+        if (currentPlayingAudio && currentPlayingButton === button) {
+            // 같은 파일 이어서 재생
+            currentPlayingAudio.play();
+        } else {
+            // 새 파일 재생
+            currentPlayingAudio = new Audio(`/api/recording/download/${encodeURIComponent(filename)}`);
+            currentPlayingButton = button;
+
+            currentPlayingAudio.onended = () => {
+                stopCurrentPlayback();
+            };
+
+            currentPlayingAudio.onerror = () => {
+                alert('재생할 수 없는 파일입니다.');
+                stopCurrentPlayback();
+            };
+
+            currentPlayingAudio.play().catch(e => {
+                console.error('재생 오류:', e);
+                alert('재생 중 오류가 발생했습니다.');
+                stopCurrentPlayback();
+            });
+        }
+
+        button.dataset.playing = 'true';
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = '';
+        button.classList.add('playing');
+    }
+}
+
+// 현재 재생 중지
+function stopCurrentPlayback() {
+    if (currentPlayingAudio) {
+        currentPlayingAudio.pause();
+        currentPlayingAudio.currentTime = 0;
+        currentPlayingAudio = null;
+    }
+
+    if (currentPlayingButton) {
+        const playIcon = currentPlayingButton.querySelector('.play-icon');
+        const pauseIcon = currentPlayingButton.querySelector('.pause-icon');
+        currentPlayingButton.dataset.playing = 'false';
+        if (playIcon) playIcon.style.display = '';
+        if (pauseIcon) pauseIcon.style.display = 'none';
+        currentPlayingButton.classList.remove('playing');
+        currentPlayingButton = null;
+    }
 }
 
 // 파일 크기 포맷

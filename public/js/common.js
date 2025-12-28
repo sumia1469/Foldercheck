@@ -2453,8 +2453,8 @@ async function summarizeMeeting(meetingId) {
         btn.innerHTML = '⏳ 요약 중...';
     }
 
-    // 로딩 오버레이 표시
-    showSummarizingOverlay();
+    // 우측 패널에 로딩 상태 표시
+    showMeetingSummaryInPanel(meetingId, null, true);
 
     // 진행 상황 폴링
     let progressInterval = setInterval(async () => {
@@ -2465,7 +2465,7 @@ async function summarizeMeeting(meetingId) {
                 const text = progress.detail
                     ? `${progress.stage} - ${progress.detail}`
                     : progress.stage;
-                updateSummarizingOverlay(text, progress.percent);
+                updatePanelProgress(text, progress.percent);
             }
         } catch (e) {
             // 폴링 실패는 무시
@@ -2488,6 +2488,9 @@ async function summarizeMeeting(meetingId) {
         // 성공 시 목록 새로고침
         await loadMeetings();
 
+        // 우측 패널에 요약 결과 표시
+        showMeetingSummaryInPanel(meetingId, data.summary, false);
+
         // 요약된 회의록으로 스크롤
         const updatedEl = document.getElementById(`meeting-${meetingId}`);
         if (updatedEl) {
@@ -2498,7 +2501,7 @@ async function summarizeMeeting(meetingId) {
 
     } catch (e) {
         console.error('요약 오류:', e);
-        alert(`요약 생성 실패: ${e.message}`);
+        showMeetingSummaryError(e.message);
 
         if (btn) {
             btn.disabled = false;
@@ -2506,7 +2509,129 @@ async function summarizeMeeting(meetingId) {
         }
     } finally {
         clearInterval(progressInterval);
-        hideSummarizingOverlay();
+    }
+}
+
+// 회의록 요약을 우측 패널에 표시
+function showMeetingSummaryInPanel(meetingId, summary, isLoading) {
+    const rightPanel = document.getElementById('rightPanel');
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    const toggleBtn = document.getElementById('toggleRightPanelBtn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
+
+    if (!rightPanel || !panelAiInfo) return;
+
+    // 패널 열기
+    rightPanel.classList.add('open');
+    if (toggleBtn) toggleBtn.classList.add('active');
+
+    // AI 정보 탭 활성화
+    panelTabs.forEach(t => {
+        t.classList.toggle('active', t.dataset.panelTab === 'ai-info');
+    });
+    document.getElementById('panelAiInfo').style.display = 'flex';
+    document.getElementById('panelLlmChat').style.display = 'none';
+
+    if (isLoading) {
+        // 로딩 상태
+        panelAiInfo.innerHTML = `
+            <div class="panel-ai-result" style="width: 100%;">
+                <div class="panel-ai-header">
+                    <span class="ai-icon">⏳</span>
+                    <h4>AI 요약 생성 중...</h4>
+                </div>
+                <div class="panel-meeting-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    </svg>
+                    <span>${meetingId}</span>
+                </div>
+                <div class="panel-progress" id="panelProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="panelProgressFill" style="width: 0%"></div>
+                    </div>
+                    <span class="progress-text" id="panelProgressText">분석 준비 중...</span>
+                </div>
+            </div>
+        `;
+    } else if (summary) {
+        // 요약 결과
+        const formattedSummary = summary
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+
+        panelAiInfo.innerHTML = `
+            <div class="panel-ai-result" style="width: 100%;">
+                <div class="panel-ai-header">
+                    <span class="ai-icon">✨</span>
+                    <h4>회의록 AI 요약</h4>
+                </div>
+                <div class="panel-meeting-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    </svg>
+                    <span>${meetingId}</span>
+                </div>
+                <div class="panel-ai-content">
+                    ${formattedSummary}
+                </div>
+                <div class="panel-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="copyMeetingSummary('${meetingId}')">
+                        📋 복사
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// 패널 진행 상태 업데이트
+function updatePanelProgress(text, percent) {
+    const progressFill = document.getElementById('panelProgressFill');
+    const progressText = document.getElementById('panelProgressText');
+
+    if (progressFill && percent !== undefined) {
+        progressFill.style.width = `${percent}%`;
+    }
+    if (progressText && text) {
+        progressText.textContent = text;
+    }
+}
+
+// 회의록 요약 오류 표시
+function showMeetingSummaryError(message) {
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    if (panelAiInfo) {
+        panelAiInfo.innerHTML = `
+            <div class="panel-empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--danger);">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <p style="color: var(--danger);">요약 생성 실패</p>
+                <span class="panel-hint">${message}</span>
+            </div>
+        `;
+    }
+}
+
+// 회의록 요약 복사
+function copyMeetingSummary(meetingId) {
+    const content = document.querySelector('.panel-ai-content');
+    if (content) {
+        const text = content.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.querySelector('.panel-actions .btn');
+            if (btn) {
+                btn.innerHTML = '✅ 복사됨';
+                setTimeout(() => {
+                    btn.innerHTML = '📋 복사';
+                }, 2000);
+            }
+        });
     }
 }
 
@@ -3755,6 +3880,8 @@ function initLLMChat() {
     if (llmSendBtn && llmInput) {
         llmSendBtn.addEventListener('click', () => sendLLMMessage(llmInput, llmMessages, false));
         llmInput.addEventListener('keydown', (e) => {
+            // 한글 IME 조합 중일 때는 무시 (중복 전송 방지)
+            if (e.isComposing || e.keyCode === 229) return;
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendLLMMessage(llmInput, llmMessages, false);
@@ -3766,6 +3893,8 @@ function initLLMChat() {
     if (panelLlmSendBtn && panelLlmInput) {
         panelLlmSendBtn.addEventListener('click', () => sendLLMMessage(panelLlmInput, panelLlmMessages, true));
         panelLlmInput.addEventListener('keydown', (e) => {
+            // 한글 IME 조합 중일 때는 무시 (중복 전송 방지)
+            if (e.isComposing || e.keyCode === 229) return;
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendLLMMessage(panelLlmInput, panelLlmMessages, true);
@@ -4013,3 +4142,290 @@ function syncLLMMessages(source) {
 }
 
 initLLMChat();
+
+// ========================================
+// 상단 검색 기능 (Command Palette)
+// ========================================
+function initGlobalSearch() {
+    const searchInput = document.getElementById('globalSearchInput');
+    const searchResults = document.getElementById('searchResults');
+    const searchDocsItems = document.getElementById('searchDocsItems');
+    const searchMeetingsItems = document.getElementById('searchMeetingsItems');
+    const searchCommandsItems = document.getElementById('searchCommandsItems');
+    const searchCategoryDocs = document.getElementById('searchCategoryDocs');
+    const searchCategoryMeetings = document.getElementById('searchCategoryMeetings');
+    const searchCategoryCommands = document.getElementById('searchCategoryCommands');
+    const searchNoResults = document.getElementById('searchNoResults');
+
+    if (!searchInput || !searchResults) return;
+
+    let selectedIndex = -1;
+    let allResults = [];
+
+    // 명령어 목록
+    const commands = [
+        { id: 'cmd-monitoring', title: '폴더 모니터링', subtitle: '문서 변경 추적', action: () => showSection('monitoring'), shortcut: '' },
+        { id: 'cmd-meeting', title: '회의록', subtitle: '회의 녹음 및 관리', action: () => showSection('meeting'), shortcut: '' },
+        { id: 'cmd-llm', title: '스마트 어시스트', subtitle: 'AI 대화', action: () => showSection('llm'), shortcut: '' },
+        { id: 'cmd-settings', title: '설정', subtitle: '앱 설정', action: () => showSection('settings'), shortcut: '' },
+        { id: 'cmd-record', title: '녹음 시작', subtitle: '새 회의 녹음', action: () => { showSection('meeting'); setTimeout(() => { if(typeof openRecordingModal === 'function') openRecordingModal(); }, 300); }, shortcut: '' },
+        { id: 'cmd-add-folder', title: '폴더 추가', subtitle: '감시 폴더 추가', action: () => { showSection('monitoring'); setTimeout(() => { const btn = document.querySelector('.add-folder-btn, [onclick*="addFolder"]'); if(btn) btn.click(); }, 300); }, shortcut: '' },
+        { id: 'cmd-refresh', title: '새로고침', subtitle: '데이터 새로고침', action: () => location.reload(), shortcut: '⌘R' },
+    ];
+
+    // 검색 실행
+    async function performSearch(query) {
+        if (!query || query.trim().length === 0) {
+            closeSearchResults();
+            return;
+        }
+
+        const q = query.toLowerCase().trim();
+        allResults = [];
+        let docsHtml = '';
+        let meetingsHtml = '';
+        let commandsHtml = '';
+
+        // 1. 문서 검색 (서버에서)
+        try {
+            const docsResponse = await fetch(`/api/search/docs?q=${encodeURIComponent(q)}`);
+            if (docsResponse.ok) {
+                const docs = await docsResponse.json();
+                docs.slice(0, 5).forEach((doc, i) => {
+                    allResults.push({ type: 'doc', data: doc, index: allResults.length });
+                    docsHtml += createDocResultItem(doc, q, allResults.length - 1);
+                });
+            }
+        } catch (e) {
+            console.log('문서 검색 오류:', e);
+        }
+
+        // 2. 회의록 검색 (서버에서)
+        try {
+            const meetingsResponse = await fetch(`/api/search/meetings?q=${encodeURIComponent(q)}`);
+            if (meetingsResponse.ok) {
+                const meetings = await meetingsResponse.json();
+                meetings.slice(0, 5).forEach((meeting, i) => {
+                    allResults.push({ type: 'meeting', data: meeting, index: allResults.length });
+                    meetingsHtml += createMeetingResultItem(meeting, q, allResults.length - 1);
+                });
+            }
+        } catch (e) {
+            console.log('회의록 검색 오류:', e);
+        }
+
+        // 3. 명령어 검색
+        commands.filter(cmd =>
+            cmd.title.toLowerCase().includes(q) ||
+            cmd.subtitle.toLowerCase().includes(q)
+        ).slice(0, 5).forEach(cmd => {
+            allResults.push({ type: 'command', data: cmd, index: allResults.length });
+            commandsHtml += createCommandResultItem(cmd, q, allResults.length - 1);
+        });
+
+        // 결과 표시
+        searchDocsItems.innerHTML = docsHtml;
+        searchMeetingsItems.innerHTML = meetingsHtml;
+        searchCommandsItems.innerHTML = commandsHtml;
+
+        searchCategoryDocs.classList.toggle('has-results', docsHtml.length > 0);
+        searchCategoryMeetings.classList.toggle('has-results', meetingsHtml.length > 0);
+        searchCategoryCommands.classList.toggle('has-results', commandsHtml.length > 0);
+
+        const hasResults = allResults.length > 0;
+        searchNoResults.classList.toggle('visible', !hasResults);
+
+        searchResults.classList.add('open');
+        selectedIndex = -1;
+        bindResultEvents();
+    }
+
+    // 문서 결과 아이템 생성
+    function createDocResultItem(doc, query, index) {
+        const title = highlightText(doc.fileName || doc.name || '문서', query);
+        const subtitle = doc.folder || doc.path || '';
+        return `
+            <div class="search-result-item" data-type="doc" data-index="${index}">
+                <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                </svg>
+                <div class="item-content">
+                    <div class="item-title">${title}</div>
+                    <div class="item-subtitle">${subtitle}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 회의록 결과 아이템 생성
+    function createMeetingResultItem(meeting, query, index) {
+        const title = highlightText(meeting.title || meeting.id || '회의록', query);
+        const subtitle = meeting.date || meeting.createdAt || '';
+        return `
+            <div class="search-result-item" data-type="meeting" data-index="${index}">
+                <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                </svg>
+                <div class="item-content">
+                    <div class="item-title">${title}</div>
+                    <div class="item-subtitle">${subtitle}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 명령어 결과 아이템 생성
+    function createCommandResultItem(cmd, query, index) {
+        const title = highlightText(cmd.title, query);
+        return `
+            <div class="search-result-item" data-type="command" data-index="${index}">
+                <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4,17 10,11 4,5"/>
+                    <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+                <div class="item-content">
+                    <div class="item-title">${title}</div>
+                    <div class="item-subtitle">${cmd.subtitle}</div>
+                </div>
+                ${cmd.shortcut ? `<span class="item-shortcut">${cmd.shortcut}</span>` : ''}
+            </div>
+        `;
+    }
+
+    // 텍스트 하이라이트
+    function highlightText(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+        return text.replace(regex, '<span class="search-highlight">$1</span>');
+    }
+
+    function escapeRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // 결과 아이템 이벤트 바인딩
+    function bindResultEvents() {
+        const items = searchResults.querySelectorAll('.search-result-item');
+        items.forEach((item, i) => {
+            item.addEventListener('click', () => selectResult(i));
+            item.addEventListener('mouseenter', () => {
+                items.forEach(it => it.classList.remove('selected'));
+                item.classList.add('selected');
+                selectedIndex = i;
+            });
+        });
+    }
+
+    // 결과 선택
+    function selectResult(index) {
+        if (index < 0 || index >= allResults.length) return;
+
+        const result = allResults[index];
+        closeSearchResults();
+        searchInput.value = '';
+
+        switch (result.type) {
+            case 'doc':
+                showSection('monitoring');
+                // 문서 상세 표시 로직 (필요시)
+                break;
+            case 'meeting':
+                showSection('meeting');
+                const meetingId = result.data.id;
+                if (meetingId && typeof viewMeetingDetail === 'function') {
+                    setTimeout(() => viewMeetingDetail(meetingId), 300);
+                }
+                break;
+            case 'command':
+                result.data.action();
+                break;
+        }
+    }
+
+    // 결과 닫기
+    function closeSearchResults() {
+        searchResults.classList.remove('open');
+        selectedIndex = -1;
+        allResults = [];
+    }
+
+    // 키보드 내비게이션
+    searchInput.addEventListener('keydown', (e) => {
+        const items = searchResults.querySelectorAll('.search-result-item');
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (selectedIndex < items.length - 1) {
+                selectedIndex++;
+                updateSelection(items);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (selectedIndex > 0) {
+                selectedIndex--;
+                updateSelection(items);
+            }
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0) {
+                selectResult(selectedIndex);
+            }
+        } else if (e.key === 'Escape') {
+            closeSearchResults();
+            searchInput.blur();
+        }
+    });
+
+    function updateSelection(items) {
+        items.forEach((item, i) => {
+            item.classList.toggle('selected', i === selectedIndex);
+        });
+        if (items[selectedIndex]) {
+            items[selectedIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    // 입력 이벤트 (디바운스)
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            performSearch(e.target.value);
+        }, 200);
+    });
+
+    // 포커스 시 결과 표시
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim().length > 0) {
+            performSearch(searchInput.value);
+        }
+    });
+
+    // 외부 클릭 시 닫기
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.titlebar-search')) {
+            closeSearchResults();
+        }
+    });
+
+    // 단축키 (Cmd+K / Ctrl+K)
+    document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+    });
+
+    // 플레이스홀더 업데이트 (Mac/Windows)
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    searchInput.placeholder = isMac ? '검색 (⌘K)' : '검색 (Ctrl+K)';
+    const shortcutEl = document.querySelector('.search-shortcut');
+    if (shortcutEl) {
+        shortcutEl.textContent = isMac ? '⌘K' : 'Ctrl+K';
+    }
+}
+
+initGlobalSearch();

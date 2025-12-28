@@ -2698,6 +2698,59 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // API: 문서 검색
+        if (pathname === '/api/search/docs' && req.method === 'GET') {
+            const query = url.searchParams.get('q') || '';
+            const q = query.toLowerCase();
+
+            // documentHistory에서 검색
+            const results = [];
+            for (const [key, doc] of Object.entries(documentHistory)) {
+                const fileName = (doc.fileName || '').toLowerCase();
+                const folder = (doc.folder || key.split('/').slice(0, -1).join('/') || '').toLowerCase();
+
+                if (fileName.includes(q) || folder.includes(q)) {
+                    results.push({
+                        key,
+                        fileName: doc.fileName,
+                        folder: doc.folder || key.split('/').slice(0, -1).join('/'),
+                        analyzedAt: doc.analyzedAt
+                    });
+                }
+            }
+
+            // 최근 분석순 정렬
+            results.sort((a, b) => new Date(b.analyzedAt || 0) - new Date(a.analyzedAt || 0));
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(results.slice(0, 10)));
+            return;
+        }
+
+        // API: 회의록 검색
+        if (pathname === '/api/search/meetings' && req.method === 'GET') {
+            const query = url.searchParams.get('q') || '';
+            const q = query.toLowerCase();
+
+            const results = meetings.filter(meeting => {
+                const title = (meeting.title || '').toLowerCase();
+                const id = (meeting.id || '').toLowerCase();
+                const transcript = (meeting.transcript || '').toLowerCase();
+                const summary = (meeting.summary || '').toLowerCase();
+
+                return title.includes(q) || id.includes(q) || transcript.includes(q) || summary.includes(q);
+            }).map(meeting => ({
+                id: meeting.id,
+                title: meeting.title || meeting.id,
+                date: meeting.date || meeting.createdAt,
+                duration: meeting.duration
+            }));
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(results.slice(0, 10)));
+            return;
+        }
+
         // API: 문서 분석 (PPTX, DOCX, XLSX)
         if (pathname === '/api/document/analyze' && req.method === 'POST') {
             const { filePath } = await parseBody(req);

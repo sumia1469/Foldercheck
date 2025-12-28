@@ -2574,11 +2574,8 @@ function renderMeetings(meetings) {
     }
 
     meetingList.innerHTML = meetings.map(meeting => {
-        const historyLen = meeting.summaryHistory?.length || (meeting.aiSummary ? 1 : 0);
-        const currentIdx = meeting.currentSummaryIndex ?? (historyLen - 1);
-
         return `
-        <div class="meeting-item" id="meeting-${meeting.id}">
+        <div class="meeting-item" id="meeting-${meeting.id}" onclick="selectMeeting('${meeting.id}')">
             <div class="meeting-item-header">
                 <label class="meeting-checkbox" onclick="event.stopPropagation()">
                     <input type="checkbox" class="meeting-select-checkbox" data-meeting-id="${meeting.id}" onchange="updateMeetingSelectionState()">
@@ -2589,41 +2586,161 @@ function renderMeetings(meetings) {
                     ${meeting.aiSummary ? `<div class="meeting-summary-badge">✨ AI 요약 완료</div>` : ''}
                 </div>
             </div>
-            <div class="meeting-actions">
+            <div class="meeting-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-primary" onclick="summarizeMeeting('${meeting.id}')" ${meeting.aiSummary ? 'title="다시 요약"' : ''}>
                     ${meeting.aiSummary ? '🔄 재요약' : '✨ AI 요약'}
                 </button>
                 <button class="btn btn-secondary" onclick="downloadMeeting('${meeting.id}')">다운로드</button>
                 <button class="btn btn-danger" onclick="deleteMeeting('${meeting.id}')">삭제</button>
             </div>
-            ${meeting.aiSummary ? `
-                <div class="meeting-summary-content collapsed" data-meeting-id="${meeting.id}">
-                    <div class="summary-header" onclick="toggleSummary('${meeting.id}')">
-                        <div class="summary-header-left">
-                            <span class="summary-toggle-icon" id="toggleIcon-${meeting.id}">▶</span>
-                            <strong>📝 AI 요약</strong>
-                            <span class="summary-date" id="summaryDate-${meeting.id}">${meeting.summarizedAt ? new Date(meeting.summarizedAt).toLocaleString('ko-KR') : ''}</span>
-                        </div>
-                        <div class="summary-header-right" onclick="event.stopPropagation()">
-                            ${historyLen > 1 ? `
-                                <div class="summary-nav">
-                                    <button class="nav-btn" onclick="navigateSummary('${meeting.id}', -1)" ${currentIdx <= 0 ? 'disabled' : ''}>‹</button>
-                                    <span class="nav-indicator" id="navIndicator-${meeting.id}">${currentIdx + 1}/${historyLen}</span>
-                                    <button class="nav-btn" onclick="navigateSummary('${meeting.id}', 1)" ${currentIdx >= historyLen - 1 ? 'disabled' : ''}>›</button>
-                                </div>
-                            ` : ''}
-                            <button class="copy-btn" onclick="copySummary('${meeting.id}')" title="복사">
-                                <span class="copy-icon">📋</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="summary-body" id="summaryBody-${meeting.id}">
-                        <pre class="summary-text" id="summaryText-${meeting.id}">${escapeHtml(meeting.aiSummary)}</pre>
-                    </div>
-                </div>
-            ` : ''}
         </div>
     `}).join('');
+}
+
+// 회의록 선택 및 우측 패널에 표시
+let selectedMeetingId = null;
+
+function selectMeeting(meetingId) {
+    // 이전 선택 해제
+    document.querySelectorAll('.meeting-item.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+
+    // 현재 선택
+    const meetingEl = document.getElementById(`meeting-${meetingId}`);
+    if (meetingEl) {
+        meetingEl.classList.add('selected');
+    }
+
+    selectedMeetingId = meetingId;
+
+    // 회의록 데이터 찾기
+    const meeting = meetingsData.find(m => m.id === meetingId);
+    if (!meeting) return;
+
+    // 우측 패널에 회의록 상세 정보 표시
+    showMeetingDetailInPanel(meeting);
+}
+
+// 회의록 상세 정보를 우측 패널에 표시
+function showMeetingDetailInPanel(meeting) {
+    const rightPanel = document.getElementById('rightPanel');
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    const toggleBtn = document.getElementById('toggleRightPanelBtn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
+
+    if (!rightPanel || !panelAiInfo) return;
+
+    // 패널 열기
+    rightPanel.classList.add('open');
+    if (toggleBtn) toggleBtn.classList.add('active');
+
+    // AI 정보 탭 활성화
+    panelTabs.forEach(t => {
+        t.classList.toggle('active', t.dataset.panelTab === 'ai-info');
+    });
+    document.getElementById('panelAiInfo').style.display = 'flex';
+    document.getElementById('panelLlmChat').style.display = 'none';
+
+    const historyLen = meeting.summaryHistory?.length || (meeting.aiSummary ? 1 : 0);
+    const currentIdx = meeting.currentSummaryIndex ?? (historyLen - 1);
+
+    if (meeting.aiSummary) {
+        // AI 요약이 있는 경우
+        const formattedSummary = meeting.aiSummary
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+
+        panelAiInfo.innerHTML = `
+            <div class="panel-ai-result" style="width: 100%;">
+                <div class="panel-ai-header">
+                    <span class="ai-icon">✨</span>
+                    <h4>회의록 AI 요약</h4>
+                </div>
+                <div class="panel-meeting-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    </svg>
+                    <span>${escapeHtml(meeting.title)}</span>
+                </div>
+                <div class="panel-analysis-meta">
+                    <span class="meta-date">${new Date(meeting.createdAt).toLocaleString('ko-KR')}</span>
+                    ${meeting.summarizedAt ? `<span class="meta-summary-date">요약: ${new Date(meeting.summarizedAt).toLocaleString('ko-KR')}</span>` : ''}
+                </div>
+                ${historyLen > 1 ? `
+                    <div class="panel-summary-nav">
+                        <button class="nav-btn" onclick="navigateMeetingSummary('${meeting.id}', -1)" ${currentIdx <= 0 ? 'disabled' : ''}>◀ 이전</button>
+                        <span class="nav-indicator">${currentIdx + 1} / ${historyLen}</span>
+                        <button class="nav-btn" onclick="navigateMeetingSummary('${meeting.id}', 1)" ${currentIdx >= historyLen - 1 ? 'disabled' : ''}>다음 ▶</button>
+                    </div>
+                ` : ''}
+                <div class="panel-analysis-section ai-summary">
+                    <div class="panel-ai-summary-content">
+                        <pre>${escapeHtml(meeting.aiSummary)}</pre>
+                    </div>
+                </div>
+                <div class="panel-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="copyMeetingSummary('${meeting.id}')">
+                        📋 복사
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="summarizeMeeting('${meeting.id}')">
+                        🔄 재요약
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // AI 요약이 없는 경우
+        panelAiInfo.innerHTML = `
+            <div class="panel-ai-result" style="width: 100%;">
+                <div class="panel-ai-header">
+                    <span class="ai-icon">📝</span>
+                    <h4>회의록 상세</h4>
+                </div>
+                <div class="panel-meeting-info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    </svg>
+                    <span>${escapeHtml(meeting.title)}</span>
+                </div>
+                <div class="panel-analysis-meta">
+                    <span class="meta-date">${new Date(meeting.createdAt).toLocaleString('ko-KR')}</span>
+                </div>
+                <div class="panel-empty-summary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    <p>아직 AI 요약이 생성되지 않았습니다</p>
+                </div>
+                <div class="panel-actions">
+                    <button class="btn btn-sm btn-primary" onclick="summarizeMeeting('${meeting.id}')">
+                        ✨ AI 요약 생성
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// 패널에서 요약 버전 네비게이션
+function navigateMeetingSummary(meetingId, direction) {
+    const meeting = meetingsData.find(m => m.id === meetingId);
+    if (!meeting || !meeting.summaryHistory || meeting.summaryHistory.length <= 1) return;
+
+    const currentIdx = meeting.currentSummaryIndex ?? (meeting.summaryHistory.length - 1);
+    const newIdx = currentIdx + direction;
+
+    if (newIdx < 0 || newIdx >= meeting.summaryHistory.length) return;
+
+    // 로컬 상태 업데이트
+    meeting.currentSummaryIndex = newIdx;
+    meeting.aiSummary = meeting.summaryHistory[newIdx].summary;
+    meeting.summarizedAt = meeting.summaryHistory[newIdx].createdAt;
+
+    // 패널 다시 렌더링
+    showMeetingDetailInPanel(meeting);
 }
 
 // 요약 접기/펼치기 토글
@@ -2839,15 +2956,20 @@ async function summarizeMeeting(meetingId) {
         // 성공 시 목록 새로고침
         await loadMeetings();
 
-        // 우측 패널에 요약 결과 표시
-        showMeetingSummaryInPanel(meetingId, data.summary, false);
+        // 선택 상태 유지 및 패널 업데이트
+        const updatedMeeting = meetingsData.find(m => m.id === meetingId);
+        if (updatedMeeting) {
+            // 선택 상태 유지
+            const updatedEl = document.getElementById(`meeting-${meetingId}`);
+            if (updatedEl) {
+                updatedEl.classList.add('selected');
+                updatedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                updatedEl.classList.add('highlight');
+                setTimeout(() => updatedEl.classList.remove('highlight'), 2000);
+            }
 
-        // 요약된 회의록으로 스크롤
-        const updatedEl = document.getElementById(`meeting-${meetingId}`);
-        if (updatedEl) {
-            updatedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            updatedEl.classList.add('highlight');
-            setTimeout(() => updatedEl.classList.remove('highlight'), 2000);
+            // 우측 패널에 업데이트된 회의록 정보 표시
+            showMeetingDetailInPanel(updatedMeeting);
         }
 
     } catch (e) {
@@ -3065,10 +3187,13 @@ function renderRecordings(recordings) {
         const sizeStr = formatFileSize(recording.size);
         const dateStr = new Date(recording.createdAt).toLocaleString('ko-KR');
 
+        const safeFilename = escapeHtml(recording.filename);
+        const seekBarId = `seekbar-${safeFilename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
         return `
-            <div class="recording-item">
+            <div class="recording-item" data-filename="${safeFilename}">
                 <label class="recording-checkbox">
-                    <input type="checkbox" class="recording-select" data-filename="${escapeHtml(recording.filename)}" onchange="updateDeleteButtonState()">
+                    <input type="checkbox" class="recording-select" data-filename="${safeFilename}" onchange="updateDeleteButtonState()">
                     <span class="checkmark"></span>
                 </label>
                 <div class="recording-icon">
@@ -3079,15 +3204,28 @@ function renderRecordings(recordings) {
                     </svg>
                 </div>
                 <div class="recording-info">
-                    <div class="recording-name">${escapeHtml(recording.filename)}</div>
+                    <div class="recording-name">${safeFilename}</div>
                     <div class="recording-meta">
                         <span class="recording-format">${ext}</span>
                         <span class="recording-size">${sizeStr}</span>
                         <span class="recording-date">${dateStr}</span>
                     </div>
+                    <div class="audio-player-controls" id="${seekBarId}" style="display: none;">
+                        <div class="audio-time-display">
+                            <span class="current-time">0:00</span>
+                            <span class="time-separator">/</span>
+                            <span class="total-time">0:00</span>
+                        </div>
+                        <div class="audio-seek-container">
+                            <input type="range" class="audio-seek-bar" min="0" max="100" value="0"
+                                   oninput="seekAudio(this, '${safeFilename}')"
+                                   onchange="seekAudio(this, '${safeFilename}')">
+                            <div class="audio-progress-bar"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="recording-actions">
-                    <button class="btn btn-sm btn-play" onclick="togglePlayRecording('${escapeHtml(recording.filename)}', this)" title="재생" data-playing="false">
+                    <button class="btn btn-sm btn-play" onclick="togglePlayRecording('${safeFilename}', this)" title="재생" data-playing="false">
                         <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width: 14px; height: 14px;">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
@@ -3096,13 +3234,13 @@ function renderRecordings(recordings) {
                             <rect x="14" y="4" width="4" height="16"/>
                         </svg>
                     </button>
-                    <button class="btn btn-sm btn-primary" onclick="transcribeRecording('${escapeHtml(recording.filename)}')" title="회의록 생성">
+                    <button class="btn btn-sm btn-primary" onclick="transcribeRecording('${safeFilename}')" title="회의록 생성">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
                             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
                         </svg>
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="downloadRecordingFile('${escapeHtml(recording.filename)}')" title="다운로드">
+                    <button class="btn btn-sm btn-secondary" onclick="downloadRecordingFile('${safeFilename}')" title="다운로드">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -3262,6 +3400,70 @@ async function deleteSelectedMeetings() {
 // 현재 재생 중인 오디오 관리
 let currentPlayingAudio = null;
 let currentPlayingButton = null;
+let currentPlayingFilename = null;
+let audioTimeUpdateInterval = null;
+
+// 시간 포맷 함수 (초 -> M:SS 또는 H:MM:SS)
+function formatAudioTime(seconds) {
+    if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// 오디오 시간 업데이트
+function updateAudioTimeDisplay() {
+    if (!currentPlayingAudio || !currentPlayingFilename) return;
+
+    const seekBarId = `seekbar-${currentPlayingFilename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const controls = document.getElementById(seekBarId);
+    if (!controls) return;
+
+    const currentTimeEl = controls.querySelector('.current-time');
+    const totalTimeEl = controls.querySelector('.total-time');
+    const seekBar = controls.querySelector('.audio-seek-bar');
+    const progressBar = controls.querySelector('.audio-progress-bar');
+
+    if (currentTimeEl) {
+        currentTimeEl.textContent = formatAudioTime(currentPlayingAudio.currentTime);
+    }
+
+    if (totalTimeEl && currentPlayingAudio.duration) {
+        totalTimeEl.textContent = formatAudioTime(currentPlayingAudio.duration);
+    }
+
+    if (seekBar && currentPlayingAudio.duration) {
+        const progress = (currentPlayingAudio.currentTime / currentPlayingAudio.duration) * 100;
+        seekBar.value = progress;
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
+    }
+}
+
+// 오디오 위치 변경 (seek)
+function seekAudio(seekBar, filename) {
+    if (!currentPlayingAudio || currentPlayingFilename !== filename) return;
+
+    const seekTo = (seekBar.value / 100) * currentPlayingAudio.duration;
+    if (!isNaN(seekTo) && isFinite(seekTo)) {
+        currentPlayingAudio.currentTime = seekTo;
+
+        // 프로그레스 바 업데이트
+        const controls = seekBar.closest('.audio-player-controls');
+        if (controls) {
+            const progressBar = controls.querySelector('.audio-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = `${seekBar.value}%`;
+            }
+        }
+    }
+}
 
 // 녹음 파일 재생/일시정지 토글
 function togglePlayRecording(filename, button) {
@@ -3283,6 +3485,10 @@ function togglePlayRecording(filename, button) {
         playIcon.style.display = '';
         pauseIcon.style.display = 'none';
         button.classList.remove('playing');
+
+        // 녹음 아이템 강조 제거
+        const recordingItem = button.closest('.recording-item');
+        if (recordingItem) recordingItem.classList.remove('playing');
     } else {
         // 재생 시작
         if (currentPlayingAudio && currentPlayingButton === button) {
@@ -3292,6 +3498,25 @@ function togglePlayRecording(filename, button) {
             // 새 파일 재생
             currentPlayingAudio = new Audio(`/api/recording/download/${encodeURIComponent(filename)}`);
             currentPlayingButton = button;
+            currentPlayingFilename = filename;
+
+            // 오디오 시간 컨트롤 표시
+            const seekBarId = `seekbar-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const controls = document.getElementById(seekBarId);
+            if (controls) {
+                controls.style.display = 'flex';
+            }
+
+            // 메타데이터 로드 시 총 재생 시간 업데이트
+            currentPlayingAudio.onloadedmetadata = () => {
+                updateAudioTimeDisplay();
+            };
+
+            // 시간 업데이트 인터벌 시작
+            if (audioTimeUpdateInterval) {
+                clearInterval(audioTimeUpdateInterval);
+            }
+            audioTimeUpdateInterval = setInterval(updateAudioTimeDisplay, 100);
 
             currentPlayingAudio.onended = () => {
                 stopCurrentPlayback();
@@ -3313,11 +3538,39 @@ function togglePlayRecording(filename, button) {
         playIcon.style.display = 'none';
         pauseIcon.style.display = '';
         button.classList.add('playing');
+
+        // 녹음 아이템 강조
+        const recordingItem = button.closest('.recording-item');
+        if (recordingItem) recordingItem.classList.add('playing');
     }
 }
 
 // 현재 재생 중지
 function stopCurrentPlayback() {
+    // 시간 업데이트 인터벌 정리
+    if (audioTimeUpdateInterval) {
+        clearInterval(audioTimeUpdateInterval);
+        audioTimeUpdateInterval = null;
+    }
+
+    // seek bar 숨기기 및 리셋
+    if (currentPlayingFilename) {
+        const seekBarId = `seekbar-${currentPlayingFilename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const controls = document.getElementById(seekBarId);
+        if (controls) {
+            controls.style.display = 'none';
+            const seekBar = controls.querySelector('.audio-seek-bar');
+            const progressBar = controls.querySelector('.audio-progress-bar');
+            const currentTimeEl = controls.querySelector('.current-time');
+            const totalTimeEl = controls.querySelector('.total-time');
+
+            if (seekBar) seekBar.value = 0;
+            if (progressBar) progressBar.style.width = '0%';
+            if (currentTimeEl) currentTimeEl.textContent = '0:00';
+            if (totalTimeEl) totalTimeEl.textContent = '0:00';
+        }
+    }
+
     if (currentPlayingAudio) {
         currentPlayingAudio.pause();
         currentPlayingAudio.currentTime = 0;
@@ -3331,8 +3584,15 @@ function stopCurrentPlayback() {
         if (playIcon) playIcon.style.display = '';
         if (pauseIcon) pauseIcon.style.display = 'none';
         currentPlayingButton.classList.remove('playing');
+
+        // 녹음 아이템 강조 제거
+        const recordingItem = currentPlayingButton.closest('.recording-item');
+        if (recordingItem) recordingItem.classList.remove('playing');
+
         currentPlayingButton = null;
     }
+
+    currentPlayingFilename = null;
 }
 
 // 파일 크기 포맷

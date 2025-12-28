@@ -3463,7 +3463,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const files = fs.readdirSync(MEETINGS_DIR);
                 const recordings = files
-                    .filter(f => f.endsWith('.wav') || f.endsWith('.webm'))
+                    .filter(f => (f.endsWith('.wav') || f.endsWith('.webm')) && !f.includes('_converted'))
                     .map(f => {
                         const filePath = path.join(MEETINGS_DIR, f);
                         const stat = fs.statSync(filePath);
@@ -3555,6 +3555,16 @@ const server = http.createServer(async (req, res) => {
                     // 로컬 Whisper로 음성 인식
                     const transcribeResult = await transcribeAudio(audioPath);
                     transcript = transcribeResult.text;
+
+                    // _converted.wav 임시 파일 정리
+                    if (transcribeResult.wavPath && transcribeResult.wavPath.includes('_converted')) {
+                        try {
+                            fs.unlinkSync(transcribeResult.wavPath);
+                            console.log('임시 변환 파일 삭제:', transcribeResult.wavPath);
+                        } catch (e) {
+                            console.log('임시 파일 삭제 실패 (무시):', e.message);
+                        }
+                    }
                 } else {
                     // 시뮬레이션 모드: 테스트용 텍스트 생성
                     console.log('시뮬레이션 모드: 음성 인식 모델 없음, 테스트 텍스트 생성');
@@ -3680,6 +3690,16 @@ const server = http.createServer(async (req, res) => {
 
                 console.log('음성 인식 완료');
                 updateProgress('🎙️ 음성 인식', 45, '완료');
+
+                // _converted.wav 임시 파일 정리
+                if (transcribeResult.wavPath && transcribeResult.wavPath.includes('_converted')) {
+                    try {
+                        fs.unlinkSync(transcribeResult.wavPath);
+                        console.log('임시 변환 파일 삭제:', transcribeResult.wavPath);
+                    } catch (e) {
+                        console.log('임시 파일 삭제 실패 (무시):', e.message);
+                    }
+                }
 
                 // 규칙 기반 분석 (키워드 추출 등)
                 const analysis = analyzeTranscript(transcript);

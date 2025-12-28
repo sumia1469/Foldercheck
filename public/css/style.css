@@ -4876,6 +4876,54 @@ body.resizing-bottom-panel * {
     gap: 12px;
 }
 
+.changes-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.changes-header-right .file-type-info {
+    margin: 0;
+}
+
+.btn-ai-analyze {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    background: linear-gradient(135deg, var(--accent-primary), #00b894);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-ai-analyze:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+}
+
+.btn-ai-analyze:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-ai-analyze .ai-icon {
+    font-size: 14px;
+}
+
+.btn-ai-analyze .ai-icon.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 .changes-file-icon {
     width: 32px;
     height: 32px;
@@ -4994,6 +5042,253 @@ body.resizing-bottom-panel * {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* GitHub 스타일 통계 바 */
+.changes-stats {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stats-bar {
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    background: var(--bg-tertiary);
+}
+
+.stats-bar-added {
+    background: linear-gradient(90deg, #2ea043, #3fb950);
+    transition: width 0.3s ease;
+}
+
+.stats-bar-removed {
+    background: linear-gradient(90deg, #f85149, #da3633);
+    transition: width 0.3s ease;
+}
+
+.stats-labels {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.stats-added {
+    color: #3fb950;
+    font-weight: 600;
+}
+
+.stats-removed {
+    color: #f85149;
+    font-weight: 600;
+}
+
+.stats-size {
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+/* 파일 타입 정보 뱃지 */
+.file-type-info {
+    display: flex;
+    align-items: center;
+}
+
+.info-badge {
+    padding: 4px 10px;
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* 인라인 diff 스타일 (GitHub 스타일) */
+.changes-inline-diff {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.diff-line {
+    display: flex;
+    align-items: flex-start;
+    padding: 4px 12px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    border-left: 3px solid transparent;
+    transition: background 0.15s ease;
+}
+
+.diff-line:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.diff-line.added {
+    background: rgba(46, 160, 67, 0.15);
+    border-left-color: #3fb950;
+}
+
+.diff-line.added:hover {
+    background: rgba(46, 160, 67, 0.25);
+}
+
+.diff-line.removed {
+    background: rgba(248, 81, 73, 0.15);
+    border-left-color: #f85149;
+}
+
+.diff-line.removed:hover {
+    background: rgba(248, 81, 73, 0.25);
+}
+
+.diff-marker {
+    width: 20px;
+    flex-shrink: 0;
+    font-weight: 700;
+    user-select: none;
+}
+
+.diff-line.added .diff-marker {
+    color: #3fb950;
+}
+
+.diff-line.removed .diff-marker {
+    color: #f85149;
+}
+
+.diff-text {
+    flex: 1;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* 아이콘 색상 */
+.changes-file-icon.added {
+    background: rgba(46, 160, 67, 0.15);
+}
+
+.changes-file-icon.added svg {
+    color: #3fb950;
+}
+
+.changes-file-icon.removed {
+    background: rgba(248, 81, 73, 0.15);
+}
+
+.changes-file-icon.removed svg {
+    color: #f85149;
+}
+
+.changes-file-icon.modified {
+    background: rgba(0, 212, 170, 0.1);
+}
+
+.changes-file-icon.modified svg {
+    color: var(--accent-primary);
+}
+
+/* 변경 내용 없음 상태 */
+.changes-empty-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+
+.changes-empty-content svg {
+    width: 40px;
+    height: 40px;
+    opacity: 0.5;
+}
+
+.changes-empty-content p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.changes-empty-content span {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* 변경 상세 정보 그리드 */
+.changes-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.info-value.added {
+    color: #3fb950;
+}
+
+.info-value.removed {
+    color: #f85149;
+}
+
+/* 변경 알림 메시지 */
+.changes-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+    border-radius: 8px;
+    color: var(--text-secondary);
+}
+
+.changes-notice svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: #ffc107;
+    margin-top: 2px;
+}
+
+.changes-notice p {
+    margin: 0 0 4px 0;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.changes-notice span {
+    font-size: 11px;
+    color: var(--text-muted);
 }
 
 /* 단일 뷰 (이전 내용이 없는 경우) */

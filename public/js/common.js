@@ -503,101 +503,214 @@ function showChangeSummary(event, fileName, summaryData) {
     }
 
     // 변경 내용 구성
-    let addedContent = '';
-    let removedContent = '';
-    let metaHtml = '';
+    let addedItems = [];
+    let removedItems = [];
+    let statsHtml = '';
+    let fileTypeHtml = '';
 
     if (summary.details) {
         const details = summary.details;
 
-        // 메타 정보
-        let metaItems = [];
-        if (details.addedCount > 0) {
-            metaItems.push(`<span class="meta-item added">+${details.addedCount} 추가</span>`);
-        }
-        if (details.removedCount > 0) {
-            metaItems.push(`<span class="meta-item removed">-${details.removedCount} 삭제</span>`);
-        }
-        if (details.lengthDiff !== undefined && details.lengthDiff !== 0) {
-            const sign = details.lengthDiff > 0 ? '+' : '';
-            metaItems.push(`<span class="meta-item ${details.lengthDiff > 0 ? 'added' : 'removed'}">${sign}${details.lengthDiff}자</span>`);
-        }
-        if (metaItems.length > 0) {
-            metaHtml = `<div class="changes-meta">${metaItems.join('')}</div>`;
+        // 통계 바 생성
+        const addedCount = details.addedCount || 0;
+        const removedCount = details.removedCount || 0;
+        const totalChanges = addedCount + removedCount;
+
+        if (totalChanges > 0) {
+            const addedPercent = Math.round((addedCount / totalChanges) * 100);
+            const removedPercent = 100 - addedPercent;
+
+            statsHtml = `
+                <div class="changes-stats">
+                    <div class="stats-bar">
+                        <div class="stats-bar-added" style="width: ${addedPercent}%"></div>
+                        <div class="stats-bar-removed" style="width: ${removedPercent}%"></div>
+                    </div>
+                    <div class="stats-labels">
+                        <span class="stats-added">+${addedCount} 추가</span>
+                        <span class="stats-removed">-${removedCount} 삭제</span>
+                        ${details.lengthDiff !== undefined && details.lengthDiff !== 0 ?
+                            `<span class="stats-size">${details.lengthDiff > 0 ? '+' : ''}${details.lengthDiff}자</span>` : ''}
+                    </div>
+                </div>
+            `;
         }
 
-        // 추가된 내용
+        // 파일 타입별 추가 정보
+        if (details.fileTypeInfo) {
+            const fti = details.fileTypeInfo;
+            if (fti.type === 'text' && fti.lineDiff !== undefined && fti.lineDiff !== 0) {
+                fileTypeHtml = `<div class="file-type-info"><span class="info-badge">${fti.lineDiff > 0 ? '+' : ''}${fti.lineDiff}줄</span></div>`;
+            } else if (fti.type === 'pptx' && fti.slideDiff !== undefined && fti.slideDiff !== 0) {
+                fileTypeHtml = `<div class="file-type-info"><span class="info-badge">${fti.slideDiff > 0 ? '+' : ''}${fti.slideDiff}슬라이드</span></div>`;
+            } else if (fti.type === 'xlsx') {
+                let xlsxInfo = [];
+                if (fti.sheetDiff !== undefined && fti.sheetDiff !== 0) {
+                    xlsxInfo.push(`${fti.sheetDiff > 0 ? '+' : ''}${fti.sheetDiff}시트`);
+                }
+                if (fti.newSheets && fti.newSheets.length > 0) {
+                    xlsxInfo.push(`새 시트: ${fti.newSheets.join(', ')}`);
+                }
+                if (xlsxInfo.length > 0) {
+                    fileTypeHtml = `<div class="file-type-info"><span class="info-badge">${xlsxInfo.join(' | ')}</span></div>`;
+                }
+            }
+        }
+
+        // 추가된 항목
         if (details.added && details.added.length > 0) {
-            addedContent = details.added.map(text => escapeHtml(text)).join('\n');
+            addedItems = details.added;
         }
 
-        // 삭제된 내용
+        // 삭제된 항목
         if (details.removed && details.removed.length > 0) {
-            removedContent = details.removed.map(text => escapeHtml(text)).join('\n');
+            removedItems = details.removed;
         }
     }
 
-    // 하단 패널에 diff 뷰 표시
-    if (addedContent || removedContent) {
+    // 인라인 diff 라인 생성 (GitHub 스타일)
+    let diffLinesHtml = '';
+
+    // 삭제된 항목 먼저
+    removedItems.forEach(text => {
+        diffLinesHtml += `<div class="diff-line removed"><span class="diff-marker">-</span><span class="diff-text">${escapeHtml(text)}</span></div>`;
+    });
+
+    // 추가된 항목
+    addedItems.forEach(text => {
+        diffLinesHtml += `<div class="diff-line added"><span class="diff-marker">+</span><span class="diff-text">${escapeHtml(text)}</span></div>`;
+    });
+
+    // AI 요약 버튼 HTML (공통)
+    const encodedFileName = encodeURIComponent(fileName);
+    const aiSummaryBtn = `
+        <button class="btn btn-primary btn-ai-analyze"
+                onclick="analyzeChangeWithAI('${encodedFileName}', '${summaryData}')">
+            <span class="ai-icon">🤖</span>
+            <span class="ai-text">AI 요약</span>
+        </button>
+    `;
+
+    // 하단 패널에 통합 뷰 표시
+    if (diffLinesHtml) {
         bottomChanges.innerHTML = `
             <div class="changes-container">
                 <div class="changes-header">
                     <div class="changes-header-left">
-                        <div class="changes-file-icon">
+                        <div class="changes-file-icon ${typeClass}">
                             ${typeIcon}
                         </div>
                         <div class="changes-file-info">
                             <h4>${escapeHtml(fileName)}</h4>
-                            <span>${typeText}</span>
+                            <span>${typeText} · ${summary.summary || ''}</span>
                         </div>
                     </div>
-                    ${metaHtml}
+                    <div class="changes-header-right">
+                        ${fileTypeHtml}
+                        ${aiSummaryBtn}
+                    </div>
                 </div>
-                <div class="changes-diff-view">
-                    <div class="changes-diff-pane before">
-                        <div class="changes-diff-pane-header">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
-                            삭제된 내용
-                        </div>
-                        <div class="changes-diff-content ${removedContent ? '' : 'empty'}">
-                            ${removedContent || '삭제된 내용 없음'}
-                        </div>
-                    </div>
-                    <div class="changes-diff-pane after">
-                        <div class="changes-diff-pane-header">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                            추가된 내용
-                        </div>
-                        <div class="changes-diff-content ${addedContent ? '' : 'empty'}">
-                            ${addedContent || '추가된 내용 없음'}
-                        </div>
-                    </div>
+                ${statsHtml}
+                <div class="changes-inline-diff">
+                    ${diffLinesHtml}
                 </div>
             </div>
         `;
     } else {
-        // 변경 내용이 없는 경우 (메타데이터만 변경 등)
+        // 변경 내용이 없는 경우 - 파일 크기/메타 정보는 표시
+        let detailsHtml = '';
+
+        if (summary.details) {
+            const details = summary.details;
+            let infoItems = [];
+
+            // 파일 크기 변화
+            if (details.lengthDiff !== undefined && details.lengthDiff !== 0) {
+                const sign = details.lengthDiff > 0 ? '+' : '';
+                infoItems.push(`
+                    <div class="info-row">
+                        <span class="info-label">크기 변화</span>
+                        <span class="info-value ${details.lengthDiff > 0 ? 'added' : 'removed'}">${sign}${details.lengthDiff}자</span>
+                    </div>
+                `);
+            }
+
+            // 이전/현재 크기
+            if (details.prevLength && details.currLength) {
+                infoItems.push(`
+                    <div class="info-row">
+                        <span class="info-label">이전 크기</span>
+                        <span class="info-value">${details.prevLength.toLocaleString()}자</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">현재 크기</span>
+                        <span class="info-value">${details.currLength.toLocaleString()}자</span>
+                    </div>
+                `);
+            }
+
+            // 파일 타입별 정보
+            if (details.fileTypeInfo) {
+                const fti = details.fileTypeInfo;
+                if (fti.type === 'xlsx') {
+                    infoItems.push(`
+                        <div class="info-row">
+                            <span class="info-label">시트 수</span>
+                            <span class="info-value">${fti.currSheets}개</span>
+                        </div>
+                    `);
+                } else if (fti.type === 'pptx') {
+                    infoItems.push(`
+                        <div class="info-row">
+                            <span class="info-label">슬라이드 수</span>
+                            <span class="info-value">${fti.currSlides}개</span>
+                        </div>
+                    `);
+                } else if (fti.type === 'text') {
+                    infoItems.push(`
+                        <div class="info-row">
+                            <span class="info-label">줄 수</span>
+                            <span class="info-value">${fti.currLines}줄</span>
+                        </div>
+                    `);
+                }
+            }
+
+            if (infoItems.length > 0) {
+                detailsHtml = `
+                    <div class="changes-details-grid">
+                        ${infoItems.join('')}
+                    </div>
+                `;
+            }
+        }
+
         bottomChanges.innerHTML = `
             <div class="changes-container">
                 <div class="changes-header">
                     <div class="changes-header-left">
-                        <div class="changes-file-icon">
+                        <div class="changes-file-icon ${typeClass}">
                             ${typeIcon}
                         </div>
                         <div class="changes-file-info">
                             <h4>${escapeHtml(fileName)}</h4>
-                            <span>${typeText}</span>
+                            <span>${typeText} · ${summary.summary || ''}</span>
                         </div>
                     </div>
-                    ${metaHtml}
+                    <div class="changes-header-right">
+                        ${fileTypeHtml}
+                        ${aiSummaryBtn}
+                    </div>
                 </div>
-                <div class="changes-single-view">
-                    <div class="changes-single-header">변경 상세</div>
-                    <div class="changes-single-content">
-                        <p style="color: var(--text-muted); text-align: center; padding: 20px;">
-                            파일이 ${typeText} 상태입니다.<br>
-                            상세 텍스트 변경 내용이 감지되지 않았습니다.
-                        </p>
+                ${detailsHtml}
+                <div class="changes-notice">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                    <div>
+                        <p>단어 단위의 상세 변경 내용은 감지되지 않았습니다</p>
+                        <span>셀 내용 수정, 서식 변경, 메타데이터 변경 등이 포함될 수 있습니다</span>
                     </div>
                 </div>
             </div>
@@ -3807,8 +3920,8 @@ function initRightPanelResize() {
     let startX = 0;
     let startWidth = 0;
 
-    const MIN_WIDTH = 280;
-    const MAX_WIDTH = 800;
+    const MIN_WIDTH = 150;
+    const MAX_WIDTH = window.innerWidth * 0.9; // 화면의 90%까지
     const DEFAULT_WIDTH = 380;
 
     // 핸들 위치 업데이트
@@ -3949,8 +4062,8 @@ function initBottomPanelResize() {
     let startY = 0;
     let startHeight = 0;
 
-    const MIN_HEIGHT = 150;
-    const MAX_HEIGHT = window.innerHeight * 0.6; // 화면의 60%까지
+    const MIN_HEIGHT = 80;
+    const MAX_HEIGHT = window.innerHeight * 0.95; // 화면의 95%까지
 
     // 저장된 높이 불러오기
     const savedHeight = localStorage.getItem('bottomPanelHeight');

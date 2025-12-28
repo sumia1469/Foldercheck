@@ -837,59 +837,111 @@ async function quickChangeAnalysis(filePath, action) {
                     }
                 }
 
-                // 의미 없는 메타데이터 텍스트 필터링
-                const isValidContent = (text) => {
-                    if (!text || text.length < 3) return false;
+                // 의미 없는 메타데이터 텍스트 필터링 (완화된 버전)
+                const isValidContent = (text, fileType) => {
+                    if (!text || text.length < 1) return false;
 
-                    // 필터링할 패턴들
-                    const invalidPatterns = [
+                    const trimmed = text.trim();
+
+                    // Office 파일 내부 메타데이터만 필터링 (최소한으로)
+                    const metadataPatterns = [
                         /^root\s*entry/i,
                         /^workbook$/i,
                         /^\[content_types\]/i,
                         /^_rels$/i,
                         /^docprops$/i,
-                        /^xl$/i,
-                        /^ppt$/i,
-                        /^word$/i,
-                        /^http:\/\//i,
-                        /^https:\/\//i,
+                        /^http:\/\/schemas/i,
+                        /^https:\/\/schemas/i,
                         /^urn:/i,
                         /^xmlns/i,
-                        /^\d+(\.\d+)*$/,  // 숫자만 있는 경우
-                        /^[a-f0-9]{8}-[a-f0-9]{4}/i,  // UUID
-                        /^[A-Z]\d+$/,  // 셀 참조 (A1, B2 등)
+                        /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}/i,  // UUID
                     ];
 
-                    const trimmed = text.trim();
-                    for (const pattern of invalidPatterns) {
+                    for (const pattern of metadataPatterns) {
                         if (pattern.test(trimmed)) return false;
                     }
 
-                    // 한글, 영문 또는 의미있는 문자가 포함되어 있어야 함
+                    // xlsx/pptx/docx 파일은 숫자도 유효한 데이터로 인정
+                    if (['xlsx', 'xls', 'pptx', 'ppt', 'docx', 'doc'].includes(fileType)) {
+                        // 숫자, 한글, 영문 모두 유효
+                        const hasNumber = /\d/.test(trimmed);
+                        const hasKorean = /[\uAC00-\uD7AF]/.test(trimmed);
+                        const hasEnglish = /[a-zA-Z]/.test(trimmed);
+                        return hasNumber || hasKorean || hasEnglish;
+                    }
+
+                    // 텍스트 파일은 한글이나 영문 단어가 있어야 함
                     const hasKorean = /[\uAC00-\uD7AF]/.test(trimmed);
                     const hasEnglishWord = /[a-zA-Z]{2,}/.test(trimmed);
-
                     return hasKorean || hasEnglishWord;
                 };
 
-                // 단어 단위로 비교하여 실제 변경된 부분만 추출
-                const prevWords = prevText.split(/\s+/).filter(w => w.length >= 2 && isValidContent(w));
-                const currWords = currText.split(/\s+/).filter(w => w.length >= 2 && isValidContent(w));
-                const prevWordSet = new Set(prevWords);
-                const currWordSet = new Set(currWords);
+                // 파일 타입 결정
+                const fileType = ext.replace('.', '');
 
-                // 추가된 단어/문구 찾기
-                for (const word of currWords) {
-                    if (!prevWordSet.has(word)) {
-                        addedTexts.push(word.length > 50 ? word.substring(0, 50) + '...' : word);
+                // 텍스트를 토큰으로 분리 (공백 + 구두점 + 한글 조사 분리)
+                const tokenize = (text) => {
+                    // 1. 먼저 공백과 구두점으로 분리
+                    let tokens = text.split(/[\s,.!?;:'"()\[\]{}<>\/\\|@#$%^&*+=~`]+/);
+
+                    // 2. 긴 토큰(10자 이상)은 추가로 분리
+                    const result = [];
+                    for (const token of tokens) {
+                        if (token.length >= 10) {
+                            // 한글의 경우 자연스러운 분리점 찾기 (조사, 어미 패턴)
+                            const subTokens = token.split(/(?<=[가-힣])(?=[은는이가을를의와과에서로])/)
+                                .flatMap(t => t.length > 15 ? [t.substring(0, 15), t.substring(15)] : [t]);
+                            result.push(...subTokens);
+                        } else {
+                            result.push(token);
+                        }
+                    }
+                    return result;
+                };
+
+                // 단어 단위로 비교하여 실제 변경된 부분만 추출 (1자 이상도 감지)
+                const prevWords = tokenize(prevText).filter(w => w.length >= 1 && isValidContent(w, fileType));
+                const currWords = tokenize(currText).filter(w => w.length >= 1 && isValidContent(w, fileType));
+
+                // 단어 빈도수 계산 (Set 대신 Map 사용하여 중복 횟수도 고려)
+                const countWords = (words) => {
+                    const map = new Map();
+                    for (const word of words) {
+                        map.set(word, (map.get(word) || 0) + 1);
+                    }
+                    return map;
+                };
+
+                const prevWordCount = countWords(prevWords);
+                const currWordCount = countWords(currWords);
+
+                // 추가된 단어/문구 찾기 (새로 등장했거나 횟수가 증가한 것)
+                for (const [word, count] of currWordCount) {
+                    const prevCount = prevWordCount.get(word) || 0;
+                    if (count > prevCount) {
+                        // 증가한 횟수만큼 추가로 표시
+                        const diff = count - prevCount;
+                        const displayWord = word.length > 50 ? word.substring(0, 50) + '...' : word;
+                        if (diff > 1) {
+                            addedTexts.push(`${displayWord} (x${diff})`);
+                        } else {
+                            addedTexts.push(displayWord);
+                        }
                         if (addedTexts.length >= 10) break;
                     }
                 }
 
-                // 삭제된 단어/문구 찾기
-                for (const word of prevWords) {
-                    if (!currWordSet.has(word)) {
-                        removedTexts.push(word.length > 50 ? word.substring(0, 50) + '...' : word);
+                // 삭제된 단어/문구 찾기 (사라졌거나 횟수가 감소한 것)
+                for (const [word, count] of prevWordCount) {
+                    const currCount = currWordCount.get(word) || 0;
+                    if (count > currCount) {
+                        const diff = count - currCount;
+                        const displayWord = word.length > 50 ? word.substring(0, 50) + '...' : word;
+                        if (diff > 1) {
+                            removedTexts.push(`${displayWord} (x${diff})`);
+                        } else {
+                            removedTexts.push(displayWord);
+                        }
                         if (removedTexts.length >= 10) break;
                     }
                 }

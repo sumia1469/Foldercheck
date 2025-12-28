@@ -1,5 +1,5 @@
 // Electron 메인 프로세스
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -251,6 +251,18 @@ if (!gotTheLock) {
         console.log('App ready, starting server...');
         console.log('__dirname:', __dirname);
         console.log('process.resourcesPath:', process.resourcesPath);
+
+        // macOS 마이크 권한 요청
+        if (process.platform === 'darwin') {
+            const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+            console.log('마이크 권한 상태:', micStatus);
+
+            if (micStatus !== 'granted') {
+                console.log('마이크 권한 요청 중...');
+                const granted = await systemPreferences.askForMediaAccess('microphone');
+                console.log('마이크 권한 결과:', granted ? '허용됨' : '거부됨');
+            }
+        }
 
         await ensurePortAvailable();
 

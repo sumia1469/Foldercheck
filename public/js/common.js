@@ -1760,11 +1760,73 @@ async function generateMinutesFromRecording() {
     const mimeType = isWav ? 'audio/wav' : 'audio/webm';
     const file = new File([recordedBlob], `${title}.${ext}`, { type: mimeType });
 
-    // 기존 handleAudioFile 함수 호출
-    handleAudioFile(file);
+    // 모달 팝업으로 회의록 생성 처리
+    await handleAudioFileWithModal(file);
 
     // 녹음 초기화
     resetRecording();
+}
+
+// 모달 팝업을 사용한 오디오 파일 처리 (녹음 완료 후 사용)
+async function handleAudioFileWithModal(file) {
+    console.log('오디오 파일 처리 (모달):', file.name);
+
+    // 로딩 오버레이 표시 (화면 전체를 덮어서 다른 조작 차단)
+    showSummarizingOverlay('🎙️ 회의록 생성 중...', '녹음 파일을 분석하고 있습니다');
+    updateSummarizingOverlay('파일 업로드 중...', 5);
+
+    // FormData로 파일 전송
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    // 서버 진행 상황 폴링
+    let progressInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/processing/progress');
+            const progress = await res.json();
+            if (progress.active) {
+                const text = progress.detail
+                    ? `${progress.stage} - ${progress.detail}`
+                    : progress.stage;
+                updateSummarizingOverlay(text, progress.percent);
+            }
+        } catch (e) {
+            // 폴링 실패는 무시
+        }
+    }, 500);
+
+    try {
+        updateSummarizingOverlay('📤 서버로 전송 중...', 10);
+
+        const response = await fetch('/api/meeting/transcribe', {
+            method: 'POST',
+            body: formData
+        });
+
+        clearInterval(progressInterval);
+
+        if (!response.ok) {
+            throw new Error('처리 실패');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            updateSummarizingOverlay('✅ 회의록 생성 완료!', 100);
+            setTimeout(() => {
+                hideSummarizingOverlay();
+                loadMeetings();
+                showToast('회의록이 생성되었습니다!', 'success');
+            }, 1500);
+        } else {
+            throw new Error(result.error || '알 수 없는 오류');
+        }
+    } catch (e) {
+        clearInterval(progressInterval);
+        console.error('회의록 생성 실패:', e);
+        hideSummarizingOverlay();
+        showToast('회의록 생성에 실패했습니다: ' + e.message, 'error');
+    }
 }
 
 // 이벤트 리스너 등록

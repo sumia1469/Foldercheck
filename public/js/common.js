@@ -2600,6 +2600,9 @@ function showMeetingDetailInPanel(meeting) {
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
             .replace(/\n/g, '<br>');
 
+        // 주요 발언 추출 (녹취록에서 의미있는 발언만)
+        const keyQuotes = extractKeyQuotes(meeting.transcript);
+
         panelAiInfo.innerHTML = `
             <div class="panel-ai-result" style="width: 100%;">
                 <div class="panel-ai-header">
@@ -2629,6 +2632,40 @@ function showMeetingDetailInPanel(meeting) {
                         <pre>${escapeHtml(meeting.aiSummary)}</pre>
                     </div>
                 </div>
+
+                ${keyQuotes.length > 0 ? `
+                <div class="panel-collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>💬 주요 발언 (${keyQuotes.length}개)</span>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="key-quotes-list">
+                            ${keyQuotes.map(q => `
+                                <div class="key-quote-item">
+                                    <span class="quote-time">${q.time}</span>
+                                    <span class="quote-text">"${escapeHtml(q.text)}"</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
+                ${meeting.transcript ? `
+                <div class="panel-collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>📝 전체 녹취록</span>
+                        <span class="collapsible-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="full-transcript">
+                            <pre>${escapeHtml(meeting.transcript)}</pre>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
                 <div class="panel-actions">
                     <button class="btn btn-sm btn-secondary" onclick="copyMeetingSummary('${meeting.id}')">
                         📋 복사
@@ -2670,6 +2707,51 @@ function showMeetingDetailInPanel(meeting) {
                 </div>
             </div>
         `;
+    }
+}
+
+// 녹취록에서 주요 발언 추출
+function extractKeyQuotes(transcript) {
+    if (!transcript) return [];
+
+    const quotes = [];
+    const lines = transcript.split('\n');
+
+    for (const line of lines) {
+        // [00:00] 형식의 타임스탬프가 있는 라인 파싱
+        const match = line.match(/^\[(\d{2}:\d{2})\]\s*(.+)$/);
+        if (match) {
+            const time = match[1];
+            const text = match[2].trim();
+
+            // 의미있는 발언만 추출 (10자 이상, 특정 키워드 제외)
+            if (text.length >= 10 &&
+                !text.includes('인식된 텍스트 없음') &&
+                !text.includes('시뮬레이션') &&
+                !text.match(/^[\[\(].*[\]\)]$/)) {  // 대괄호/괄호만 있는 줄 제외
+                quotes.push({ time, text });
+            }
+        }
+    }
+
+    // 최대 10개까지만 반환 (너무 많으면 주요 발언의 의미가 없음)
+    return quotes.slice(0, 10);
+}
+
+// 펼쳐보기/접기 토글
+function toggleCollapsible(header) {
+    const section = header.parentElement;
+    const content = section.querySelector('.collapsible-content');
+    const icon = header.querySelector('.collapsible-icon');
+
+    if (section.classList.contains('expanded')) {
+        section.classList.remove('expanded');
+        content.style.maxHeight = '0';
+        icon.textContent = '▼';
+    } else {
+        section.classList.add('expanded');
+        content.style.maxHeight = content.scrollHeight + 'px';
+        icon.textContent = '▲';
     }
 }
 

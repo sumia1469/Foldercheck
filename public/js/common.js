@@ -1140,16 +1140,26 @@ async function loadWhisperStatus() {
 // AI 상태 로드
 async function loadAiModelStatus() {
     try {
-        const res = await fetch('/api/ollama/status');
-        const status = await res.json();
+        // 로컬 AI와 외부 API 상태 모두 가져오기
+        const [statusRes, externalRes] = await Promise.all([
+            fetch('/api/ollama/status'),
+            fetch('/api/ai/external-settings')
+        ]);
+        const status = await statusRes.json();
+        const externalSettings = await externalRes.json();
 
         const ollamaStatus = document.getElementById('ollamaStatus');
         const aiModelSelect = document.getElementById('aiModelSelect');
         const aiModelDescription = document.getElementById('aiModelDescription');
 
+        // 로컬 Ollama 상태와 외부 API 상태 표시
         if (ollamaStatus) {
+            const hasExternalApi = externalSettings.openai.hasKey || externalSettings.gemini.hasKey;
             if (status.ready) {
-                ollamaStatus.textContent = '정상 동작 중 ✓';
+                ollamaStatus.textContent = hasExternalApi ? '로컬 + 온라인 ✓' : '로컬 AI 동작 중 ✓';
+                ollamaStatus.style.color = 'var(--success)';
+            } else if (hasExternalApi) {
+                ollamaStatus.textContent = '온라인 AI 사용 가능 ✓';
                 ollamaStatus.style.color = 'var(--success)';
             } else {
                 ollamaStatus.textContent = status.error || '연결 실패';
@@ -1160,14 +1170,44 @@ async function loadAiModelStatus() {
         // 모델 선택 드롭다운 업데이트
         if (aiModelSelect && status.availableModels) {
             aiModelSelect.innerHTML = '';
+
+            // 로컬 모델 그룹
+            const localGroup = document.createElement('optgroup');
+            localGroup.label = '📦 로컬 모델 (Ollama)';
+
+            // 온라인 모델 그룹
+            const onlineGroup = document.createElement('optgroup');
+            onlineGroup.label = '🌐 온라인 모델';
+
             for (const [modelId, modelInfo] of Object.entries(status.availableModels)) {
+                const modelType = modelInfo.type || 'local';
+
+                // 외부 API 모델은 해당 API 키가 설정된 경우에만 표시
+                if (modelType === 'openai' && !externalSettings.openai.hasKey) continue;
+                if (modelType === 'gemini' && !externalSettings.gemini.hasKey) continue;
+
                 const option = document.createElement('option');
                 option.value = modelId;
-                option.textContent = `${modelInfo.name} (${modelInfo.size})`;
+                option.textContent = modelInfo.name + ' (' + modelInfo.size + ')';
                 if (modelId === status.model) {
                     option.selected = true;
                 }
-                aiModelSelect.appendChild(option);
+
+                if (modelType === 'local') {
+                    localGroup.appendChild(option);
+                } else {
+                    onlineGroup.appendChild(option);
+                }
+            }
+
+            // 로컬 모델이 있으면 추가
+            if (localGroup.children.length > 0) {
+                aiModelSelect.appendChild(localGroup);
+            }
+
+            // 온라인 모델이 있으면 추가
+            if (onlineGroup.children.length > 0) {
+                aiModelSelect.appendChild(onlineGroup);
             }
 
             // 현재 모델 설명 업데이트
@@ -5149,3 +5189,130 @@ function initGlobalSearch() {
 }
 
 initGlobalSearch();
+
+// ========================================
+// 외부 AI API 설정 관련 함수
+// ========================================
+
+// 외부 API 설정 로드
+async function loadExternalApiSettings() {
+    try {
+        const response = await fetch('/api/ai/external-settings');
+        const data = await response.json();
+
+        // OpenAI 상태 업데이트
+        const openaiStatus = document.getElementById('openaiStatus');
+        if (openaiStatus) {
+            if (data.openai.hasKey) {
+                openaiStatus.textContent = '연결됨';
+                openaiStatus.className = 'provider-status connected';
+            } else {
+                openaiStatus.textContent = '미설정';
+                openaiStatus.className = 'provider-status';
+            }
+        }
+
+        // Gemini 상태 업데이트
+        const geminiStatus = document.getElementById('geminiStatus');
+        if (geminiStatus) {
+            if (data.gemini.hasKey) {
+                geminiStatus.textContent = '연결됨';
+                geminiStatus.className = 'provider-status connected';
+            } else {
+                geminiStatus.textContent = '미설정';
+                geminiStatus.className = 'provider-status';
+            }
+        }
+    } catch (error) {
+        console.error('외부 API 설정 로드 실패:', error);
+    }
+}
+
+// API 키 표시/숨기기 토글
+function toggleApiKeyVisibility(provider) {
+    const input = document.getElementById(provider + 'ApiKey');
+    const eyeIcon = document.getElementById(provider + 'EyeIcon');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    } else {
+        input.type = 'password';
+        eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+}
+
+// API 키 저장
+async function saveExternalApiKey(provider) {
+    const input = document.getElementById(provider + 'ApiKey');
+    const apiKey = input.value.trim();
+
+    if (!apiKey) {
+        showToast('API 키를 입력해주세요.', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/ai/external-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider,
+                apiKey,
+                enabled: true
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const providerName = provider === 'openai' ? 'OpenAI' : 'Gemini';
+            showToast(providerName + ' API 키가 저장되었습니다.', 'success');
+            input.value = '';
+            loadExternalApiSettings();
+            // 모델 목록 갱신
+            checkOllamaStatus();
+        } else {
+            showToast(result.error || 'API 키 저장 실패', 'error');
+        }
+    } catch (error) {
+        showToast('API 키 저장 중 오류가 발생했습니다.', 'error');
+    }
+}
+
+// API 연결 테스트
+async function testExternalApiConnection(provider) {
+    const statusEl = document.getElementById(provider + 'Status');
+    const originalText = statusEl.textContent;
+    statusEl.textContent = '테스트 중...';
+    statusEl.className = 'provider-status';
+
+    try {
+        const response = await fetch('/api/ai/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider })
+        });
+
+        const result = await response.json();
+        const providerName = provider === 'openai' ? 'OpenAI' : 'Gemini';
+
+        if (result.success) {
+            showToast(providerName + ' 연결 성공!', 'success');
+            statusEl.textContent = '연결됨';
+            statusEl.className = 'provider-status connected';
+        } else {
+            showToast(result.error || '연결 테스트 실패', 'error');
+            statusEl.textContent = '연결 실패';
+            statusEl.className = 'provider-status error';
+        }
+    } catch (error) {
+        showToast('연결 테스트 중 오류가 발생했습니다.', 'error');
+        statusEl.textContent = originalText;
+    }
+}
+
+// 페이지 로드 시 외부 API 설정 로드
+document.addEventListener('DOMContentLoaded', function() {
+    loadExternalApiSettings();
+});

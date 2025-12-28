@@ -2097,54 +2097,12 @@ ${text}
     };
     const numPredict = tokenLimits[type] || 2000;
 
-    return new Promise((resolve, reject) => {
-        const postData = JSON.stringify({
-            model: CURRENT_AI_MODEL,
-            prompt: prompt,
-            system: systemPrompt,
-            stream: false,
-            options: {
-                temperature: 0.3,      // 더 일관된 출력
-                num_predict: numPredict,
-                num_ctx: 4096,         // 컨텍스트 크기 축소 (CPU 부하 감소)
-                num_thread: 4,         // CPU 스레드 수 제한 (과부하 방지)
-                num_batch: 256         // 배치 크기 축소 (메모리/CPU 부하 감소)
-            }
-        });
-
-        const options = {
-            hostname: 'localhost',
-            port: 11434,
-            path: '/api/generate',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        const req = http.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    resolve(result.response || '요약 생성 실패');
-                } catch (e) {
-                    reject(new Error('응답 파싱 오류'));
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.setTimeout(600000, () => {
-            req.destroy();
-            reject(new Error('요약 생성 타임아웃 (10분)'));
-        });
-
-        req.write(postData);
-        req.end();
-    });
+    try {
+        const result = await callAI(prompt, systemPrompt, numPredict);
+        return result || '요약 생성 실패';
+    } catch (error) {
+        throw new Error(`요약 생성 오류: ${error.message}`);
+    }
 }
 
 // 변경 내용 AI 분석
@@ -2171,54 +2129,12 @@ ${changeContent}
 
 분석:`;
 
-    return new Promise((resolve, reject) => {
-        const postData = JSON.stringify({
-            model: CURRENT_AI_MODEL,
-            prompt: prompt,
-            system: systemPrompt,
-            stream: false,
-            options: {
-                temperature: 0.3,
-                num_predict: 800,      // 간결한 분석
-                num_ctx: 2048,
-                num_thread: 4,
-                num_batch: 256
-            }
-        });
-
-        const options = {
-            hostname: 'localhost',
-            port: 11434,
-            path: '/api/generate',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        const req = http.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    resolve(result.response || '분석 결과를 생성할 수 없습니다.');
-                } catch (e) {
-                    reject(new Error('응답 파싱 오류'));
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.setTimeout(60000, () => {  // 1분 타임아웃
-            req.destroy();
-            reject(new Error('분석 타임아웃'));
-        });
-
-        req.write(postData);
-        req.end();
-    });
+    try {
+        const result = await callAI(prompt, systemPrompt, 800);
+        return result || '분석 결과를 생성할 수 없습니다.';
+    } catch (error) {
+        throw new Error(`분석 오류: ${error.message}`);
+    }
 }
 
 // LLM 채팅 함수
@@ -2584,54 +2500,12 @@ async function chatWithOllama(message, history) {
         ? `${conversationContext}사용자: ${message}${dataContext}\n\nAI:`
         : `사용자: ${message}${dataContext}\n\nAI:`;
 
-    return new Promise((resolve, reject) => {
-        const postData = JSON.stringify({
-            model: CURRENT_AI_MODEL,
-            prompt: prompt,
-            system: systemPrompt,
-            stream: false,
-            options: {
-                temperature: 0.7,
-                num_predict: 2048,
-                num_ctx: 4096,
-                num_thread: 4,
-                num_batch: 256
-            }
-        });
-
-        const options = {
-            hostname: 'localhost',
-            port: 11434,
-            path: '/api/generate',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        const req = http.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    resolve(result.response || '응답을 생성할 수 없습니다.');
-                } catch (e) {
-                    reject(new Error('응답 파싱 오류'));
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.setTimeout(120000, () => {  // 2분 타임아웃
-            req.destroy();
-            reject(new Error('응답 생성 타임아웃'));
-        });
-
-        req.write(postData);
-        req.end();
-    });
+    try {
+        const result = await callAI(prompt, systemPrompt, 2048);
+        return result || '응답을 생성할 수 없습니다.';
+    } catch (error) {
+        throw new Error(`응답 생성 오류: ${error.message}`);
+    }
 }
 
 // ========================================
@@ -3432,6 +3306,20 @@ const server = http.createServer(async (req, res) => {
                     res.end(JSON.stringify({ error: '지원하지 않는 모델입니다' }));
                     return;
                 }
+
+                // 외부 모델인 경우 API 키 확인
+                const modelInfo = AVAILABLE_MODELS[model];
+                if (modelInfo.type === 'openai' && !externalApiSettings.openai.apiKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'OpenAI API 키가 설정되지 않았습니다. 먼저 API 키를 등록해주세요.' }));
+                    return;
+                }
+                if (modelInfo.type === 'gemini' && !externalApiSettings.gemini.apiKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Gemini API 키가 설정되지 않았습니다. 먼저 API 키를 등록해주세요.' }));
+                    return;
+                }
+
                 CURRENT_AI_MODEL = model;
                 // settings에도 저장하여 재시작 후에도 유지
                 settings.aiModel = model;

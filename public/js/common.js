@@ -1558,8 +1558,11 @@ async function saveRecordingToServer(blob, title, isWebm = false) {
     try {
         const formData = new FormData();
         const ext = isWebm ? 'webm' : 'wav';
-        // 제목 정리: 공백 제거, 파일명에 사용할 수 없는 문자 제거
-        const cleanTitle = (title || '').trim().replace(/[\\/:*?"<>|]/g, '_') || '회의녹음';
+        // 제목 정리: 파일시스템 금지 문자만 제거, 한글/공백 등은 유지
+        const cleanTitle = (title || '').trim()
+            .replace(/[\\/:*?"<>|]/g, '')  // 파일시스템 금지 문자 제거
+            .replace(/\s+/g, ' ')           // 연속 공백 하나로
+            .trim() || '회의녹음';
         const filename = `${cleanTitle}.${ext}`;
         formData.append('file', blob, filename);
 

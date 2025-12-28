@@ -2556,7 +2556,11 @@ const server = http.createServer(async (req, res) => {
                 // 파일명 생성
                 const originalName = fileData.filename || 'recording.wav';
                 const ext = path.extname(originalName) || '.wav';
-                const baseName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9가-힣_\- ]/g, '_');
+                // 파일명에 사용할 수 없는 문자만 제거 (한글, 영문, 숫자, 공백, 하이픈, 언더스코어 허용)
+                const baseName = path.basename(originalName, ext)
+                    .replace(/[\\/:*?"<>|]/g, '') // 파일시스템 금지 문자 제거
+                    .replace(/\s+/g, ' ')          // 연속 공백 하나로
+                    .trim() || '회의녹음';
 
                 // 기본 파일명으로 먼저 시도
                 let newFilename = `${baseName}${ext}`;

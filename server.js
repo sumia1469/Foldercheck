@@ -2073,6 +2073,17 @@ function getDocumentChanges(fileName) {
 function parseLLMCommand(message) {
     const lowerMsg = message.toLowerCase();
 
+    // 감시 중인 폴더 조회
+    if ((lowerMsg.includes('감시') || lowerMsg.includes('모니터링') || lowerMsg.includes('워치')) &&
+        (lowerMsg.includes('폴더') || lowerMsg.includes('경로') || lowerMsg.includes('목록') || lowerMsg.includes('뭐'))) {
+        return { action: 'list_watched_folders' };
+    }
+
+    // 현재 상태 확인
+    if (lowerMsg.includes('현재') && (lowerMsg.includes('상태') || lowerMsg.includes('현황'))) {
+        return { action: 'get_status' };
+    }
+
     // 검색 명령어
     if (lowerMsg.includes('검색') || lowerMsg.includes('찾아')) {
         // 문서/모니터링 검색
@@ -2127,22 +2138,75 @@ function parseLLMCommand(message) {
         }
     }
 
-    // 회의 녹음 시작 명령
-    if (lowerMsg.includes('녹음') && (lowerMsg.includes('시작') || lowerMsg.includes('해줘'))) {
-        return { action: 'start_recording' };
+    // 회의 녹음 시작 명령 - 실제 API 호출 트리거
+    if (lowerMsg.includes('녹음') && (lowerMsg.includes('시작') || lowerMsg.includes('해줘') || lowerMsg.includes('해 줘'))) {
+        return { action: 'start_recording', triggerAction: true };
     }
 
-    // 회의록 생성/요약 명령
-    if (lowerMsg.includes('회의록') && (lowerMsg.includes('생성') || lowerMsg.includes('만들어') || lowerMsg.includes('작성'))) {
-        return { action: 'create_meeting' };
+    // 회의록 생성/요약 명령 - 실제 API 호출 트리거
+    if (lowerMsg.includes('회의록') && (lowerMsg.includes('생성') || lowerMsg.includes('만들어') || lowerMsg.includes('작성') || lowerMsg.includes('새'))) {
+        return { action: 'create_meeting', triggerAction: true };
     }
 
-    // 요약 명령
+    // 요약 명령 - 실제 API 호출 트리거
     if (lowerMsg.includes('요약') && lowerMsg.includes('회의')) {
         const idMatch = message.match(/meeting_\d+/);
         if (idMatch) {
-            return { action: 'summarize_meeting', meetingId: idMatch[0] };
+            return { action: 'summarize_meeting', meetingId: idMatch[0], triggerAction: true };
         }
+        // ID 없이 최근 회의록 요약 요청
+        return { action: 'summarize_latest_meeting', triggerAction: true };
+    }
+
+    // 날짜/시간별 문서 변경 검색
+    if ((lowerMsg.includes('몇시') || lowerMsg.includes('몇일') || lowerMsg.includes('언제') ||
+         lowerMsg.includes('오늘') || lowerMsg.includes('어제') || lowerMsg.includes('이번주')) &&
+        (lowerMsg.includes('변경') || lowerMsg.includes('수정') || lowerMsg.includes('변화'))) {
+        // 날짜 추출 시도
+        let dateFilter = null;
+        if (lowerMsg.includes('오늘')) {
+            dateFilter = 'today';
+        } else if (lowerMsg.includes('어제')) {
+            dateFilter = 'yesterday';
+        } else if (lowerMsg.includes('이번주') || lowerMsg.includes('이번 주')) {
+            dateFilter = 'this_week';
+        } else if (lowerMsg.includes('이번달') || lowerMsg.includes('이번 달')) {
+            dateFilter = 'this_month';
+        }
+        return { action: 'search_changes_by_date', dateFilter };
+    }
+
+    // 파일명으로 검색 (like 검색)
+    if ((lowerMsg.includes('파일') || lowerMsg.includes('문서')) &&
+        (lowerMsg.includes('이름') || lowerMsg.includes('명') || lowerMsg.includes('찾아'))) {
+        const searchTermMatch = message.match(/['""]([^'""]+)['""]/);
+        if (searchTermMatch) {
+            return { action: 'search_docs_by_filename', query: searchTermMatch[1] };
+        }
+        // 따옴표 없이 검색어 추출
+        const words = message.replace(/파일|문서|이름|명|으로|검색|찾아|줘|해|봐/g, '').trim();
+        if (words.length > 0) {
+            return { action: 'search_docs_by_filename', query: words };
+        }
+    }
+
+    // 회의명으로 검색 (like 검색)
+    if ((lowerMsg.includes('회의') || lowerMsg.includes('회의록')) &&
+        (lowerMsg.includes('이름') || lowerMsg.includes('제목') || lowerMsg.includes('명') || lowerMsg.includes('찾아'))) {
+        const searchTermMatch = message.match(/['""]([^'""]+)['""]/);
+        if (searchTermMatch) {
+            return { action: 'search_meetings_by_title', query: searchTermMatch[1] };
+        }
+        // 따옴표 없이 검색어 추출
+        const words = message.replace(/회의록|회의|이름|제목|명|으로|검색|찾아|줘|해|봐/g, '').trim();
+        if (words.length > 0) {
+            return { action: 'search_meetings_by_title', query: words };
+        }
+    }
+
+    // 도움말 요청
+    if (lowerMsg.includes('도움말') || lowerMsg.includes('사용법') || lowerMsg.includes('뭘 할 수 있') || lowerMsg.includes('기능')) {
+        return { action: 'show_help' };
     }
 
     return null;
@@ -2250,6 +2314,170 @@ function executeCommand(command) {
         case 'summarize_meeting':
             return `[명령] 회의록 ${command.meetingId}의 요약을 요청하셨습니다.\n\n회의록 상세 화면에서 "AI 요약" 버튼을 클릭하면 AI가 회의 내용을 요약해줍니다.`;
 
+        case 'summarize_latest_meeting': {
+            const mtgs = getRecentMeetings(1);
+            if (mtgs.length === 0) {
+                return '저장된 회의록이 없습니다.';
+            }
+            const latest = mtgs[0];
+            return `[최근 회의록 정보]\n제목: ${latest.title || '제목 없음'}\nID: ${latest.id}\n일시: ${new Date(latest.createdAt).toLocaleString('ko-KR')}\n\n이 회의록을 요약하려면 회의록 상세 화면에서 "AI 요약" 버튼을 클릭해주세요.`;
+        }
+
+        case 'list_watched_folders': {
+            if (watchedFolders.length === 0) {
+                return '현재 감시 중인 폴더가 없습니다.\n\n폴더를 추가하려면 화면 상단의 "모니터링" 메뉴에서 "폴더 추가" 버튼을 클릭해주세요.';
+            }
+            let response = `현재 감시 중인 폴더/파일 (${watchedFolders.length}개):\n\n`;
+            watchedFolders.forEach((folder, i) => {
+                const fileName = path.basename(folder);
+                const isFile = folder.includes('.') && !fs.existsSync(folder) ? '파일' : (fs.statSync(folder).isFile() ? '파일' : '폴더');
+                response += `${i+1}. [${isFile}] ${fileName}\n   경로: ${folder}\n\n`;
+            });
+            return response;
+        }
+
+        case 'get_status': {
+            let response = '=== DocWatch 현재 상태 ===\n\n';
+            response += `감시 중인 폴더/파일: ${watchedFolders.length}개\n`;
+            response += `저장된 문서: ${Object.keys(documentHistory).length}개\n`;
+            response += `저장된 회의록: ${meetings.length}개\n\n`;
+
+            // 최근 변경사항
+            const recentDocs = getRecentDocuments(3);
+            if (recentDocs.length > 0) {
+                response += '[최근 문서 변경]\n';
+                recentDocs.forEach(d => {
+                    response += `- ${d.fileName} (${new Date(d.analyzedAt).toLocaleString('ko-KR')})\n`;
+                });
+            }
+            return response;
+        }
+
+        case 'search_changes_by_date': {
+            const now = new Date();
+            let startDate, endDate = now;
+
+            switch (command.dateFilter) {
+                case 'today':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    break;
+                case 'yesterday':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    break;
+                case 'this_week':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+                    break;
+                case 'this_month':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                default:
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+            }
+
+            const results = [];
+            for (const key of Object.keys(documentHistory)) {
+                const doc = documentHistory[key];
+                if (doc.changes && doc.changes.length > 0) {
+                    doc.changes.forEach(change => {
+                        const changeDate = new Date(change.timestamp || change.analyzedAt);
+                        if (changeDate >= startDate && changeDate <= endDate) {
+                            results.push({
+                                fileName: doc.fileName,
+                                timestamp: changeDate,
+                                summary: change.summary || change.aiSummary || '요약 없음'
+                            });
+                        }
+                    });
+                }
+            }
+
+            if (results.length === 0) {
+                const dateLabel = command.dateFilter === 'today' ? '오늘' :
+                                  command.dateFilter === 'yesterday' ? '어제' :
+                                  command.dateFilter === 'this_week' ? '이번 주' : '이번 달';
+                return `${dateLabel} 변경된 문서가 없습니다.`;
+            }
+
+            results.sort((a, b) => b.timestamp - a.timestamp);
+            let response = `문서 변경 내역 (${results.length}건):\n\n`;
+            results.slice(0, 10).forEach((r, i) => {
+                response += `${i+1}. ${r.fileName}\n`;
+                response += `   - 시간: ${r.timestamp.toLocaleString('ko-KR')}\n`;
+                response += `   - 요약: ${r.summary.substring(0, 100)}\n\n`;
+            });
+            return response;
+        }
+
+        case 'search_docs_by_filename': {
+            const query = command.query.toLowerCase();
+            const results = [];
+
+            for (const key of Object.keys(documentHistory)) {
+                const doc = documentHistory[key];
+                if (doc.fileName && doc.fileName.toLowerCase().includes(query)) {
+                    results.push({
+                        fileName: doc.fileName,
+                        analyzedAt: doc.analyzedAt,
+                        changeCount: doc.changes ? doc.changes.length : 0
+                    });
+                }
+            }
+
+            if (results.length === 0) {
+                return `"${command.query}" 파일명을 포함하는 문서를 찾을 수 없습니다.`;
+            }
+
+            results.sort((a, b) => new Date(b.analyzedAt) - new Date(a.analyzedAt));
+            let response = `"${command.query}" 파일명 검색 결과 (${results.length}건):\n\n`;
+            results.forEach((r, i) => {
+                response += `${i+1}. ${r.fileName}\n`;
+                response += `   - 분석일시: ${new Date(r.analyzedAt).toLocaleString('ko-KR')}\n`;
+                response += `   - 변경 횟수: ${r.changeCount}회\n\n`;
+            });
+            return response;
+        }
+
+        case 'search_meetings_by_title': {
+            const query = command.query.toLowerCase();
+            const results = meetings.filter(m =>
+                (m.title && m.title.toLowerCase().includes(query)) ||
+                (m.name && m.name.toLowerCase().includes(query))
+            );
+
+            if (results.length === 0) {
+                return `"${command.query}" 제목의 회의록을 찾을 수 없습니다.`;
+            }
+
+            let response = `"${command.query}" 회의록 검색 결과 (${results.length}건):\n\n`;
+            results.forEach((m, i) => {
+                response += `${i+1}. ${m.title || m.name || '제목 없음'}\n`;
+                response += `   - ID: ${m.id}\n`;
+                response += `   - 일시: ${new Date(m.createdAt).toLocaleString('ko-KR')}\n\n`;
+            });
+            return response;
+        }
+
+        case 'show_help': {
+            return `=== DocWatch 스마트 어시스트 사용법 ===
+
+[문서 모니터링]
+• "감시 중인 폴더 보여줘" - 현재 모니터링 중인 폴더 목록
+• "현재 상태 알려줘" - DocWatch 전체 현황
+• "오늘 변경된 문서 보여줘" - 날짜별 문서 변경 검색
+• "'파일명' 변경 내역 보여줘" - 특정 문서 변경 이력
+• "문서에서 '키워드' 검색해줘" - 문서 내용 검색
+
+[회의록]
+• "최근 회의록 보여줘" - 최근 회의록 목록
+• "회의록 제목 '키워드' 검색해줘" - 회의명으로 검색
+• "회의록에서 '키워드' 검색해줘" - 회의 내용 검색
+• "meeting_123456 회의록 내용 보여줘" - 특정 회의록 상세
+
+[일반]
+• 자유롭게 질문하시면 제가 도와드립니다!`;
+        }
+
         default:
             return null;
     }
@@ -2267,7 +2495,17 @@ async function chatWithOllama(message, history) {
         }
     }
 
+    // 현재 상태 컨텍스트 생성
+    const currentContext = `
+[현재 DocWatch 상태]
+- 감시 중인 폴더/파일: ${watchedFolders.length}개
+- 저장된 문서: ${Object.keys(documentHistory).length}개
+- 저장된 회의록: ${meetings.length}개
+${watchedFolders.length > 0 ? `- 감시 목록: ${watchedFolders.slice(0, 3).map(f => path.basename(f)).join(', ')}${watchedFolders.length > 3 ? ' 외 ' + (watchedFolders.length - 3) + '개' : ''}` : ''}`;
+
     const systemPrompt = `당신은 DocWatch의 스마트 어시스트입니다. DocWatch는 문서 모니터링과 회의록 관리를 도와주는 로컬 업무 자동화 도구입니다.
+
+${currentContext}
 
 [당신의 역할]
 1. 사용자의 문서 모니터링 관련 질문에 답변
@@ -2275,15 +2513,16 @@ async function chatWithOllama(message, history) {
 3. 문서 변경 내역 확인 및 요약 제공
 4. 업무 효율화 조언
 
-[사용 가능한 기능 안내]
-- 문서 검색: "문서에서 '키워드' 검색해줘"
-- 회의록 검색: "회의록에서 '키워드' 검색해줘"
-- 최근 문서 목록: "최근 문서 목록 보여줘"
-- 최근 회의록 목록: "최근 회의록 보여줘"
+[사용 가능한 기능]
+- 감시 폴더: "감시 중인 폴더 보여줘", "현재 상태 알려줘"
+- 문서 검색: "문서에서 '키워드' 검색해줘", "파일명 'CMS' 검색해줘"
+- 날짜 검색: "오늘 변경된 문서 보여줘", "이번주 수정된 파일"
+- 최근 문서: "최근 문서 목록 보여줘"
+- 변경 내역: "'파일명' 변경 내역 보여줘"
+- 회의록 검색: "회의록에서 '키워드' 검색해줘", "회의 제목 '기획' 검색"
+- 최근 회의록: "최근 회의록 보여줘"
 - 회의록 상세: "meeting_123456 회의록 내용 보여줘"
-- 문서 변경 내역: "'파일명' 변경 내역 보여줘"
-- 녹음 시작: "회의 녹음 시작해줘"
-- 회의록 생성: "새 회의록 만들어줘"
+- 도움말: "도움말", "사용법"
 
 [응답 규칙]
 1. 반드시 한국어로 응답하세요 (한자/중국어 문자 절대 사용 금지)

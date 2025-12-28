@@ -1670,7 +1670,6 @@ body {
 
 .meeting-item:hover:not(.selected) {
     background: var(--bg-hover);
-    transform: translateX(4px);
 }
 
 @keyframes highlight-pulse {

@@ -298,7 +298,7 @@ app.on('activate', () => {
     }
 });
 
-// macOS 기본 메뉴 (Cmd+Q 지원)
+// macOS 기본 메뉴 (Cmd+Q, 복사/붙여넣기 지원)
 if (process.platform === 'darwin') {
     const template = [
         {
@@ -311,6 +311,18 @@ if (process.platform === 'darwin') {
                 { label: '모두 보기', role: 'unhide' },
                 { type: 'separator' },
                 { label: '종료', accelerator: 'Cmd+Q', click: () => { app.isQuitting = true; app.quit(); } }
+            ]
+        },
+        {
+            label: '편집',
+            submenu: [
+                { label: '실행 취소', accelerator: 'Cmd+Z', role: 'undo' },
+                { label: '다시 실행', accelerator: 'Shift+Cmd+Z', role: 'redo' },
+                { type: 'separator' },
+                { label: '잘라내기', accelerator: 'Cmd+X', role: 'cut' },
+                { label: '복사', accelerator: 'Cmd+C', role: 'copy' },
+                { label: '붙여넣기', accelerator: 'Cmd+V', role: 'paste' },
+                { label: '모두 선택', accelerator: 'Cmd+A', role: 'selectAll' }
             ]
         }
     ];

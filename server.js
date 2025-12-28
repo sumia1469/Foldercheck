@@ -48,61 +48,14 @@ const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
 // Ollama 설정 (로컬 LLM)
 const OLLAMA_HOST = 'http://localhost:11434';
 
-// 사용 가능한 AI 모델 목록 (로컬 + 외부 API)
+// 사용 가능한 AI 모델 목록 (로컬 전용 - 폐쇄망 환경)
 const AVAILABLE_MODELS = {
-    // 로컬 모델 (Ollama)
+    // 로컬 모델 (저사양 PC 호환)
     'qwen2.5:3b': {
         name: 'Qwen 2.5 (3B)',
-        description: '알리바바 Qwen2.5 3B - 빠른 속도, 가벼운 모델 (1.9GB)',
+        description: '경량 AI 모델 - 저사양 PC 호환 (1.9GB, 4GB RAM 이상)',
         size: '1.9GB',
         type: 'local'
-    },
-    'qwen2.5:7b-instruct-q4_K_M': {
-        name: 'Qwen 2.5 (7B Q4_K_M)',
-        description: '알리바바 Qwen2.5 7B - 높은 품질, 균형잡힌 성능 (4.7GB)',
-        size: '4.7GB',
-        type: 'local'
-    },
-    // 외부 API 모델
-    'openai:gpt-4o-mini': {
-        name: 'GPT-4o Mini (OpenAI)',
-        description: 'OpenAI GPT-4o Mini - 빠르고 경제적인 모델 (API 키 필요)',
-        size: '온라인',
-        type: 'openai',
-        apiModel: 'gpt-4o-mini'
-    },
-    'openai:gpt-4o': {
-        name: 'GPT-4o (OpenAI)',
-        description: 'OpenAI GPT-4o - 고성능 멀티모달 모델 (API 키 필요)',
-        size: '온라인',
-        type: 'openai',
-        apiModel: 'gpt-4o'
-    },
-    'gemini:gemini-1.5-flash': {
-        name: 'Gemini 1.5 Flash (Google)',
-        description: 'Google Gemini 1.5 Flash - 빠르고 효율적인 모델 (API 키 필요)',
-        size: '온라인',
-        type: 'gemini',
-        apiModel: 'gemini-1.5-flash'
-    },
-    'gemini:gemini-1.5-pro': {
-        name: 'Gemini 1.5 Pro (Google)',
-        description: 'Google Gemini 1.5 Pro - 고성능 모델 (API 키 필요)',
-        size: '온라인',
-        type: 'gemini',
-        apiModel: 'gemini-1.5-pro'
-    }
-};
-
-// 외부 API 설정
-let externalApiSettings = {
-    openai: {
-        apiKey: '',
-        enabled: false
-    },
-    gemini: {
-        apiKey: '',
-        enabled: false
     }
 };
 
@@ -354,11 +307,6 @@ function loadSettings() {
             if (settings.aiModel && AVAILABLE_MODELS[settings.aiModel]) {
                 CURRENT_AI_MODEL = settings.aiModel;
                 console.log(`AI 모델 설정 로드: ${CURRENT_AI_MODEL}`);
-            }
-            // 외부 API 설정 로드
-            if (settings.externalApi) {
-                externalApiSettings = { ...externalApiSettings, ...settings.externalApi };
-                console.log('외부 API 설정 로드 완료');
             }
             console.log('고급 설정 로드 완료');
         }
@@ -1638,151 +1586,11 @@ function generateDocumentOverview(content, ext) {
 }
 
 // ========================================
-// 외부 AI API 호출 함수
+// AI 호출 함수 (로컬 Ollama 전용 - 폐쇄망 환경)
 // ========================================
 
-// OpenAI API 호출
-async function callOpenAI(prompt, systemPrompt, modelId) {
-    const modelInfo = AVAILABLE_MODELS[modelId];
-    if (!modelInfo || !externalApiSettings.openai.apiKey) {
-        throw new Error('OpenAI API 키가 설정되지 않았습니다');
-    }
-
-    const https = require('https');
-    const postData = JSON.stringify({
-        model: modelInfo.apiModel,
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 2000
-    });
-
-    return new Promise((resolve, reject) => {
-        const options = {
-            hostname: 'api.openai.com',
-            port: 443,
-            path: '/v1/chat/completions',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${externalApiSettings.openai.apiKey}`,
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    if (result.error) {
-                        reject(new Error(result.error.message));
-                    } else {
-                        resolve(result.choices[0].message.content);
-                    }
-                } catch (e) {
-                    reject(new Error('OpenAI 응답 파싱 오류'));
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.setTimeout(120000, () => {
-            req.destroy();
-            reject(new Error('OpenAI API 타임아웃'));
-        });
-
-        req.write(postData);
-        req.end();
-    });
-}
-
-// Google Gemini API 호출
-async function callGemini(prompt, systemPrompt, modelId) {
-    const modelInfo = AVAILABLE_MODELS[modelId];
-    if (!modelInfo || !externalApiSettings.gemini.apiKey) {
-        throw new Error('Gemini API 키가 설정되지 않았습니다');
-    }
-
-    const https = require('https');
-    const postData = JSON.stringify({
-        contents: [{
-            parts: [{ text: `${systemPrompt}\n\n${prompt}` }]
-        }],
-        generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 2000
-        }
-    });
-
-    return new Promise((resolve, reject) => {
-        const options = {
-            hostname: 'generativelanguage.googleapis.com',
-            port: 443,
-            path: `/v1beta/models/${modelInfo.apiModel}:generateContent?key=${externalApiSettings.gemini.apiKey}`,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const result = JSON.parse(data);
-                    if (result.error) {
-                        reject(new Error(result.error.message));
-                    } else if (result.candidates && result.candidates[0]) {
-                        resolve(result.candidates[0].content.parts[0].text);
-                    } else {
-                        reject(new Error('Gemini 응답이 비어 있습니다'));
-                    }
-                } catch (e) {
-                    reject(new Error('Gemini 응답 파싱 오류'));
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.setTimeout(120000, () => {
-            req.destroy();
-            reject(new Error('Gemini API 타임아웃'));
-        });
-
-        req.write(postData);
-        req.end();
-    });
-}
-
-// 통합 AI 호출 함수 (모델 타입에 따라 적절한 API 호출)
+// AI 호출 함수 (로컬 Ollama만 사용)
 async function callAI(prompt, systemPrompt, numPredict = 2000) {
-    const modelInfo = AVAILABLE_MODELS[CURRENT_AI_MODEL];
-    if (!modelInfo) {
-        throw new Error('알 수 없는 AI 모델입니다');
-    }
-
-    const modelType = modelInfo.type || 'local';
-
-    switch (modelType) {
-        case 'openai':
-            return await callOpenAI(prompt, systemPrompt, CURRENT_AI_MODEL);
-        case 'gemini':
-            return await callGemini(prompt, systemPrompt, CURRENT_AI_MODEL);
-        case 'local':
-        default:
-            // 기존 Ollama 호출 (로컬)
-            return await callLocalOllama(prompt, systemPrompt, numPredict);
-    }
-}
-
-// 로컬 Ollama 호출
-async function callLocalOllama(prompt, systemPrompt, numPredict = 2000) {
     return new Promise((resolve, reject) => {
         const postData = JSON.stringify({
             model: CURRENT_AI_MODEL,
@@ -3307,19 +3115,6 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
-                // 외부 모델인 경우 API 키 확인
-                const modelInfo = AVAILABLE_MODELS[model];
-                if (modelInfo.type === 'openai' && !externalApiSettings.openai.apiKey) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'OpenAI API 키가 설정되지 않았습니다. 먼저 API 키를 등록해주세요.' }));
-                    return;
-                }
-                if (modelInfo.type === 'gemini' && !externalApiSettings.gemini.apiKey) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Gemini API 키가 설정되지 않았습니다. 먼저 API 키를 등록해주세요.' }));
-                    return;
-                }
-
                 CURRENT_AI_MODEL = model;
                 // settings에도 저장하여 재시작 후에도 유지
                 settings.aiModel = model;
@@ -3345,109 +3140,6 @@ const server = http.createServer(async (req, res) => {
                 currentModel: CURRENT_AI_MODEL,
                 availableModels: AVAILABLE_MODELS
             }));
-            return;
-        }
-
-        // API: 외부 AI API 설정 조회
-        if (pathname === '/api/ai/external-settings' && req.method === 'GET') {
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            // API 키는 마스킹하여 반환
-            res.end(JSON.stringify({
-                openai: {
-                    enabled: externalApiSettings.openai.enabled,
-                    hasKey: !!externalApiSettings.openai.apiKey,
-                    keyPreview: externalApiSettings.openai.apiKey ?
-                        `${externalApiSettings.openai.apiKey.slice(0, 8)}...` : ''
-                },
-                gemini: {
-                    enabled: externalApiSettings.gemini.enabled,
-                    hasKey: !!externalApiSettings.gemini.apiKey,
-                    keyPreview: externalApiSettings.gemini.apiKey ?
-                        `${externalApiSettings.gemini.apiKey.slice(0, 8)}...` : ''
-                }
-            }));
-            return;
-        }
-
-        // API: 외부 AI API 설정 저장
-        if (pathname === '/api/ai/external-settings' && req.method === 'POST') {
-            try {
-                const { provider, apiKey, enabled } = await parseBody(req);
-
-                if (!['openai', 'gemini'].includes(provider)) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: '지원하지 않는 AI 제공자입니다' }));
-                    return;
-                }
-
-                // 설정 업데이트
-                if (apiKey !== undefined) {
-                    externalApiSettings[provider].apiKey = apiKey;
-                }
-                if (enabled !== undefined) {
-                    externalApiSettings[provider].enabled = enabled;
-                }
-
-                // settings에 저장
-                settings.externalApi = externalApiSettings;
-                saveSettings();
-
-                console.log(`외부 AI 설정 저장: ${provider}`);
-                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({
-                    success: true,
-                    provider,
-                    enabled: externalApiSettings[provider].enabled,
-                    hasKey: !!externalApiSettings[provider].apiKey
-                }));
-            } catch (error) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: error.message }));
-            }
-            return;
-        }
-
-        // API: 외부 AI API 연결 테스트
-        if (pathname === '/api/ai/test-connection' && req.method === 'POST') {
-            try {
-                const { provider } = await parseBody(req);
-
-                if (!['openai', 'gemini'].includes(provider)) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: '지원하지 않는 AI 제공자입니다' }));
-                    return;
-                }
-
-                if (!externalApiSettings[provider].apiKey) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'API 키가 설정되지 않았습니다' }));
-                    return;
-                }
-
-                // 간단한 테스트 호출
-                const testPrompt = '안녕하세요. 테스트입니다.';
-                const testSystem = '한 문장으로 인사에 답해주세요.';
-
-                let response;
-                if (provider === 'openai') {
-                    response = await callOpenAI(testPrompt, testSystem, 'openai:gpt-4o-mini');
-                } else {
-                    response = await callGemini(testPrompt, testSystem, 'gemini:gemini-1.5-flash');
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({
-                    success: true,
-                    message: '연결 성공',
-                    response: response.slice(0, 100)
-                }));
-            } catch (error) {
-                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({
-                    success: false,
-                    error: error.message
-                }));
-            }
             return;
         }
 

@@ -1288,11 +1288,38 @@ async function extractPdfContent(filePath) {
     }
 }
 
+// 문서 분석 결과 캐시 (메모리)
+const analysisCache = {};
+
 // 문서 분석 및 요약 생성
-async function analyzeDocument(filePath) {
+async function analyzeDocument(filePath, forceReanalyze = false) {
     const ext = path.extname(filePath).toLowerCase();
     const fileName = path.basename(filePath);
     const fileKey = filePath.replace(/[^a-zA-Z0-9]/g, '_');
+
+    // 파일 수정 시간 확인
+    let fileStats;
+    try {
+        fileStats = fs.statSync(filePath);
+    } catch (e) {
+        return { error: '파일을 찾을 수 없습니다: ' + filePath };
+    }
+    const fileMtime = fileStats.mtimeMs;
+
+    // 캐시된 분석 결과가 있고, 파일이 변경되지 않았으면 캐시 반환
+    if (!forceReanalyze && analysisCache[fileKey]) {
+        const cached = analysisCache[fileKey];
+        if (cached.fileMtime === fileMtime) {
+            console.log(`[캐시 사용] 분석 결과 캐시 반환: ${fileName}`);
+            return {
+                ...cached.result,
+                fromCache: true,
+                cachedAt: cached.cachedAt
+            };
+        } else {
+            console.log(`[캐시 만료] 파일 수정됨, 재분석: ${fileName}`);
+        }
+    }
 
     let currentContent = null;
     let documentType = '';
@@ -1395,6 +1422,14 @@ async function analyzeDocument(filePath) {
         fileName
     };
     saveDocHistory();
+
+    // 분석 결과 캐시에 저장
+    analysisCache[fileKey] = {
+        result: summary,
+        fileMtime: fileMtime,
+        cachedAt: new Date().toISOString()
+    };
+    console.log(`[캐시 저장] 분석 결과 캐시됨: ${fileName}`);
 
     return summary;
 }

@@ -459,157 +459,149 @@ function getActionClass(action) {
     return '';
 }
 
-// 변경 요약 팝업 표시
+// 변경 요약을 하단 패널에 표시 (diff 뷰)
 function showChangeSummary(event, fileName, summaryData) {
     event.stopPropagation();
 
-    // 기존 팝업 제거
-    const existingPopup = document.getElementById('changeSummaryPopup');
-    if (existingPopup) existingPopup.remove();
-
     const summary = JSON.parse(decodeURIComponent(summaryData));
 
-    // 타입별 아이콘과 색상
-    let typeIcon = '📝';
-    let typeText = '수정됨';
-    let typeClass = 'modified';
+    // 하단 패널 열기
+    const bottomPanel = document.getElementById('bottomPanel');
+    const bottomChanges = document.getElementById('bottomChanges');
+    const bottomPanelFileInfo = document.getElementById('bottomPanelFileInfo');
+    const mainContent = document.querySelector('.main-content');
 
+    if (!bottomPanel || !bottomChanges) return;
+
+    bottomPanel.classList.add('open');
+    if (mainContent) mainContent.classList.add('with-bottom-panel');
+
+    // 타입별 아이콘과 색상
+    let typeIcon, typeText, typeClass;
     if (summary.type === 'new') {
-        typeIcon = '✨';
+        typeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>`;
         typeText = '새 파일';
-        typeClass = 'new';
+        typeClass = 'added';
     } else if (summary.type === 'deleted') {
-        typeIcon = '🗑️';
+        typeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>`;
         typeText = '삭제됨';
-        typeClass = 'deleted';
+        typeClass = 'removed';
+    } else {
+        typeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+        typeText = '수정됨';
+        typeClass = 'modified';
     }
 
-    // 상세 정보 구성
-    let statsHtml = '';
-    let fileInfoHtml = '';
-    let changesHtml = '';
+    // 파일명 정보 표시
+    if (bottomPanelFileInfo) {
+        bottomPanelFileInfo.innerHTML = `
+            <span class="file-name">${escapeHtml(fileName)}</span>
+            <span class="changes-meta">
+                <span class="meta-item ${typeClass}">${typeText}</span>
+            </span>
+        `;
+    }
+
+    // 변경 내용 구성
+    let addedContent = '';
+    let removedContent = '';
+    let metaHtml = '';
 
     if (summary.details) {
         const details = summary.details;
 
-        // 기본 통계
-        let statsItems = [];
-        if (details.lengthDiff !== undefined && details.lengthDiff !== 0) {
-            const sign = details.lengthDiff > 0 ? '+' : '';
-            statsItems.push(`<span class="stat-item ${details.lengthDiff > 0 ? 'added' : 'removed'}">${sign}${details.lengthDiff}자</span>`);
-        }
+        // 메타 정보
+        let metaItems = [];
         if (details.addedCount > 0) {
-            statsItems.push(`<span class="stat-item added">+${details.addedCount}항목</span>`);
+            metaItems.push(`<span class="meta-item added">+${details.addedCount} 추가</span>`);
         }
         if (details.removedCount > 0) {
-            statsItems.push(`<span class="stat-item removed">-${details.removedCount}항목</span>`);
+            metaItems.push(`<span class="meta-item removed">-${details.removedCount} 삭제</span>`);
         }
-        if (statsItems.length > 0) {
-            statsHtml = `<div class="popup-stats">${statsItems.join(' ')}</div>`;
+        if (details.lengthDiff !== undefined && details.lengthDiff !== 0) {
+            const sign = details.lengthDiff > 0 ? '+' : '';
+            metaItems.push(`<span class="meta-item ${details.lengthDiff > 0 ? 'added' : 'removed'}">${sign}${details.lengthDiff}자</span>`);
         }
-
-        // 파일 타입별 상세 정보
-        if (details.fileTypeInfo) {
-            const info = details.fileTypeInfo;
-            if (info.type === 'text' && info.lineDiff !== 0) {
-                const sign = info.lineDiff > 0 ? '+' : '';
-                fileInfoHtml += `<div class="file-info-item">📄 줄 수: ${info.prevLines} → ${info.currLines} (${sign}${info.lineDiff}줄)</div>`;
-            } else if (info.type === 'pptx') {
-                if (info.slideDiff !== 0) {
-                    const sign = info.slideDiff > 0 ? '+' : '';
-                    fileInfoHtml += `<div class="file-info-item">📊 슬라이드: ${info.prevSlides} → ${info.currSlides} (${sign}${info.slideDiff}장)</div>`;
-                } else {
-                    fileInfoHtml += `<div class="file-info-item">📊 슬라이드: ${info.currSlides}장</div>`;
-                }
-            } else if (info.type === 'xlsx') {
-                if (info.sheetDiff !== 0) {
-                    const sign = info.sheetDiff > 0 ? '+' : '';
-                    fileInfoHtml += `<div class="file-info-item">📋 시트: ${info.prevSheets} → ${info.currSheets} (${sign}${info.sheetDiff}개)</div>`;
-                }
-                if (info.newSheets && info.newSheets.length > 0) {
-                    fileInfoHtml += `<div class="file-info-item new-sheets">➕ 새 시트: ${info.newSheets.join(', ')}</div>`;
-                }
-                if (info.removedSheets && info.removedSheets.length > 0) {
-                    fileInfoHtml += `<div class="file-info-item removed-sheets">➖ 삭제된 시트: ${info.removedSheets.join(', ')}</div>`;
-                }
-            }
+        if (metaItems.length > 0) {
+            metaHtml = `<div class="changes-meta">${metaItems.join('')}</div>`;
         }
 
-        // 추가된 내용 표시
+        // 추가된 내용
         if (details.added && details.added.length > 0) {
-            const moreCount = details.addedCount > details.added.length ? ` 외 ${details.addedCount - details.added.length}개` : '';
-            changesHtml += `<div class="changes-section added">
-                <div class="changes-title">➕ 추가된 내용${moreCount}</div>
-                ${details.added.map(text => `<div class="change-item">${escapeHtml(text)}</div>`).join('')}
-            </div>`;
+            addedContent = details.added.map(text => escapeHtml(text)).join('\n');
         }
 
-        // 삭제된 내용 표시
+        // 삭제된 내용
         if (details.removed && details.removed.length > 0) {
-            const moreCount = details.removedCount > details.removed.length ? ` 외 ${details.removedCount - details.removed.length}개` : '';
-            changesHtml += `<div class="changes-section removed">
-                <div class="changes-title">➖ 삭제된 내용${moreCount}</div>
-                ${details.removed.map(text => `<div class="change-item">${escapeHtml(text)}</div>`).join('')}
-            </div>`;
+            removedContent = details.removed.map(text => escapeHtml(text)).join('\n');
         }
     }
 
-    // AI 분석 버튼 HTML (수정된 파일만 표시)
-    const aiAnalyzeHtml = (summary.type === 'modified' && summary.details &&
-        (summary.details.added?.length > 0 || summary.details.removed?.length > 0))
-        ? `<div class="popup-ai-analyze">
-            <button class="btn-ai-analyze" onclick="analyzeChangeWithAI('${encodeURIComponent(fileName)}', '${summaryData}')">
-                <span class="ai-icon">✨</span>
-                <span class="ai-text">AI로 변경 내용 분석하기</span>
-            </button>
-           </div>
-           <div id="aiAnalysisResult" class="ai-analysis-result" style="display: none;"></div>`
-        : '';
-
-    // 팝업 생성
-    const popup = document.createElement('div');
-    popup.id = 'changeSummaryPopup';
-    popup.className = 'change-summary-popup';
-    popup.innerHTML = `
-        <div class="popup-header">
-            <span class="popup-icon">${typeIcon}</span>
-            <span class="popup-title">변경 내역</span>
-            <button class="popup-close" onclick="closeChangeSummaryPopup()">×</button>
-        </div>
-        <div class="popup-content">
-            <div class="popup-filename">${escapeHtml(fileName)}</div>
-            <div class="popup-type ${typeClass}">${typeText}</div>
-            ${statsHtml}
-            ${fileInfoHtml ? `<div class="popup-file-info">${fileInfoHtml}</div>` : ''}
-            ${aiAnalyzeHtml}
-            ${changesHtml ? `<div class="popup-changes">${changesHtml}</div>` : ''}
-        </div>
-    `;
-
-    document.body.appendChild(popup);
-
-    // 화면 중앙에 위치
-    popup.style.position = 'fixed';
-    popup.style.top = '50%';
-    popup.style.left = '50%';
-    popup.style.transform = 'translate(-50%, -50%)';
-
-    // 외부 클릭 시 닫기
-    setTimeout(() => {
-        document.addEventListener('click', closeChangeSummaryOnOutsideClick);
-    }, 100);
-}
-
-function closeChangeSummaryPopup() {
-    const popup = document.getElementById('changeSummaryPopup');
-    if (popup) popup.remove();
-    document.removeEventListener('click', closeChangeSummaryOnOutsideClick);
-}
-
-function closeChangeSummaryOnOutsideClick(event) {
-    const popup = document.getElementById('changeSummaryPopup');
-    if (popup && !popup.contains(event.target)) {
-        closeChangeSummaryPopup();
+    // 하단 패널에 diff 뷰 표시
+    if (addedContent || removedContent) {
+        bottomChanges.innerHTML = `
+            <div class="changes-container">
+                <div class="changes-header">
+                    <div class="changes-header-left">
+                        <div class="changes-file-icon">
+                            ${typeIcon}
+                        </div>
+                        <div class="changes-file-info">
+                            <h4>${escapeHtml(fileName)}</h4>
+                            <span>${typeText}</span>
+                        </div>
+                    </div>
+                    ${metaHtml}
+                </div>
+                <div class="changes-diff-view">
+                    <div class="changes-diff-pane before">
+                        <div class="changes-diff-pane-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+                            삭제된 내용
+                        </div>
+                        <div class="changes-diff-content ${removedContent ? '' : 'empty'}">
+                            ${removedContent || '삭제된 내용 없음'}
+                        </div>
+                    </div>
+                    <div class="changes-diff-pane after">
+                        <div class="changes-diff-pane-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            추가된 내용
+                        </div>
+                        <div class="changes-diff-content ${addedContent ? '' : 'empty'}">
+                            ${addedContent || '추가된 내용 없음'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        // 변경 내용이 없는 경우 (메타데이터만 변경 등)
+        bottomChanges.innerHTML = `
+            <div class="changes-container">
+                <div class="changes-header">
+                    <div class="changes-header-left">
+                        <div class="changes-file-icon">
+                            ${typeIcon}
+                        </div>
+                        <div class="changes-file-info">
+                            <h4>${escapeHtml(fileName)}</h4>
+                            <span>${typeText}</span>
+                        </div>
+                    </div>
+                    ${metaHtml}
+                </div>
+                <div class="changes-single-view">
+                    <div class="changes-single-header">변경 상세</div>
+                    <div class="changes-single-content">
+                        <p style="color: var(--text-muted); text-align: center; padding: 20px;">
+                            파일이 ${typeText} 상태입니다.<br>
+                            상세 텍스트 변경 내용이 감지되지 않았습니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 }
 
@@ -1162,12 +1154,51 @@ function isAnalyzableDocument(extension) {
     return analyzable.includes(extension?.toLowerCase());
 }
 
-// 문서 분석 실행
+// 문서 분석 실행 (우측 패널에 표시)
 async function analyzeDocument(filePath) {
-    try {
-        // 분석 중 표시
-        const modal = showAnalysisModal('analyzing');
+    // 우측 패널 열기
+    const rightPanel = document.getElementById('rightPanel');
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    const toggleBtn = document.getElementById('toggleRightPanelBtn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
 
+    if (!rightPanel || !panelAiInfo) return;
+
+    rightPanel.classList.add('open');
+    if (toggleBtn) toggleBtn.classList.add('active');
+
+    // AI 정보 탭 활성화
+    panelTabs.forEach(t => {
+        t.classList.toggle('active', t.dataset.panelTab === 'ai-info');
+    });
+    panelAiInfo.style.display = 'flex';
+    document.getElementById('panelLlmChat').style.display = 'none';
+
+    // 파일명 추출
+    const fileName = filePath.split('/').pop().split('\\').pop();
+
+    // 로딩 표시
+    panelAiInfo.innerHTML = `
+        <div class="panel-document-analysis">
+            <div class="panel-analysis-header">
+                <span class="panel-analysis-icon">📊</span>
+                <h4>문서 분석 중...</h4>
+            </div>
+            <div class="panel-analysis-file">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                </svg>
+                <span>${escapeHtml(fileName)}</span>
+            </div>
+            <div class="panel-analysis-loading">
+                <div class="ai-loading-spinner"></div>
+                <p>문서를 분석하고 있습니다...</p>
+            </div>
+        </div>
+    `;
+
+    try {
         const res = await fetch('/api/document/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1177,14 +1208,138 @@ async function analyzeDocument(filePath) {
         const result = await res.json();
 
         if (result.error) {
-            showAnalysisModal('error', result.error);
+            showDocumentAnalysisInPanel('error', result.error, fileName);
         } else {
-            showAnalysisModal('result', result);
+            showDocumentAnalysisInPanel('result', result, fileName);
         }
     } catch (e) {
         console.error('문서 분석 오류:', e);
-        showAnalysisModal('error', '문서 분석 중 오류가 발생했습니다.');
+        showDocumentAnalysisInPanel('error', '문서 분석 중 오류가 발생했습니다.', fileName);
     }
+}
+
+// 문서 분석 결과를 우측 패널에 표시
+function showDocumentAnalysisInPanel(state, data, fileName) {
+    const panelAiInfo = document.getElementById('panelAiInfo');
+    if (!panelAiInfo) return;
+
+    if (state === 'error') {
+        panelAiInfo.innerHTML = `
+            <div class="panel-document-analysis">
+                <div class="panel-analysis-header error">
+                    <span class="panel-analysis-icon">⚠️</span>
+                    <h4>분석 오류</h4>
+                </div>
+                <div class="panel-analysis-file">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                    </svg>
+                    <span>${escapeHtml(fileName)}</span>
+                </div>
+                <div class="panel-analysis-error">
+                    <p>${escapeHtml(data)}</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const result = data;
+    let contentHtml = '';
+
+    // AI 요약 섹션
+    if (result.aiSummary) {
+        contentHtml += `
+            <div class="panel-analysis-section ai-summary">
+                <h5>✨ AI 요약</h5>
+                <div class="panel-ai-summary-content">
+                    <pre>${escapeHtml(result.aiSummary)}</pre>
+                </div>
+            </div>
+        `;
+    }
+
+    if (result.isNewDocument) {
+        // 새 문서 개요
+        const overview = result.overview || {};
+        contentHtml += `
+            <div class="panel-analysis-section">
+                <h5>📄 새 문서 분석</h5>
+                <ul class="panel-analysis-list">
+                    <li><strong>문서 유형:</strong> ${result.documentType}</li>
+                    <li><strong>글자 수:</strong> ${overview.contentLength?.toLocaleString() || 0}자</li>
+                    <li><strong>단어 수:</strong> ${overview.wordCount?.toLocaleString() || 0}개</li>
+                    ${overview.slideCount ? `<li><strong>슬라이드:</strong> ${overview.slideCount}장</li>` : ''}
+                    ${overview.sheetCount ? `<li><strong>시트:</strong> ${overview.sheetCount}개 (${overview.sheetNames?.join(', ') || ''})</li>` : ''}
+                </ul>
+            </div>
+        `;
+
+        if (overview.topKeywords?.length > 0) {
+            contentHtml += `
+                <div class="panel-analysis-section">
+                    <h5>🔑 주요 키워드</h5>
+                    <div class="panel-keyword-tags">
+                        ${overview.topKeywords.map(k => `<span class="panel-keyword-tag">${escapeHtml(k.word)} (${k.count})</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    } else {
+        // 변경 사항
+        contentHtml += `
+            <div class="panel-analysis-section">
+                <h5>📝 변경 사항 요약</h5>
+                <p class="panel-analysis-meta">이전 분석: ${new Date(result.previousAnalyzedAt).toLocaleString('ko-KR')}</p>
+                <ul class="panel-changes-list-detail">
+                    ${result.changes.map(change => {
+                        let changeContent = `<strong>${change.type}</strong>`;
+                        if (change.description) {
+                            changeContent += `: ${escapeHtml(change.description)}`;
+                        }
+                        if (change.keywords) {
+                            changeContent += `<br><span class="panel-change-keywords">${change.keywords.slice(0, 5).map(k => escapeHtml(k)).join(', ')}${change.keywords.length > 5 ? '...' : ''}</span>`;
+                        }
+                        if (change.sheets) {
+                            changeContent += `: ${change.sheets.join(', ')}`;
+                        }
+                        return `<li>${changeContent}</li>`;
+                    }).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // 캐시에서 로드된 경우 표시
+    const cacheInfo = result.fromCache
+        ? `<div class="panel-cache-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                <polyline points="20,6 9,17 4,12"/>
+            </svg>
+            캐시됨 (${new Date(result.cachedAt).toLocaleString('ko-KR')})
+           </div>`
+        : '';
+
+    panelAiInfo.innerHTML = `
+        <div class="panel-document-analysis">
+            <div class="panel-analysis-header">
+                <span class="panel-analysis-icon">📊</span>
+                <h4>문서 변경 요약</h4>
+                ${cacheInfo}
+            </div>
+            <div class="panel-analysis-file">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                </svg>
+                <span>${escapeHtml(result.fileName)}</span>
+                <span class="panel-file-type">${result.documentType}</span>
+            </div>
+            <p class="panel-analysis-time">분석 시간: ${new Date(result.analyzedAt).toLocaleString('ko-KR')}</p>
+            ${contentHtml}
+        </div>
+    `;
 }
 
 // 분석 결과 모달 표시
@@ -3739,57 +3894,132 @@ function initRightPanelResize() {
 initRightPanelResize();
 
 // ========================================
-// 하단 패널 기능
+// 하단 패널 기능 (변경 내역 전용)
 // ========================================
 function initBottomPanel() {
     const bottomPanel = document.getElementById('bottomPanel');
-    const toggleBtn = document.getElementById('toggleBottomPanelBtn');
     const closeBtn = document.getElementById('closeBottomPanelBtn');
-    const panelTabs = document.querySelectorAll('.bottom-panel-tabs .panel-tab');
     const mainContent = document.querySelector('.main-content');
 
     if (!bottomPanel) return;
-
-    // 패널 토글
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => {
-            bottomPanel.classList.toggle('open');
-            toggleBtn.classList.toggle('active', bottomPanel.classList.contains('open'));
-            if (mainContent) {
-                mainContent.classList.toggle('with-bottom-panel', bottomPanel.classList.contains('open'));
-            }
-        });
-    }
 
     // 패널 닫기
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             bottomPanel.classList.remove('open');
-            if (toggleBtn) toggleBtn.classList.remove('active');
             if (mainContent) {
                 mainContent.classList.remove('with-bottom-panel');
             }
+            // 하단 패널 내용 초기화
+            const bottomChanges = document.getElementById('bottomChanges');
+            const bottomPanelFileInfo = document.getElementById('bottomPanelFileInfo');
+            if (bottomChanges) {
+                bottomChanges.innerHTML = `
+                    <div class="changes-empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                            <path d="M9 15h6M12 12v6"/>
+                        </svg>
+                        <p>변경 내역이 여기에 표시됩니다</p>
+                        <span class="changes-hint">모니터링에서 "변경내역 보기" 버튼을 클릭하세요</span>
+                    </div>
+                `;
+            }
+            if (bottomPanelFileInfo) {
+                bottomPanelFileInfo.innerHTML = '';
+            }
         });
     }
-
-    // 탭 전환
-    panelTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.dataset.bottomTab;
-
-            // 탭 활성화 상태 변경
-            panelTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-
-            // 콘텐츠 전환
-            document.getElementById('bottomTerminal').style.display = tabName === 'terminal' ? 'block' : 'none';
-            document.getElementById('bottomOutput').style.display = tabName === 'output' ? 'block' : 'none';
-            document.getElementById('bottomProblems').style.display = tabName === 'problems' ? 'block' : 'none';
-        });
-    });
 }
 
 initBottomPanel();
+
+// ========================================
+// 하단 패널 리사이즈 기능
+// ========================================
+function initBottomPanelResize() {
+    const resizeHandle = document.getElementById('bottomPanelResizeHandle');
+    const bottomPanel = document.getElementById('bottomPanel');
+    const mainContent = document.querySelector('.main-content');
+
+    if (!resizeHandle || !bottomPanel) return;
+
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    const MIN_HEIGHT = 150;
+    const MAX_HEIGHT = window.innerHeight * 0.6; // 화면의 60%까지
+
+    // 저장된 높이 불러오기
+    const savedHeight = localStorage.getItem('bottomPanelHeight');
+    if (savedHeight) {
+        const height = parseInt(savedHeight, 10);
+        if (height >= MIN_HEIGHT && height <= MAX_HEIGHT) {
+            document.documentElement.style.setProperty('--bottom-panel-height', `${height}px`);
+        }
+    }
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = bottomPanel.offsetHeight;
+
+        resizeHandle.classList.add('resizing');
+        document.body.classList.add('resizing-bottom-panel');
+
+        // transition 비활성화
+        bottomPanel.style.transition = 'none';
+
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const deltaY = startY - e.clientY;
+        let newHeight = startHeight + deltaY;
+
+        // 범위 제한
+        newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+
+        // CSS 변수로 높이 설정
+        document.documentElement.style.setProperty('--bottom-panel-height', `${newHeight}px`);
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+
+        isResizing = false;
+        resizeHandle.classList.remove('resizing');
+        document.body.classList.remove('resizing-bottom-panel');
+
+        // transition 다시 활성화
+        bottomPanel.style.transition = '';
+
+        // 높이 저장
+        const currentHeight = bottomPanel.offsetHeight;
+        localStorage.setItem('bottomPanelHeight', currentHeight.toString());
+    });
+
+    // 패널이 열릴 때 리사이즈 핸들 표시
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                if (bottomPanel.classList.contains('open')) {
+                    resizeHandle.classList.add('visible');
+                } else {
+                    resizeHandle.classList.remove('visible');
+                }
+            }
+        });
+    });
+
+    observer.observe(bottomPanel, { attributes: true });
+}
+
+initBottomPanelResize();
 
 // 터미널에 메시지 추가 함수
 function addTerminalLine(text, type = 'info') {

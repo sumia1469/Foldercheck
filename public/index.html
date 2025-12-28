@@ -1058,14 +1058,23 @@
             </div>
         </aside>
 
-        <!-- 하단 패널 -->
+        <!-- 하단 패널 리사이즈 핸들 -->
+        <div class="bottom-panel-resize-handle" id="bottomPanelResizeHandle"></div>
+
+        <!-- 하단 패널 (변경 내역 전용) -->
         <aside class="bottom-panel" id="bottomPanel">
             <div class="bottom-panel-header">
                 <div class="bottom-panel-tabs">
-                    <button class="panel-tab active" data-bottom-tab="terminal">터미널</button>
-                    <button class="panel-tab" data-bottom-tab="output">출력</button>
-                    <button class="panel-tab" data-bottom-tab="problems">문제</button>
+                    <button class="panel-tab active" data-bottom-tab="changes">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                            <path d="M9 15h6M12 12v6"/>
+                        </svg>
+                        변경 내역
+                    </button>
                 </div>
+                <div class="bottom-panel-file-info" id="bottomPanelFileInfo"></div>
                 <button class="bottom-panel-close" id="closeBottomPanelBtn" title="패널 닫기">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1073,25 +1082,15 @@
                     </svg>
                 </button>
             </div>
-            <div class="bottom-panel-content" id="bottomTerminal">
-                <div class="terminal-output" id="terminalOutput">
-                    <div class="terminal-line">
-                        <span class="terminal-prompt">$</span>
-                        <span class="terminal-text">DocWatch 터미널이 준비되었습니다.</span>
-                    </div>
-                </div>
-            </div>
-            <div class="bottom-panel-content" id="bottomOutput" style="display: none;">
-                <div class="output-empty">
-                    <p>출력 내용이 없습니다.</p>
-                </div>
-            </div>
-            <div class="bottom-panel-content" id="bottomProblems" style="display: none;">
-                <div class="problems-empty">
+            <div class="bottom-panel-content" id="bottomChanges">
+                <div class="changes-empty-state">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                        <path d="M9 15h6M12 12v6"/>
                     </svg>
-                    <p>문제가 발견되지 않았습니다.</p>
+                    <p>변경 내역이 여기에 표시됩니다</p>
+                    <span class="changes-hint">모니터링에서 "변경내역 보기" 버튼을 클릭하세요</span>
                 </div>
             </div>
         </aside>

@@ -3218,8 +3218,11 @@ function renderRecordings(recordings) {
                         </div>
                         <div class="audio-seek-container">
                             <input type="range" class="audio-seek-bar" min="0" max="100" value="0"
-                                   oninput="seekAudio(this, '${safeFilename}')"
-                                   onchange="seekAudio(this, '${safeFilename}')">
+                                   onmousedown="isSeekingAudio=true"
+                                   ontouchstart="isSeekingAudio=true"
+                                   onmouseup="isSeekingAudio=false; seekAudio(this, '${safeFilename}')"
+                                   ontouchend="isSeekingAudio=false; seekAudio(this, '${safeFilename}')"
+                                   oninput="updateSeekPreview(this, '${safeFilename}')">
                             <div class="audio-progress-bar"></div>
                         </div>
                     </div>
@@ -3449,7 +3452,28 @@ function updateAudioTimeDisplay() {
     }
 }
 
-// 오디오 위치 변경 (seek)
+// 시크바 드래그 중 미리보기 업데이트 (실제 재생 위치는 변경하지 않음)
+function updateSeekPreview(seekBar, filename) {
+    if (!currentPlayingAudio || currentPlayingFilename !== filename) return;
+
+    const controls = seekBar.closest('.audio-player-controls');
+    if (!controls) return;
+
+    // 프로그레스 바 미리보기 업데이트
+    const progressBar = controls.querySelector('.audio-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = `${seekBar.value}%`;
+    }
+
+    // 시간 표시 미리보기 업데이트
+    const currentTimeEl = controls.querySelector('.current-time');
+    if (currentTimeEl && currentPlayingAudio.duration) {
+        const previewTime = (seekBar.value / 100) * currentPlayingAudio.duration;
+        currentTimeEl.textContent = formatAudioTime(previewTime);
+    }
+}
+
+// 오디오 위치 변경 (seek) - 드래그 완료 시 호출
 function seekAudio(seekBar, filename) {
     if (!currentPlayingAudio || currentPlayingFilename !== filename) return;
 

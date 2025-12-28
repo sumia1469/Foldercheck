@@ -265,7 +265,8 @@ let settings = {
         enabled: false,
         botToken: '',
         chatId: ''
-    }
+    },
+    aiModel: 'qwen2.5:3b'  // 현재 선택된 AI 모델
 };
 let stats = {
     created: 0,
@@ -305,6 +306,11 @@ function loadSettings() {
         if (fs.existsSync(SETTINGS_FILE)) {
             const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
             settings = { ...settings, ...JSON.parse(data) };
+            // AI 모델 설정 로드
+            if (settings.aiModel && AVAILABLE_MODELS[settings.aiModel]) {
+                CURRENT_AI_MODEL = settings.aiModel;
+                console.log(`AI 모델 설정 로드: ${CURRENT_AI_MODEL}`);
+            }
             console.log('고급 설정 로드 완료');
         }
     } catch (e) {
@@ -3182,7 +3188,10 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 CURRENT_AI_MODEL = model;
-                console.log(`AI 모델 변경: ${model}`);
+                // settings에도 저장하여 재시작 후에도 유지
+                settings.aiModel = model;
+                saveSettings();
+                console.log(`AI 모델 변경 및 저장: ${model}`);
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({
                     success: true,

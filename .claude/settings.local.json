@@ -67,7 +67,11 @@
       "Bash(grep -i doc echo \"\" echo \"=== 포트 4400 상태 ===\" lsof -i:4400)",
       "Bash(# 앱 직접 실행하고 출력 캡처 echo \"\"=== DocWatch 앱 직접 실행 ===\"\" /Users/ibyeonghyeon/docwatch/docwatch/dist/mac-arm64/DocWatch.app/Contents/MacOS/DocWatch 2>&1 & PID=$! # 3초 대기 /bin/sleep 3 # 프로세스 상태 확인 if kill -0 $PID ; then echo \"\"앱이 실행 중입니다 \\(PID: $PID\\)\"\" else echo \"\"앱이 종료되었습니다\"\" fi # 포트 확인 echo \"\"\"\" echo \"\"=== 포트 4400 ===\"\" lsof -i:4400)",
       "Bash(# 기존 DocWatch 프로세스 종료 pkill -f \"\"DocWatch\"\" || true sleep 1 # Mac용으로 다시 빌드 cd /Users/ibyeonghyeon/docwatch/docwatch npm run build:mac 2>&1)",
-      "Bash(# 기존 프로세스 종료 pkill -f \"\"DocWatch\"\" || true pkill -f \"\"Electron\"\" || true sleep 2 # 개발 모드에서 테스트 cd /Users/ibyeonghyeon/docwatch/docwatch ./node_modules/electron/dist/Electron.app/Contents/MacOS/Electron . 2>&1 & sleep 5 # 포트 확인 echo \"\"=== 포트 4400 ===\"\" lsof -i :4400 && echo \"\"열림\"\" || echo \"\"안열림\"\" # 로그 확인 echo \"\"\"\" echo \"\"=== 로그 ===\"\" cat logs/docwatch-*.log)"
+      "Bash(# 기존 프로세스 종료 pkill -f \"\"DocWatch\"\" || true pkill -f \"\"Electron\"\" || true sleep 2 # 개발 모드에서 테스트 cd /Users/ibyeonghyeon/docwatch/docwatch ./node_modules/electron/dist/Electron.app/Contents/MacOS/Electron . 2>&1 & sleep 5 # 포트 확인 echo \"\"=== 포트 4400 ===\"\" lsof -i :4400 && echo \"\"열림\"\" || echo \"\"안열림\"\" # 로그 확인 echo \"\"\"\" echo \"\"=== 로그 ===\"\" cat logs/docwatch-*.log)",
+      "Bash(security find-identity:*)",
+      "Bash(export APPLE_ID=\"sumia@naver.com\")",
+      "Bash(export APPLE_APP_PASSWORD=\"wlzk-kave-vkmn-xsgd\")",
+      "Bash(sudo sntp:*)"
     ]
   }
 }

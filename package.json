@@ -13,6 +13,7 @@
   "author": "DocWatch Team",
   "license": "MIT",
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "electron": "^33.4.11",
     "electron-builder": "^24.9.1"
   },
@@ -54,14 +55,31 @@
       "node_modules/**/*"
     ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "icon.icns",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "identity": "BYUNGHYUN LEE (UF9B4Q43XH)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
     },
+    "afterSign": "notarize.js",
     "dmg": {
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   },

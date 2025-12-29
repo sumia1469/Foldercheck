@@ -843,6 +843,30 @@
                             <span class="status-label">상태:</span>
                             <span class="status-value" id="whisperStateSettings">확인 중...</span>
                         </div>
+                        <div class="status-row" id="whisperModelRow">
+                            <span class="status-label">모델:</span>
+                            <span class="status-value" id="whisperModelStatus">-</span>
+                        </div>
+                        <div class="status-row" id="whisperCliRow">
+                            <span class="status-label">CLI:</span>
+                            <span class="status-value" id="whisperCliStatus">-</span>
+                        </div>
+                    </div>
+
+                    <!-- 다운로드 진행 상황 -->
+                    <div id="whisperDownloadProgress" class="download-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="whisperProgressBar" style="width: 0%;"></div>
+                        </div>
+                        <span class="progress-text" id="whisperProgressText">다운로드 중...</span>
+                    </div>
+
+                    <!-- 설치 버튼 -->
+                    <div id="whisperInstallSection" style="margin-top: 15px;">
+                        <button id="whisperInstallBtn" class="btn btn-primary" style="display: none;">
+                            🔽 음성 인식 설치 (~500MB)
+                        </button>
+                        <p class="help-text" id="whisperInstallHelp" style="display: none; margin-top: 10px;"></p>
                     </div>
                 </div>
 

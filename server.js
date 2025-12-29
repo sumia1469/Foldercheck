@@ -42,8 +42,34 @@ const DEV_MODE = process.env.NODE_ENV !== 'production';
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Whisper 설정
-const WHISPER_MODEL_PATH = path.join(__dirname, 'models', 'ggml-small.bin');
-const WHISPER_CLI_PATH = '/opt/homebrew/bin/whisper-cli';
+const MODELS_DIR = path.join(USER_DATA_DIR, 'models');
+const WHISPER_MODEL_PATH = path.join(MODELS_DIR, 'ggml-small.bin');
+const WHISPER_CLI_DIR = path.join(USER_DATA_DIR, 'bin');
+const WHISPER_CLI_PATH = process.platform === 'win32'
+    ? path.join(WHISPER_CLI_DIR, 'whisper.exe')
+    : '/opt/homebrew/bin/whisper-cli';
+
+// 모델 디렉토리 초기화
+if (!fs.existsSync(MODELS_DIR)) {
+    fs.mkdirSync(MODELS_DIR, { recursive: true });
+}
+if (!fs.existsSync(WHISPER_CLI_DIR)) {
+    fs.mkdirSync(WHISPER_CLI_DIR, { recursive: true });
+}
+
+// Whisper 모델 다운로드 URL
+const WHISPER_MODEL_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin';
+const WHISPER_CLI_URLS = {
+    win32: 'https://github.com/ggerganov/whisper.cpp/releases/download/v1.7.3/whisper-bin-x64.zip',
+    darwin: null, // macOS는 homebrew로 설치 권장
+    linux: 'https://github.com/ggerganov/whisper.cpp/releases/download/v1.7.3/whisper-bin-x64.zip'
+};
+
+// 다운로드 진행 상태
+let whisperDownloadProgress = {
+    model: { downloading: false, progress: 0, error: null },
+    cli: { downloading: false, progress: 0, error: null }
+};
 
 // Ollama 설정 (로컬 LLM)
 const OLLAMA_HOST = 'http://localhost:11434';
@@ -175,18 +201,192 @@ let whisperReady = false;
 // Whisper 준비 상태 확인
 function checkWhisperModel() {
     const modelExists = fs.existsSync(WHISPER_MODEL_PATH);
-    const cliExists = fs.existsSync(WHISPER_CLI_PATH);
-    whisperReady = modelExists && cliExists;
+    const cliPath = findWhisperCli();
+    whisperReady = modelExists && cliPath !== null;
     return whisperReady;
+}
+
+// 파일 다운로드 함수 (진행률 콜백 지원)
+function downloadFile(url, destPath, progressCallback) {
+    return new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(destPath);
+
+        const request = (url.startsWith('https') ? https : http).get(url, (response) => {
+            // 리다이렉트 처리
+            if (response.statusCode === 301 || response.statusCode === 302) {
+                file.close();
+                fs.unlinkSync(destPath);
+                return downloadFile(response.headers.location, destPath, progressCallback)
+                    .then(resolve)
+                    .catch(reject);
+            }
+
+            if (response.statusCode !== 200) {
+                file.close();
+                fs.unlinkSync(destPath);
+                reject(new Error(`다운로드 실패: HTTP ${response.statusCode}`));
+                return;
+            }
+
+            const totalSize = parseInt(response.headers['content-length'], 10);
+            let downloadedSize = 0;
+
+            response.on('data', (chunk) => {
+                downloadedSize += chunk.length;
+                if (progressCallback && totalSize) {
+                    const progress = Math.round((downloadedSize / totalSize) * 100);
+                    progressCallback(progress, downloadedSize, totalSize);
+                }
+            });
+
+            response.pipe(file);
+
+            file.on('finish', () => {
+                file.close();
+                resolve(destPath);
+            });
+        });
+
+        request.on('error', (err) => {
+            file.close();
+            if (fs.existsSync(destPath)) {
+                fs.unlinkSync(destPath);
+            }
+            reject(err);
+        });
+
+        request.setTimeout(300000, () => { // 5분 타임아웃
+            request.destroy();
+            reject(new Error('다운로드 시간 초과'));
+        });
+    });
+}
+
+// Whisper 모델 다운로드
+async function downloadWhisperModel(progressCallback) {
+    if (whisperDownloadProgress.model.downloading) {
+        throw new Error('이미 다운로드 중입니다.');
+    }
+
+    whisperDownloadProgress.model = { downloading: true, progress: 0, error: null };
+
+    try {
+        const tempPath = WHISPER_MODEL_PATH + '.tmp';
+
+        await downloadFile(WHISPER_MODEL_URL, tempPath, (progress, downloaded, total) => {
+            whisperDownloadProgress.model.progress = progress;
+            if (progressCallback) {
+                progressCallback({
+                    type: 'model',
+                    progress,
+                    downloaded,
+                    total,
+                    status: `모델 다운로드 중... ${progress}%`
+                });
+            }
+        });
+
+        // 다운로드 완료 후 파일명 변경
+        fs.renameSync(tempPath, WHISPER_MODEL_PATH);
+
+        whisperDownloadProgress.model = { downloading: false, progress: 100, error: null };
+        console.log('Whisper 모델 다운로드 완료:', WHISPER_MODEL_PATH);
+
+        return { success: true, path: WHISPER_MODEL_PATH };
+    } catch (err) {
+        whisperDownloadProgress.model = { downloading: false, progress: 0, error: err.message };
+        throw err;
+    }
+}
+
+// Whisper CLI 다운로드 (Windows용)
+async function downloadWhisperCli(progressCallback) {
+    if (process.platform !== 'win32') {
+        throw new Error('Windows 전용 기능입니다. macOS는 brew install whisper-cpp 명령을 사용하세요.');
+    }
+
+    if (whisperDownloadProgress.cli.downloading) {
+        throw new Error('이미 다운로드 중입니다.');
+    }
+
+    whisperDownloadProgress.cli = { downloading: true, progress: 0, error: null };
+
+    try {
+        const zipPath = path.join(WHISPER_CLI_DIR, 'whisper-cli.zip');
+        const url = WHISPER_CLI_URLS.win32;
+
+        await downloadFile(url, zipPath, (progress, downloaded, total) => {
+            whisperDownloadProgress.cli.progress = progress;
+            if (progressCallback) {
+                progressCallback({
+                    type: 'cli',
+                    progress,
+                    downloaded,
+                    total,
+                    status: `CLI 다운로드 중... ${progress}%`
+                });
+            }
+        });
+
+        // ZIP 압축 해제
+        if (progressCallback) {
+            progressCallback({ type: 'cli', progress: 100, status: '압축 해제 중...' });
+        }
+
+        await fs.createReadStream(zipPath)
+            .pipe(unzipper.Extract({ path: WHISPER_CLI_DIR }))
+            .promise();
+
+        // ZIP 파일 삭제
+        fs.unlinkSync(zipPath);
+
+        // whisper.exe 찾기 및 위치 확인
+        const possibleExePaths = [
+            path.join(WHISPER_CLI_DIR, 'whisper.exe'),
+            path.join(WHISPER_CLI_DIR, 'main.exe'),
+            path.join(WHISPER_CLI_DIR, 'bin', 'whisper.exe'),
+            path.join(WHISPER_CLI_DIR, 'bin', 'main.exe')
+        ];
+
+        let foundExe = null;
+        for (const exePath of possibleExePaths) {
+            if (fs.existsSync(exePath)) {
+                foundExe = exePath;
+                break;
+            }
+        }
+
+        // main.exe를 whisper.exe로 이름 변경
+        if (foundExe && foundExe.includes('main.exe')) {
+            const newPath = foundExe.replace('main.exe', 'whisper.exe');
+            fs.renameSync(foundExe, newPath);
+            foundExe = newPath;
+        }
+
+        whisperDownloadProgress.cli = { downloading: false, progress: 100, error: null };
+        console.log('Whisper CLI 다운로드 완료:', foundExe || WHISPER_CLI_DIR);
+
+        return { success: true, path: foundExe || WHISPER_CLI_DIR };
+    } catch (err) {
+        whisperDownloadProgress.cli = { downloading: false, progress: 0, error: err.message };
+        throw err;
+    }
 }
 
 // Whisper CLI 경로 찾기 (다양한 플랫폼 지원)
 function findWhisperCli() {
     const paths = [
-        '/opt/homebrew/bin/whisper-cli',  // macOS (Apple Silicon)
-        '/usr/local/bin/whisper-cli',      // macOS (Intel) / Linux
-        path.join(__dirname, 'whisper-cpp', 'build', 'bin', 'whisper-cli'),  // 로컬 빌드
-        path.join(__dirname, 'whisper-cli.exe')  // Windows
+        // 다운로드된 위치 (Windows)
+        path.join(WHISPER_CLI_DIR, 'whisper.exe'),
+        path.join(WHISPER_CLI_DIR, 'main.exe'),
+        path.join(WHISPER_CLI_DIR, 'bin', 'whisper.exe'),
+        // macOS (Apple Silicon)
+        '/opt/homebrew/bin/whisper-cli',
+        // macOS (Intel) / Linux
+        '/usr/local/bin/whisper-cli',
+        // 로컬 빌드
+        path.join(__dirname, 'whisper-cpp', 'build', 'bin', 'whisper-cli'),
+        path.join(__dirname, 'whisper-cli.exe')
     ];
 
     for (const p of paths) {
@@ -3355,15 +3555,130 @@ const server = http.createServer(async (req, res) => {
         // API: Whisper 상태
         if (pathname === '/api/whisper/status' && req.method === 'GET') {
             checkWhisperModel();
+            const modelExists = fs.existsSync(WHISPER_MODEL_PATH);
+            const cliPath = findWhisperCli();
+            const cliExists = cliPath !== null;
+
+            let status = '준비됨 (로컬)';
+            if (!modelExists && !cliExists) {
+                status = '모델과 CLI 필요';
+            } else if (!modelExists) {
+                status = '모델 다운로드 필요';
+            } else if (!cliExists) {
+                status = 'CLI 설치 필요';
+            }
+
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 ready: whisperReady,
-                status: whisperReady ? '준비됨 (로컬)' : '모델 파일 필요',
+                status,
                 model: 'ggml-small',
                 local: true,
                 modelPath: WHISPER_MODEL_PATH,
-                modelExists: whisperReady
+                modelExists,
+                cliPath,
+                cliExists,
+                platform: process.platform,
+                downloadProgress: whisperDownloadProgress
             }));
+            return;
+        }
+
+        // API: Whisper 모델 다운로드
+        if (pathname === '/api/whisper/download/model' && req.method === 'POST') {
+            try {
+                if (fs.existsSync(WHISPER_MODEL_PATH)) {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, message: '모델이 이미 존재합니다.', path: WHISPER_MODEL_PATH }));
+                    return;
+                }
+
+                // 비동기로 다운로드 시작
+                downloadWhisperModel().catch(err => {
+                    console.error('모델 다운로드 오류:', err);
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, message: '다운로드가 시작되었습니다.', downloading: true }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+            return;
+        }
+
+        // API: Whisper CLI 다운로드 (Windows용)
+        if (pathname === '/api/whisper/download/cli' && req.method === 'POST') {
+            try {
+                if (process.platform !== 'win32') {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: 'Windows 전용 기능입니다.',
+                        message: 'macOS: brew install whisper-cpp\nLinux: 패키지 관리자를 사용하세요.'
+                    }));
+                    return;
+                }
+
+                const existingCli = findWhisperCli();
+                if (existingCli) {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, message: 'CLI가 이미 존재합니다.', path: existingCli }));
+                    return;
+                }
+
+                // 비동기로 다운로드 시작
+                downloadWhisperCli().catch(err => {
+                    console.error('CLI 다운로드 오류:', err);
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, message: '다운로드가 시작되었습니다.', downloading: true }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+            return;
+        }
+
+        // API: Whisper 전체 설치 (모델 + CLI)
+        if (pathname === '/api/whisper/install' && req.method === 'POST') {
+            try {
+                const results = { model: null, cli: null };
+                const modelExists = fs.existsSync(WHISPER_MODEL_PATH);
+                const cliExists = findWhisperCli() !== null;
+
+                // 모델 다운로드
+                if (!modelExists) {
+                    downloadWhisperModel().catch(err => console.error('모델 다운로드 오류:', err));
+                    results.model = { downloading: true };
+                } else {
+                    results.model = { exists: true };
+                }
+
+                // CLI 다운로드 (Windows만)
+                if (process.platform === 'win32' && !cliExists) {
+                    downloadWhisperCli().catch(err => console.error('CLI 다운로드 오류:', err));
+                    results.cli = { downloading: true };
+                } else if (cliExists) {
+                    results.cli = { exists: true };
+                } else {
+                    results.cli = { message: 'macOS/Linux는 수동 설치 필요' };
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, results }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+            return;
+        }
+
+        // API: Whisper 다운로드 진행 상황
+        if (pathname === '/api/whisper/download/progress' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(whisperDownloadProgress));
             return;
         }
 

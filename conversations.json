@@ -1,5 +1,28 @@
 [
   {
+    "id": "conv_1766968661176",
+    "title": "현재 상태 알려줘",
+    "messages": [
+      {
+        "role": "user",
+        "content": "현재 상태 알려줘",
+        "timestamp": "2025-12-29T00:37:41.204Z"
+      },
+      {
+        "role": "user",
+        "content": "감시 중인 폴더 보여줘",
+        "timestamp": "2025-12-29T00:37:43.729Z"
+      },
+      {
+        "role": "assistant",
+        "content": "응답 생성 실패",
+        "timestamp": "2025-12-29T00:37:43.735Z"
+      }
+    ],
+    "createdAt": "2025-12-29T00:37:41.176Z",
+    "updatedAt": "2025-12-29T00:37:43.735Z"
+  },
+  {
     "id": "conv_1766927948338",
     "title": "감시 중인 폴더 보여줘",
     "messages": [

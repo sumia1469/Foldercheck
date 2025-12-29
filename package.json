@@ -25,8 +25,7 @@
     "productName": "DocWatch",
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "icon.ico",
       "signAndEditExecutable": false
@@ -49,24 +48,27 @@
       "server.js",
       "license.js",
       "public/**/*",
-      "folderList.json",
-      "settings.json",
-      "docHistory.json",
       "templates/**/*",
-      "meetings/**/*",
-      "models/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/.cache/**/*"
     ],
     "extraResources": [
       {
-        "from": "resources/ollama",
-        "to": "ollama",
+        "from": "bin",
+        "to": "bin",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "models",
+        "to": "models",
         "filter": ["**/*"]
       }
     ],
     "asar": true,
     "asarUnpack": [
-      "resources/ollama/**/*"
+      "node_modules/ffmpeg-static/**/*"
     ],
     "mac": {
       "target": [

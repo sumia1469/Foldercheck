@@ -98,6 +98,92 @@ console.log('=== DocWatch 시작 ===');
 console.log(`로그 파일: ${LOG_FILE}`);
 console.log(`앱 패키징 여부: ${isPackaged}`);
 
+// ===== 첫 실행 시 자동 설정 =====
+
+// 리소스 복사 함수 (재귀)
+function copyFolderSync(src, dest) {
+    if (!fs.existsSync(src)) return false;
+    if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest, { recursive: true });
+    }
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+            copyFolderSync(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
+    }
+    return true;
+}
+
+// 첫 실행 시 번들된 리소스를 사용자 데이터 폴더로 복사
+async function setupBundledResources() {
+    const userDataDir = getUserDataDir();
+    const setupFlagFile = path.join(userDataDir, '.setup_complete');
+
+    // 이미 설정 완료되었으면 스킵
+    if (fs.existsSync(setupFlagFile)) {
+        console.log('이미 초기 설정이 완료되었습니다.');
+        return;
+    }
+
+    console.log('첫 실행 감지 - 리소스 설정 시작...');
+
+    // 사용자 데이터 디렉토리 생성
+    if (!fs.existsSync(userDataDir)) {
+        fs.mkdirSync(userDataDir, { recursive: true });
+    }
+
+    // 번들된 리소스 경로 (패키징된 경우)
+    const resourcesPath = isPackaged ? process.resourcesPath : __dirname;
+
+    // 1. Whisper 모델 복사
+    const bundledModelsDir = path.join(resourcesPath, 'models');
+    const userModelsDir = path.join(userDataDir, 'models');
+    if (fs.existsSync(bundledModelsDir)) {
+        console.log('Whisper 모델 복사 중...');
+        copyFolderSync(bundledModelsDir, userModelsDir);
+        console.log('Whisper 모델 복사 완료');
+    }
+
+    // 2. Whisper CLI 복사 (Windows)
+    const bundledBinDir = path.join(resourcesPath, 'bin');
+    const userBinDir = path.join(userDataDir, 'bin');
+    if (fs.existsSync(bundledBinDir)) {
+        console.log('Whisper CLI 복사 중...');
+        copyFolderSync(bundledBinDir, userBinDir);
+        console.log('Whisper CLI 복사 완료');
+    }
+
+    // 3. 템플릿 복사
+    const bundledTemplatesDir = path.join(resourcesPath, 'templates');
+    const userTemplatesDir = path.join(userDataDir, 'templates');
+    if (fs.existsSync(bundledTemplatesDir) && !fs.existsSync(userTemplatesDir)) {
+        console.log('템플릿 복사 중...');
+        copyFolderSync(bundledTemplatesDir, userTemplatesDir);
+        console.log('템플릿 복사 완료');
+    }
+
+    // 4. 회의록 폴더 생성
+    const meetingsDir = path.join(userDataDir, 'meetings');
+    if (!fs.existsSync(meetingsDir)) {
+        fs.mkdirSync(meetingsDir, { recursive: true });
+    }
+
+    // 5. 녹음 폴더 생성
+    const recordingsDir = path.join(userDataDir, 'recordings');
+    if (!fs.existsSync(recordingsDir)) {
+        fs.mkdirSync(recordingsDir, { recursive: true });
+    }
+
+    // 설정 완료 플래그 생성
+    fs.writeFileSync(setupFlagFile, new Date().toISOString());
+    console.log('초기 설정 완료!');
+}
+
 // ===== 내장 Ollama 관련 함수 =====
 
 // 내장 Ollama 경로 반환
@@ -578,6 +664,9 @@ if (!gotTheLock) {
         console.log('App ready, starting server...');
         console.log('__dirname:', __dirname);
         console.log('process.resourcesPath:', process.resourcesPath);
+
+        // 첫 실행 시 번들된 리소스 설정 (Whisper 모델, CLI 등)
+        await setupBundledResources();
 
         // macOS 마이크 권한 요청
         if (process.platform === 'darwin') {

@@ -2007,14 +2007,22 @@ async function startRecording() {
             meetingTitleInput.value = `${dateStr} ${timeStr} 회의`;
         }
 
-        // 마이크 권한 요청
-        audioStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                sampleRate: 44100
-            }
-        });
+        // 마이크 권한 요청 (권한 요청 후에야 장치 목록을 제대로 가져올 수 있음)
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+            });
+        } catch (err) {
+            // 기본 설정 실패 시 최소 설정으로 재시도
+            console.log('기본 마이크 설정 실패, 최소 설정으로 재시도:', err.message);
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+
+        console.log('마이크 연결 성공');
 
         // 오디오 컨텍스트 및 분석기 설정
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -2083,11 +2091,19 @@ async function startRecording() {
         console.log('녹음 시작');
     } catch (error) {
         console.error('녹음 시작 실패:', error);
+        let errorMsg = '녹음을 시작할 수 없습니다.\n\n';
+
         if (error.name === 'NotAllowedError') {
-            alert('마이크 사용 권한이 필요합니다.\n브라우저 설정에서 마이크 권한을 허용해주세요.');
+            errorMsg += '마이크 사용 권한이 거부되었습니다.\n시스템 설정에서 마이크 권한을 허용해주세요.';
+        } else if (error.name === 'NotFoundError' || error.message.includes('Requested device not found')) {
+            errorMsg += '마이크를 찾을 수 없습니다.\n\n• 마이크가 연결되어 있는지 확인해주세요\n• 다른 프로그램이 마이크를 사용 중인지 확인해주세요\n• 시스템 설정에서 마이크가 활성화되어 있는지 확인해주세요';
+        } else if (error.name === 'NotReadableError') {
+            errorMsg += '마이크가 다른 프로그램에서 사용 중입니다.\n다른 프로그램을 종료 후 다시 시도해주세요.';
         } else {
-            alert('녹음을 시작할 수 없습니다: ' + error.message);
+            errorMsg += error.message;
         }
+
+        alert(errorMsg);
     }
 }
 
@@ -3133,8 +3149,21 @@ function updateSummarizingOverlay(text, percent) {
     const progressBar = document.getElementById('summarizingProgressBar');
     const percentText = document.getElementById('summarizingPercent');
     if (detail) detail.textContent = text;
-    if (progressBar) progressBar.style.width = `${percent}%`;
-    if (percentText) percentText.textContent = `${Math.round(percent)}%`;
+
+    // percent가 -1이면 시간 기반 진행률 (무한 애니메이션)
+    if (percent < 0) {
+        if (progressBar) {
+            progressBar.style.width = '100%';
+            progressBar.style.animation = 'progress-pulse 1.5s ease-in-out infinite';
+        }
+        if (percentText) percentText.textContent = text;
+    } else {
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+            progressBar.style.animation = 'none';
+        }
+        if (percentText) percentText.textContent = `${Math.round(percent)}%`;
+    }
 }
 
 function hideSummarizingOverlay() {

@@ -515,7 +515,22 @@ async function transcribeAudio(audioPath) {
 
         whisperProcess.stderr.on('data', (data) => {
             stderr += data;
-            console.log('음성 인식:', data.trim());
+            const line = data.trim();
+            console.log('음성 인식:', line);
+
+            // whisper.cpp 진행률 파싱 (예: "whisper_print_progress_callback: progress = 45%")
+            const progressMatch = line.match(/progress\s*=?\s*(\d+)%/i);
+            if (progressMatch) {
+                const percent = parseInt(progressMatch[1]);
+                updateProgress('음성 인식 중', percent, `${percent}% 완료`);
+            }
+            // 시간 기반 진행률 파싱 (예: "[00:30.000 --> 00:35.000]")
+            const timeMatch = line.match(/\[(\d+):(\d+)/);
+            if (timeMatch && !progressMatch) {
+                const minutes = parseInt(timeMatch[1]);
+                const seconds = parseInt(timeMatch[2]);
+                updateProgress('음성 인식 중', -1, `${minutes}분 ${seconds}초 처리 중...`);
+            }
         });
 
         whisperProcess.on('close', (code) => {

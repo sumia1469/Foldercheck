@@ -1,5 +1,5 @@
 // Electron 메인 프로세스
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, systemPreferences } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, systemPreferences, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -462,6 +462,24 @@ function waitForServer(port, timeout = 30000) {
 }
 
 function createWindow() {
+    // 미디어 장치(마이크, 카메라) 권한 자동 허용
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+        const allowedPermissions = ['media', 'mediaKeySystem', 'geolocation', 'notifications', 'midi', 'midiSysex'];
+        if (allowedPermissions.includes(permission)) {
+            callback(true);
+        } else {
+            callback(false);
+        }
+    });
+
+    // 미디어 권한 체크 핸들러 (Electron 12+)
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+        if (permission === 'media') {
+            return true;
+        }
+        return true;
+    });
+
     mainWindow = new BrowserWindow({
         width: 1000,
         height: 700,

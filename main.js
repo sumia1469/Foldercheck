@@ -6,6 +6,15 @@ const os = require('os');
 const { execSync, spawn } = require('child_process');
 const net = require('net');
 
+// Windows 콘솔 UTF-8 인코딩 설정
+if (process.platform === 'win32') {
+    try {
+        execSync('chcp 65001', { stdio: 'ignore' });
+    } catch (e) {
+        // 무시
+    }
+}
+
 let mainWindow;
 let tray;
 let ollamaProcess = null; // 내장 Ollama 프로세스
@@ -46,7 +55,7 @@ function writeLog(level, message) {
     const timestamp = new Date().toISOString();
     const logLine = `[${timestamp}] [${level}] ${message}`;
     try {
-        fs.appendFileSync(LOG_FILE, logLine + '\n');
+        fs.appendFileSync(LOG_FILE, logLine + '\n', { encoding: 'utf8' });
     } catch (e) {
         // 로그 쓰기 실패 시 무시
     }

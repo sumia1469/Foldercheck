@@ -10,6 +10,15 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
 const { execSync, spawn } = require('child_process');
 
+// Windows 콘솔 UTF-8 인코딩 설정
+if (process.platform === 'win32') {
+    try {
+        execSync('chcp 65001', { stdio: 'ignore' });
+    } catch (e) {
+        // 무시
+    }
+}
+
 // 라이선스 모듈
 const license = require('./license');
 

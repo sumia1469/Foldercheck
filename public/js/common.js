@@ -3187,7 +3187,7 @@ async function checkWhisperStatus() {
 
         if (modelStatus) {
             if (data.modelExists) {
-                modelStatus.textContent = '설치됨 (ggml-small)';
+                modelStatus.textContent = '설치됨';
                 modelStatus.style.color = 'var(--success)';
             } else if (data.downloadProgress?.model?.downloading) {
                 modelStatus.textContent = `다운로드 중... ${data.downloadProgress.model.progress}%`;

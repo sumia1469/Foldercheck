@@ -93,7 +93,8 @@
       "Bash(where:*)",
       "Bash(cmd /c \"dir C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\docwatch 2>nul\")",
       "Bash(cmd /c \"dir /s /b C:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\\\\win-unpacked\\\\resources\\\\ollama* 2>nul\")",
-      "Bash(powershell -Command \"\\(Get-ChildItem -Path ''C:\\\\Users\\\\D101\\\\.ollama\\\\models'' -Recurse | Measure-Object -Property Length -Sum\\).Sum / 1GB\")"
+      "Bash(powershell -Command \"\\(Get-ChildItem -Path ''C:\\\\Users\\\\D101\\\\.ollama\\\\models'' -Recurse | Measure-Object -Property Length -Sum\\).Sum / 1GB\")",
+      "Bash(cmd /c \"taskkill /F /IM DocWatch.exe /T\")"
     ]
   }
 }

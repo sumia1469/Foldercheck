@@ -87,7 +87,8 @@
       "Bash(node_modules\\\\.bin\\\\electron.cmd --version)",
       "Bash(cmd /c \"node_modules\\\\.bin\\\\electron.cmd --version\")",
       "Bash(cmd /c \"npm start\")",
-      "Bash(cmd /c \"ping -n 10 localhost >nul && tasklist | findstr electron\")"
+      "Bash(cmd /c \"ping -n 10 localhost >nul && tasklist | findstr electron\")",
+      "Bash(node --check:*)"
     ]
   }
 }

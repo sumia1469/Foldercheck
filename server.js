@@ -405,7 +405,12 @@ async function downloadWhisperCli(progressCallback) {
 // Whisper CLI 경로 찾기 (다양한 플랫폼 지원)
 function findWhisperCli() {
     const paths = [
-        // 다운로드된 위치 (Windows)
+        // 다운로드된 위치 (Windows) - Release 폴더 내
+        path.join(WHISPER_CLI_DIR, 'Release', 'whisper-cli.exe'),
+        path.join(WHISPER_CLI_DIR, 'Release', 'main.exe'),
+        path.join(WHISPER_CLI_DIR, 'Release', 'whisper.exe'),
+        // 다운로드된 위치 (Windows) - 직접
+        path.join(WHISPER_CLI_DIR, 'whisper-cli.exe'),
         path.join(WHISPER_CLI_DIR, 'whisper.exe'),
         path.join(WHISPER_CLI_DIR, 'main.exe'),
         path.join(WHISPER_CLI_DIR, 'bin', 'whisper.exe'),
@@ -479,6 +484,11 @@ async function transcribeAudio(audioPath) {
 
     // whisper-cli로 음성 인식 (JSON 출력)
     return new Promise((resolve, reject) => {
+        const cliPath = findWhisperCli();
+        if (!cliPath) {
+            return reject(new Error('Whisper CLI를 찾을 수 없습니다. 설정에서 음성 인식을 설치해주세요.'));
+        }
+
         const args = [
             '-m', WHISPER_MODEL_PATH,
             '-f', wavPath,
@@ -487,9 +497,9 @@ async function transcribeAudio(audioPath) {
             '-pp'   // 진행상황 표시
         ];
 
-        console.log('실행 명령:', WHISPER_CLI_PATH, args.join(' '));
+        console.log('실행 명령:', cliPath, args.join(' '));
 
-        const whisperProcess = spawn(WHISPER_CLI_PATH, args, {
+        const whisperProcess = spawn(cliPath, args, {
             env: { ...process.env, LANG: 'ko_KR.UTF-8', LC_ALL: 'ko_KR.UTF-8' }
         });
         let stdout = '';

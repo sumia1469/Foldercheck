@@ -89,7 +89,8 @@
       "Bash(cmd /c \"npm start\")",
       "Bash(cmd /c \"ping -n 10 localhost >nul && tasklist | findstr electron\")",
       "Bash(node --check:*)",
-      "Bash(npm run build:win:*)"
+      "Bash(npm run build:win:*)",
+      "Bash(where:*)"
     ]
   }
 }

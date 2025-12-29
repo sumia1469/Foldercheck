@@ -64,6 +64,11 @@
         "from": "models",
         "to": "models",
         "filter": ["**/*"]
+      },
+      {
+        "from": "resources/ollama",
+        "to": "ollama",
+        "filter": ["**/*"]
       }
     ],
     "asar": true,

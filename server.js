@@ -3294,31 +3294,41 @@ const server = http.createServer(async (req, res) => {
             }
 
             try {
-                const { exec } = require('child_process');
+                const { exec, spawn } = require('child_process');
                 const platform = process.platform;
-                let command;
 
                 if (platform === 'darwin') {
                     // macOS
-                    command = `open "${folder}"`;
+                    exec(`open "${folder}"`, (error) => {
+                        if (error) {
+                            console.error('폴더 열기 실패:', error);
+                            res.writeHead(500, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: '폴더를 열 수 없습니다' }));
+                        } else {
+                            res.writeHead(200, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ success: true }));
+                        }
+                    });
                 } else if (platform === 'win32') {
-                    // Windows
-                    command = `explorer "${folder}"`;
+                    // Windows: spawn을 사용하여 경로 문제 해결
+                    const explorer = spawn('explorer', [folder], { shell: true, detached: true, stdio: 'ignore' });
+                    explorer.unref();
+                    // explorer는 종료 코드 1을 반환할 수 있으므로 성공으로 처리
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
                 } else {
                     // Linux
-                    command = `xdg-open "${folder}"`;
+                    exec(`xdg-open "${folder}"`, (error) => {
+                        if (error) {
+                            console.error('폴더 열기 실패:', error);
+                            res.writeHead(500, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: '폴더를 열 수 없습니다' }));
+                        } else {
+                            res.writeHead(200, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ success: true }));
+                        }
+                    });
                 }
-
-                exec(command, (error) => {
-                    if (error) {
-                        console.error('폴더 열기 실패:', error);
-                        res.writeHead(500, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: '폴더를 열 수 없습니다' }));
-                    } else {
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ success: true }));
-                    }
-                });
             } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: e.message }));
@@ -3336,32 +3346,42 @@ const server = http.createServer(async (req, res) => {
             }
 
             try {
-                const { exec } = require('child_process');
+                const { exec, spawn } = require('child_process');
                 const platform = process.platform;
-                let command;
 
                 if (platform === 'darwin') {
                     // macOS: Finder에서 파일 선택 상태로 열기
-                    command = `open -R "${file}"`;
+                    exec(`open -R "${file}"`, (error) => {
+                        if (error) {
+                            console.error('파일 열기 실패:', error);
+                            res.writeHead(500, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: '파일을 열 수 없습니다' }));
+                        } else {
+                            res.writeHead(200, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ success: true }));
+                        }
+                    });
                 } else if (platform === 'win32') {
-                    // Windows: 탐색기에서 파일 선택 상태로 열기
-                    command = `explorer /select,"${file}"`;
+                    // Windows: spawn을 사용하여 파일 선택 상태로 열기
+                    const explorer = spawn('explorer', ['/select,', file], { shell: true, detached: true, stdio: 'ignore' });
+                    explorer.unref();
+                    // explorer는 종료 코드 1을 반환할 수 있으므로 성공으로 처리
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
                 } else {
                     // Linux: 파일이 있는 폴더 열기
                     const folderPath = path.dirname(file);
-                    command = `xdg-open "${folderPath}"`;
+                    exec(`xdg-open "${folderPath}"`, (error) => {
+                        if (error) {
+                            console.error('파일 열기 실패:', error);
+                            res.writeHead(500, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: '파일을 열 수 없습니다' }));
+                        } else {
+                            res.writeHead(200, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ success: true }));
+                        }
+                    });
                 }
-
-                exec(command, (error) => {
-                    if (error) {
-                        console.error('파일 열기 실패:', error);
-                        res.writeHead(500, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: '파일을 열 수 없습니다' }));
-                    } else {
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ success: true }));
-                    }
-                });
             } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: e.message }));

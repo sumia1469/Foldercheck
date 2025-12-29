@@ -3579,13 +3579,18 @@ body:has(.web-warning) .app-container {
 ======================================== */
 .titlebar-left-actions {
     position: absolute;
-    left: 80px;
+    left: 8px; /* Windows: 좌측 끝 */
     top: 0;
     height: 100%;
     display: flex;
     align-items: center;
     gap: 4px;
     -webkit-app-region: no-drag;
+}
+
+/* macOS: 신호등 버튼 피해서 배치 */
+.is-mac .titlebar-left-actions {
+    left: 80px;
 }
 
 .titlebar-actions {

@@ -1235,17 +1235,26 @@ async function loadAiModelStatus() {
             }
         }
 
-        // 설치 버튼 표시/숨김 (내장 AI 실행 중이고 모델 없을 때만)
-        if (installBtn) {
-            if (status.ollamaRunning && !status.hasModel) {
-                installBtn.style.display = 'inline-block';
-            } else {
-                installBtn.style.display = 'none';
+        // 다운로드 진행 상황 확인
+        const progress = await checkOllamaDownloadProgress();
+
+        // 다운로드 중이면 인라인 박스 표시, 버튼 숨김
+        if (progress && progress.downloading) {
+            if (installBtn) installBtn.style.display = 'none';
+            InlineDownload.show('ollama', 'AI 모델 설치 중', progress.status || '다운로드 중...');
+            InlineDownload.update('ollama', `${progress.status || '다운로드 중...'} (${progress.progress}%)`, progress.progress);
+            // 폴링 시작
+            startOllamaProgressPolling();
+        } else {
+            // 설치 버튼 표시/숨김 (내장 AI 실행 중이고 모델 없을 때만)
+            if (installBtn) {
+                if (status.ollamaRunning && !status.hasModel) {
+                    installBtn.style.display = 'inline-block';
+                } else {
+                    installBtn.style.display = 'none';
+                }
             }
         }
-
-        // 다운로드 진행 상황 확인
-        await checkOllamaDownloadProgress();
 
         return status;
     } catch (e) {
@@ -1259,39 +1268,11 @@ async function loadAiModelStatus() {
     }
 }
 
-// 내장 AI 모델 다운로드 진행 상황 확인
+// 내장 AI 모델 다운로드 진행 상황 확인 (데이터만 반환)
 async function checkOllamaDownloadProgress() {
     try {
         const res = await fetch('/api/ollama/pull/progress');
         const progress = await res.json();
-
-        const progressDiv = document.getElementById('ollamaDownloadProgress');
-        const progressBar = document.getElementById('ollamaProgressBar');
-        const progressText = document.getElementById('ollamaProgressText');
-        const installBtn = document.getElementById('ollamaInstallBtn');
-        const aiStatusEl = document.getElementById('ollamaStatus');
-
-        if (progress.downloading) {
-            if (progressDiv) progressDiv.style.display = 'block';
-            if (progressBar) progressBar.style.width = `${progress.progress}%`;
-            if (progressText) progressText.textContent = `${progress.status} (${progress.progress}%)`;
-            if (installBtn) {
-                installBtn.style.display = 'inline-block';
-                installBtn.disabled = true;
-                installBtn.textContent = '⏳ 다운로드 중...';
-            }
-            if (aiStatusEl) {
-                aiStatusEl.textContent = `다운로드 중 ${progress.progress}%`;
-                aiStatusEl.style.color = 'var(--info)';
-            }
-        } else {
-            if (progressDiv) progressDiv.style.display = 'none';
-            if (installBtn) {
-                installBtn.disabled = false;
-                installBtn.textContent = '🔽 AI 모델 설치 (~2GB)';
-            }
-        }
-
         return progress;
     } catch (e) {
         return null;
@@ -3433,46 +3414,43 @@ async function checkWhisperStatus() {
             }
         }
 
-        // 설치 버튼 표시/숨김
-        if (installBtn) {
-            const needsInstall = !data.modelExists || (!data.cliExists && data.platform === 'win32');
-            const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
+        // 다운로드 진행 상황 확인
+        const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
 
-            if (needsInstall && !isDownloading) {
-                installBtn.style.display = 'inline-block';
-                installBtn.disabled = false;
-                installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
-            } else if (isDownloading) {
-                installBtn.style.display = 'inline-block';
-                installBtn.disabled = true;
-                installBtn.textContent = '⏳ 다운로드 중...';
+        if (isDownloading) {
+            // 다운로드 중이면 인라인 박스 표시, 버튼 숨김
+            if (installBtn) installBtn.style.display = 'none';
+
+            const modelProgress = data.downloadProgress?.model?.progress || 0;
+            const cliProgress = data.downloadProgress?.cli?.progress || 0;
+            const modelDownloading = data.downloadProgress?.model?.downloading;
+
+            let statusText = '다운로드 중...';
+            let totalProgress = 0;
+
+            if (modelDownloading) {
+                statusText = '음성 인식 모델 다운로드 중...';
+                totalProgress = modelProgress;
             } else {
-                installBtn.style.display = 'none';
+                statusText = 'CLI 도구 다운로드 중...';
+                totalProgress = cliProgress;
             }
-        }
 
-        // 진행 상황 표시
-        if (progressDiv) {
-            const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
-            if (isDownloading) {
-                progressDiv.style.display = 'block';
-                const progressBar = document.getElementById('whisperProgressBar');
-                const progressText = document.getElementById('whisperProgressText');
-
-                const modelProgress = data.downloadProgress?.model?.progress || 0;
-                const cliProgress = data.downloadProgress?.cli?.progress || 0;
-                const totalProgress = Math.max(modelProgress, cliProgress);
-
-                if (progressBar) progressBar.style.width = `${totalProgress}%`;
-                if (progressText) {
-                    if (data.downloadProgress?.model?.downloading) {
-                        progressText.textContent = `모델 다운로드 중... ${modelProgress}%`;
-                    } else if (data.downloadProgress?.cli?.downloading) {
-                        progressText.textContent = `CLI 다운로드 중... ${cliProgress}%`;
-                    }
+            InlineDownload.show('whisper', '음성 인식 설치 중', statusText);
+            InlineDownload.update('whisper', statusText, totalProgress);
+            // 폴링 시작
+            startWhisperProgressPolling();
+        } else {
+            // 설치 버튼 표시/숨김
+            if (installBtn) {
+                const needsInstall = !data.modelExists || (!data.cliExists && data.platform === 'win32');
+                if (needsInstall) {
+                    installBtn.style.display = 'inline-block';
+                    installBtn.disabled = false;
+                    installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
+                } else {
+                    installBtn.style.display = 'none';
                 }
-            } else {
-                progressDiv.style.display = 'none';
             }
         }
 

@@ -4,8 +4,11 @@
   "description": "기획자를 위한 로컬 업무 자동화 도구 - 폴더 감시부터 회의록까지",
   "main": "main.js",
   "scripts": {
-    "start": "./start-app.sh",
-    "build": "electron-builder --win",
+    "start": "electron .",
+    "start:win": "electron .",
+    "start:mac": "./start-app.sh",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac",
     "build:portable": "electron-builder --win portable"

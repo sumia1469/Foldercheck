@@ -3155,6 +3155,8 @@ async function checkWhisperStatus() {
     try {
         const res = await fetch('/api/whisper/status');
         const data = await res.json();
+
+        // 메인 상태 표시
         if (whisperStatus) {
             if (data.ready) {
                 whisperStatus.textContent = '준비됨';
@@ -3164,13 +3166,181 @@ async function checkWhisperStatus() {
                 whisperStatus.style.color = 'var(--warning)';
             }
         }
+
+        // 설정 페이지 상세 상태
+        const stateSettings = document.getElementById('whisperStateSettings');
+        const modelStatus = document.getElementById('whisperModelStatus');
+        const cliStatus = document.getElementById('whisperCliStatus');
+        const installBtn = document.getElementById('whisperInstallBtn');
+        const installHelp = document.getElementById('whisperInstallHelp');
+        const progressDiv = document.getElementById('whisperDownloadProgress');
+
+        if (stateSettings) {
+            if (data.ready) {
+                stateSettings.textContent = '준비됨';
+                stateSettings.style.color = 'var(--success)';
+            } else {
+                stateSettings.textContent = data.status || '설치 필요';
+                stateSettings.style.color = 'var(--warning)';
+            }
+        }
+
+        if (modelStatus) {
+            if (data.modelExists) {
+                modelStatus.textContent = '설치됨 (ggml-small)';
+                modelStatus.style.color = 'var(--success)';
+            } else if (data.downloadProgress?.model?.downloading) {
+                modelStatus.textContent = `다운로드 중... ${data.downloadProgress.model.progress}%`;
+                modelStatus.style.color = 'var(--info)';
+            } else {
+                modelStatus.textContent = '설치 필요';
+                modelStatus.style.color = 'var(--warning)';
+            }
+        }
+
+        if (cliStatus) {
+            if (data.cliExists) {
+                cliStatus.textContent = '설치됨';
+                cliStatus.style.color = 'var(--success)';
+            } else if (data.platform === 'darwin') {
+                cliStatus.textContent = 'brew install whisper-cpp 필요';
+                cliStatus.style.color = 'var(--warning)';
+            } else if (data.downloadProgress?.cli?.downloading) {
+                cliStatus.textContent = `다운로드 중... ${data.downloadProgress.cli.progress}%`;
+                cliStatus.style.color = 'var(--info)';
+            } else {
+                cliStatus.textContent = '설치 필요';
+                cliStatus.style.color = 'var(--warning)';
+            }
+        }
+
+        // 설치 버튼 표시/숨김
+        if (installBtn) {
+            const needsInstall = !data.modelExists || (!data.cliExists && data.platform === 'win32');
+            const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
+
+            if (needsInstall && !isDownloading) {
+                installBtn.style.display = 'inline-block';
+                installBtn.disabled = false;
+                installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
+            } else if (isDownloading) {
+                installBtn.style.display = 'inline-block';
+                installBtn.disabled = true;
+                installBtn.textContent = '⏳ 다운로드 중...';
+            } else {
+                installBtn.style.display = 'none';
+            }
+        }
+
+        // 진행 상황 표시
+        if (progressDiv) {
+            const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
+            if (isDownloading) {
+                progressDiv.style.display = 'block';
+                const progressBar = document.getElementById('whisperProgressBar');
+                const progressText = document.getElementById('whisperProgressText');
+
+                const modelProgress = data.downloadProgress?.model?.progress || 0;
+                const cliProgress = data.downloadProgress?.cli?.progress || 0;
+                const totalProgress = Math.max(modelProgress, cliProgress);
+
+                if (progressBar) progressBar.style.width = `${totalProgress}%`;
+                if (progressText) {
+                    if (data.downloadProgress?.model?.downloading) {
+                        progressText.textContent = `모델 다운로드 중... ${modelProgress}%`;
+                    } else if (data.downloadProgress?.cli?.downloading) {
+                        progressText.textContent = `CLI 다운로드 중... ${cliProgress}%`;
+                    }
+                }
+            } else {
+                progressDiv.style.display = 'none';
+            }
+        }
+
+        // macOS 안내
+        if (installHelp && data.platform === 'darwin' && !data.cliExists) {
+            installHelp.style.display = 'block';
+            installHelp.innerHTML = 'macOS에서 CLI 설치: <code>brew install whisper-cpp</code>';
+        } else if (installHelp) {
+            installHelp.style.display = 'none';
+        }
+
+        return data;
     } catch (e) {
         if (whisperStatus) {
             whisperStatus.textContent = '연결 오류';
             whisperStatus.style.color = 'var(--danger)';
         }
+        return null;
     }
 }
+
+// Whisper 설치 시작
+async function installWhisper() {
+    const installBtn = document.getElementById('whisperInstallBtn');
+    if (installBtn) {
+        installBtn.disabled = true;
+        installBtn.textContent = '⏳ 설치 시작 중...';
+    }
+
+    try {
+        const res = await fetch('/api/whisper/install', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            // 진행 상황 폴링 시작
+            startWhisperProgressPolling();
+        } else {
+            alert('설치 시작 실패: ' + (data.error || '알 수 없는 오류'));
+            if (installBtn) {
+                installBtn.disabled = false;
+                installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
+            }
+        }
+    } catch (e) {
+        alert('설치 요청 실패: ' + e.message);
+        if (installBtn) {
+            installBtn.disabled = false;
+            installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
+        }
+    }
+}
+
+// 다운로드 진행 상황 폴링
+let whisperProgressInterval = null;
+
+function startWhisperProgressPolling() {
+    if (whisperProgressInterval) return;
+
+    whisperProgressInterval = setInterval(async () => {
+        const data = await checkWhisperStatus();
+
+        if (data) {
+            const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
+
+            if (!isDownloading) {
+                clearInterval(whisperProgressInterval);
+                whisperProgressInterval = null;
+
+                // 설치 완료 확인
+                if (data.ready) {
+                    alert('✅ 음성 인식 설치가 완료되었습니다!');
+                } else if (data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error) {
+                    const error = data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error;
+                    alert('❌ 설치 중 오류 발생: ' + error);
+                }
+            }
+        }
+    }, 1000);
+}
+
+// 설치 버튼 이벤트 연결
+document.addEventListener('DOMContentLoaded', () => {
+    const installBtn = document.getElementById('whisperInstallBtn');
+    if (installBtn) {
+        installBtn.addEventListener('click', installWhisper);
+    }
+});
 
 // ========================================
 // 녹음 파일 목록 기능

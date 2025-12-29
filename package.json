@@ -4,8 +4,8 @@
   "description": "기획자를 위한 로컬 업무 자동화 도구 - 폴더 감시부터 회의록까지",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "start:win": "electron .",
+    "start": "chcp 65001 >nul && electron .",
+    "start:win": "chcp 65001 >nul && electron .",
     "start:mac": "./start-app.sh",
     "build": "electron-builder",
     "build:win": "electron-builder --win",

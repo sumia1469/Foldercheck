@@ -10999,5 +10999,1996 @@
     },
     "analyzedAt": "2025-12-28T11:19:09.500Z",
     "fileName": "104. 정보보호 서약서(협력업체용)_LG헬로비전.doc"
+  },
+  "Z__2____100____02_________________DN25_NIA_NSDP_DP01_____________v1_3_xlsx": {
+    "content": {
+      "sheets": {
+        "표지": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [
+            "2025년 국가공유데이터 플랫폼 구축사업(2차)"
+          ],
+          [],
+          [
+            "정보구조도(국가공유)"
+          ],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "문서코드",
+            null,
+            "DN25-NIA-NSDP-DP01"
+          ],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "개정번호",
+            null,
+            "Ver.1.3"
+          ],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "작성일자",
+            null,
+            46013
+          ],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "Copyright © 2025 데이터누리 컨소시엄"
+          ],
+          []
+        ],
+        "개정이력": [
+          [],
+          [
+            "개정이력"
+          ],
+          [],
+          [
+            "버전",
+            "작성일",
+            "변경 내용",
+            null,
+            null,
+            null,
+            null,
+            "작성자",
+            "검토자",
+            "비고"
+          ],
+          [
+            "1.0",
+            "2025.12.12",
+            "최종본(v1.0) 공유",
+            null,
+            null,
+            null,
+            null,
+            "김진"
+          ],
+          [
+            "1.1",
+            "2025.12.15",
+            "CMS 메뉴 수정/변경\r\n- 행정평가관리 (데이터심의 > 공유데이터, 개방데이터 탭 추가)",
+            null,
+            null,
+            null,
+            null,
+            "김진"
+          ],
+          [
+            "1.2",
+            "2025.12.16",
+            "CMS 메뉴 수정/변경\r\n- 행정평가관리 (심의항목 관리 > 중장기 공유 계획, 공유데이터 탭 추가)",
+            null,
+            null,
+            null,
+            null,
+            "김진"
+          ],
+          [
+            "1.3",
+            "2025.12.22",
+            "심의 수정사항 업데이트",
+            null,
+            null,
+            null,
+            null,
+            "김진"
+          ],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "용어": [
+          [
+            "용어",
+            "영문명",
+            "약어",
+            "물리용어",
+            "설명"
+          ],
+          [
+            "API 데이터 활용방법",
+            "API Data Usage Guide",
+            "APIUSE",
+            "API_DATA_UTILIZE_GUIDE",
+            "메뉴명: API 데이터 활용방법"
+          ],
+          [
+            "API 활용신청",
+            "API Usage Request",
+            "APIREQ",
+            "API_USAGE_REQUEST",
+            "메뉴명: API 활용신청"
+          ],
+          [
+            "ID찾기",
+            "ID Find",
+            "IDFD"
+          ],
+          [
+            "ONE-윈도우",
+            null,
+            "OWIN",
+            "ONE_WINDOW",
+            "메뉴명: ONE-윈도우"
+          ],
+          [
+            "PW찾기",
+            "PW Find",
+            "PWFD"
+          ],
+          [
+            "Q&A",
+            "QnA",
+            "QNA",
+            "QNA"
+          ],
+          [
+            "가공",
+            "Process",
+            "PRC"
+          ],
+          [
+            "개요",
+            null,
+            "OTLN",
+            "OTLN",
+            "개요, 소개"
+          ],
+          [
+            "게시글",
+            "Board / Post",
+            "TBBS",
+            "TBBS",
+            "게시글"
+          ],
+          [
+            "공유 데이터 맵",
+            "Shared Data Map",
+            "SDMAP",
+            "SHARED_DATA_MAP",
+            "메뉴명: 공유 데이터 맵"
+          ],
+          [
+            "공유데이터",
+            "Shared Data",
+            "SDT"
+          ],
+          [
+            "공유데이터 생성",
+            "Shared Data Create",
+            "SDTCRT",
+            "SHARED_DATA_CREATE",
+            "메뉴명: 공유데이터 생성"
+          ],
+          [
+            "공유데이터 요청",
+            "Shared Data Request",
+            "SDTREQ",
+            "SHARED_DATA_REQUEST",
+            "메뉴명: 공유데이터 요청"
+          ],
+          [
+            "공지사항",
+            "Notice",
+            "NTC",
+            "NOTICE",
+            "메뉴명: 공지사항"
+          ],
+          [
+            "관계도맵",
+            null,
+            "RM",
+            null,
+            "관계도맵"
+          ],
+          [
+            "관심 데이터",
+            "Favorite Data",
+            "FAVDT",
+            null,
+            "메뉴명: 관심 데이터"
+          ],
+          [
+            "국가공유",
+            "National Share",
+            "NS",
+            "NAT_SHARE"
+          ],
+          [
+            "국가공유플랫폼",
+            "National Data Sharing Platform",
+            "NDSP",
+            null,
+            "메뉴명: 국가공유플랫폼"
+          ],
+          [
+            "기관공유",
+            "instrution_Shar",
+            "IS",
+            "INST_SHRN"
+          ],
+          [
+            "기관담당자",
+            "Institution Manager",
+            "INSTMNGR",
+            "INSTITUTION_MANAGER",
+            "기관담당자"
+          ],
+          [
+            "나의 정보",
+            "My Info",
+            "MYINFO",
+            null,
+            "메뉴명: 나의 정보"
+          ],
+          [
+            "대시보드",
+            "Dashboard",
+            "DBRD",
+            null,
+            "대시보드"
+          ],
+          [
+            "데이터 목록 정보",
+            "Data List Information",
+            "DTLIST",
+            "DT_LIST_INFO",
+            "메뉴명: 데이터 목록 정보"
+          ],
+          [
+            "데이터 종료/폐기 관리",
+            "Data End/Discard Management",
+            "DTENDDISCMNG",
+            "DATA_END_DISCARD_MANAGEMENT",
+            "메뉴명: 데이터 종료/폐기 관리"
+          ],
+          [
+            "데이터 종료/폐기 신청",
+            "Data End/Discard Request",
+            "DTENDDISCREQ",
+            "DATA_END_DISCARD_REQUEST",
+            "메뉴명: 데이터 종료/폐기 신청"
+          ],
+          [
+            "데이터검색",
+            "Data Search",
+            "SRCH",
+            null,
+            "메뉴명: 데이터검색"
+          ],
+          [
+            "데이터결합",
+            "Data Join",
+            "DTJOIN",
+            "DATA_JOIN"
+          ],
+          [
+            "데이터등록",
+            null,
+            "DR",
+            "DT_REG",
+            "메뉴명: 데이터등록"
+          ],
+          [
+            "데이터요청",
+            null,
+            "DD",
+            "DT_DMND",
+            "메뉴명: 데이터요청"
+          ],
+          [
+            "데이터요청 등록",
+            "Data Demand Registration",
+            "DDREG",
+            null,
+            "메뉴명: 데이터요청 등록"
+          ],
+          [
+            "데이터이관",
+            null,
+            "DTTRNS",
+            "DT_TRNS"
+          ],
+          [
+            "데이터찾기",
+            "Data_Search",
+            "DTSRCH",
+            "DT_SRCH",
+            "메뉴명: 데이터찾기"
+          ],
+          [
+            "등록",
+            "Register",
+            "REG",
+            "REG",
+            "등록"
+          ],
+          [
+            "로그인",
+            "Login",
+            "LGN",
+            "LGN",
+            "로그인"
+          ],
+          [
+            "마이페이지",
+            "My Page",
+            "MP",
+            null,
+            "메뉴명: 마이페이지"
+          ],
+          [
+            "메인",
+            "Main",
+            "MAT"
+          ],
+          [
+            "사용자 등록",
+            null,
+            "UREG",
+            "USR_REG",
+            "사용자 등록"
+          ],
+          [
+            "상세",
+            "Detail",
+            "DTL",
+            "DTL",
+            "상세"
+          ],
+          [
+            "상세목록",
+            "Detail List",
+            "DTLIST"
+          ],
+          [
+            "수신요청",
+            "Receive Request",
+            "RCVREQ"
+          ],
+          [
+            "수집",
+            "Collection",
+            "COL"
+          ],
+          [
+            "시스템 개선요청",
+            "Improvement Request",
+            "IMPREQ"
+          ],
+          [
+            "시스템 모니터링",
+            null,
+            "SYSMON",
+            null,
+            "메뉴명: 시스템 모니터링"
+          ],
+          [
+            "시스템현황",
+            "System Status",
+            "SYSSTAT",
+            "SYSTEM_STATUS",
+            "시스템 자원, 서버, 프로세스 등 운영 상태를 조회하는 기능"
+          ],
+          [
+            "알림",
+            "Notification",
+            "NOTI",
+            null,
+            "알림"
+          ],
+          [
+            "연계",
+            "Link",
+            "LNK"
+          ],
+          [
+            "이용안내",
+            null,
+            "UG",
+            "UTZTN_GD",
+            "메뉴명: 이용안내"
+          ],
+          [
+            "자료실",
+            null,
+            "RPSTR",
+            "RPSTR",
+            "자료실"
+          ],
+          [
+            "정보",
+            "INFO",
+            "INFO"
+          ],
+          [
+            "정보",
+            "Information",
+            "INFO",
+            "INFO",
+            "데이터에 대한 세부 내용"
+          ],
+          [
+            "중앙메타",
+            "Meta Management",
+            "MMT"
+          ],
+          [
+            "중앙메타데이터",
+            null,
+            "MMDT",
+            "CENTRAL_METADATA",
+            "메뉴: 중앙메타데이터"
+          ],
+          [
+            "지정공개",
+            "Designated Open",
+            "DSGOPN",
+            "DESIGNATED_OPEN"
+          ],
+          [
+            "찾기",
+            "Find",
+            "FD",
+            null,
+            "찾기"
+          ],
+          [
+            "커뮤니티",
+            "Community",
+            "COMM",
+            "CMNTY",
+            "커뮤니티 (국가공유: 소통마당)"
+          ],
+          [
+            "파일 데이터 활용방법",
+            "File Data Usage Guide",
+            "FILEUSE",
+            "FILE_DATA_UTILIZE_GUIDE",
+            "메뉴명: 파일 데이터 활용방법"
+          ],
+          [
+            "파일다운로드",
+            "File Download",
+            "FDOWN",
+            null,
+            "파일다운로드"
+          ],
+          [
+            "플랫폼 소개",
+            "Platform",
+            "PF",
+            null,
+            "메뉴명: 플랫폼 소개"
+          ],
+          [
+            "확장맵",
+            "Expansion Map",
+            "EM",
+            "EXPANSION_MAP",
+            "확장맵"
+          ],
+          [
+            "활용방법",
+            "Utilize Guide",
+            "UG",
+            "UTLZ_GUIDE"
+          ],
+          [
+            "활용사례",
+            null,
+            "UC",
+            "UTLZ_CASE"
+          ],
+          [
+            "활용사례 결과 등록",
+            "Use Case Registration",
+            "UCREG"
+          ],
+          [
+            "중장기 공유계획",
+            "Mid/Long-term Sharing Plan",
+            "MLSHRPLAN"
+          ],
+          [
+            "심의",
+            "Deliberation/Plan",
+            "DLB"
+          ],
+          [
+            "평가기관",
+            "Evaluation Institution",
+            "EVALINST"
+          ],
+          [
+            "평가일정",
+            "Evaluation Schedule",
+            "EVALSCHD"
+          ],
+          [
+            "평가결과",
+            "Evaluation Result",
+            "EVALRES"
+          ],
+          [
+            "평가항목",
+            "Evaluation Item",
+            "EVALITEM"
+          ],
+          [
+            "AI 대화형 검색",
+            "AI Conversational Search",
+            "AICSRCH",
+            "AI_CNV_SRCH",
+            "메뉴명 : AI 대화형 검색"
+          ],
+          [
+            "최근 대화",
+            "Chat",
+            "CHAT",
+            "CHAT",
+            "사용자가 주고받은 최근 대화 내역"
+          ],
+          [
+            "자료",
+            "Reference",
+            "REF",
+            "REFERENCE",
+            "AI 검색과 연계된 자료 목록/참조"
+          ],
+          [
+            "가공설정 관리",
+            "Processing Configuration Management",
+            "PROCSETMNG",
+            null,
+            "메뉴명: 가공설정 관리"
+          ],
+          [
+            "사용자권한요청 관리",
+            "User Authority Request Management",
+            "USRATHREQMNG",
+            null,
+            "메뉴명: 사용자권한요청 관리"
+          ],
+          [
+            "심의항목 관리",
+            "Deliberation Item Management",
+            "DLBITMNG",
+            "DLB_ITEM_MNG",
+            "메뉴명 : 심의항목 관리"
+          ],
+          [
+            "연계현황 모니터링",
+            "Linkage Status Monitoring",
+            "LSMOR",
+            "LNK_STAT_MOR",
+            "메뉴명 : 연계현황 모니터링"
+          ],
+          [
+            "모바일 공무원증",
+            "Mobile Government ID",
+            "MBLGOVID",
+            "MBL_GOVID",
+            "메뉴명 : 모바일 공무원증"
+          ],
+          [
+            "내가 본 데이터",
+            "The Data Observed",
+            "DTOSV",
+            "DT_OSV",
+            "AI 검색과 연계된 자료 목록"
+          ],
+          [
+            "자료 추적 중",
+            "Tracking Data",
+            "TD",
+            null,
+            "어떤 데이터를 추적하고 있다' 는 진행형 문장"
+          ],
+          [
+            "이관데이터",
+            "Transfer Data",
+            "TRNSDT",
+            "TRNS_DT",
+            "메뉴명 : 이관데이터"
+          ],
+          [
+            "공유 요청",
+            "Share Request",
+            "SHR",
+            "SHR_RQ"
+          ],
+          [
+            "개방 요청",
+            "Open Request",
+            "OPNRQ",
+            "OPEN_RQ"
+          ]
+        ],
+        "메뉴구조도(FRONT)": [
+          [],
+          [
+            null,
+            "1. 메뉴구조도"
+          ],
+          [],
+          [
+            null,
+            "메뉴레벨",
+            null,
+            null,
+            "메뉴 목록",
+            null,
+            "화면 ID",
+            "메뉴 변경 유무",
+            "메뉴별 권한",
+            null,
+            null,
+            "비고"
+          ],
+          [
+            null,
+            "1 Depth",
+            "2 Depth",
+            "3 Depth (Tab)",
+            "상위메뉴 ID",
+            "하위메뉴 ID",
+            null,
+            null,
+            "일반사용자",
+            "기관업무담당자",
+            "기관총괄담당자"
+          ],
+          [
+            null,
+            "AI 대화형 검색",
+            "AI 대화형 검색",
+            null,
+            "UI_FRT_AICSRCH",
+            "UI_FRT_AICSRCH_SRCH",
+            " UI_FRT_AICSRCH_SRCH",
+            "신규",
+            "O",
+            "O",
+            "O",
+            "좌측상단 로고(홈)', 사이드바 내 '새대화 시작 버튼' 클릭 시 화면 우측에 대화형 패널 노출 / 데이터 찾기>데이터 검색 메뉴 이관"
+          ],
+          [
+            null,
+            "AI 대화형 검색",
+            "최근 대화",
+            null,
+            "UI_FRT_AICSRCH",
+            "UI_FRT_AICSRCH_SRCH",
+            "UI_FRT_AICSRCH_CHAT",
+            "신규",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "AI 대화형 검색",
+            "내가 본 데이터",
+            null,
+            "UI_FRT_AICSRCH",
+            "UI_FRT_AICSRCH_SRCH",
+            "UI_FRT_AICSRCH_DTOSV",
+            "신규",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "플랫폼 소개",
+            "개요",
+            null,
+            "UI_FRT_PF",
+            "UI_FRT_PF_INTRO",
+            "UI_FRT_PF_INTRO",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "플랫폼 소개",
+            "이용안내",
+            "데이터 목록 정보",
+            "UI_FRT_PF",
+            "UI_FRT_PF_UG",
+            "UI_FRT_PF_UG_DTLIST",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "플랫폼 소개",
+            "이용안내",
+            "파일 데이터 활용방법",
+            "UI_FRT_PF",
+            "UI_FRT_PF_UG",
+            "UI_FRT_PF_UG_FILEUSE",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "플랫폼 소개",
+            "이용안내",
+            "API 데이터 활용방법",
+            "UI_FRT_PF",
+            "UI_FRT_PF_UG",
+            "UI_FRT_PF_UG_APIUSE",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "플랫폼 소개",
+            "이용안내",
+            "공유 데이터 맵 이용방법",
+            "UI_FRT_PF",
+            "UI_FRT_PF_UG",
+            "UI_FRT_PF_UG_SDMAP",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "플랫폼 소개",
+            "이용안내",
+            "활용사례",
+            "UI_FRT_PF",
+            "UI_FRT_PF_UG",
+            "UI_FRT_PF_UG_UC",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공유 데이터 맵",
+            "관계도 맵",
+            null,
+            "UI_FRT_SDMAP",
+            "UI_FRT_SDMAP_RM",
+            "UI_FRT_SDMAP_RM",
+            "수정",
+            "O",
+            "O",
+            "O",
+            "1Depth로 변경"
+          ],
+          [
+            null,
+            "공유 데이터 맵",
+            "확장 맵",
+            null,
+            "UI_FRT_SDMAP",
+            "UI_FRT_SDMAP_EM",
+            "UI_FRT_SDMAP_EM",
+            "수정",
+            "O",
+            "O",
+            "O",
+            "1Depth로 변경"
+          ],
+          [
+            null,
+            "공유 데이터 맵",
+            "상세목록",
+            null,
+            "UI_FRT_SDMAP",
+            "UI_FRT_SDMAP_DTLIST",
+            "UI_FRT_SDMAP_DTLIST",
+            "수정",
+            "O",
+            "O",
+            "O",
+            "1Depth로 변경"
+          ],
+          [
+            null,
+            "데이터 요청",
+            "개요",
+            null,
+            "UI_FRT_DD",
+            "UI_FRT_DD_INTRO",
+            "UI_FRT_DD_INTRO",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "데이터 요청",
+            "데이터 요청 등록",
+            null,
+            "UI_FRT_DD",
+            "UI_FRT_DD_DDREG",
+            "UI_FRT_DD_DDREG",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "소통마당",
+            "공지사항",
+            null,
+            "UI_FRT_CMT",
+            "UI_FRT_CMT_NTC",
+            "UI_FRT_CMT_NTC",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "소통마당",
+            "활용사례",
+            null,
+            "UI_FRT_CMT",
+            "UI_FRT_CMT_UC",
+            "UI_FRT_CMT_UC",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "소통마당",
+            "자료실",
+            null,
+            "UI_FRT_CMT",
+            "UI_FRT_CMT_RPSTR",
+            "UI_FRT_CMT_RPSTR",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "소통마당",
+            "Q&A",
+            null,
+            "UI_FRT_CMT",
+            "UI_FRT_CMT_QNA",
+            "UI_FRT_CMT_QNA",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "소통마당",
+            "시스템 개선요청 등록",
+            null,
+            "UI_FRT_CMT",
+            "UI_FRT_CMT_SYS_IMPREQREG",
+            "UI_FRT_CMT_SYS_IMPREQREG",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "기관담당자",
+            "공유데이터 생성",
+            "데이터 등록",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_SDTCRT",
+            "UI_FRT_INSTMNGR_SDTCRT_DR",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "공유데이터 생성",
+            "데이터 가공",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_SDTCRT",
+            "UI_FRT_INSTMNGR_SDTCRT_DMP",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "공유데이터 생성",
+            "데이터 결합",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_SDTCRT",
+            "UI_FRT_INSTMNGR_SDTCRT_DTJOIN",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "데이터 관리",
+            "데이터 종료·폐기 신청",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_DM",
+            "UI_FRT_INSTMNGR_DM_DTENDDISCREQ",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "데이터 관리",
+            "데이터 종료·폐기 관리",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_DM",
+            "UI_FRT_INSTMNGR_DM_DTENDDISCMNG",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "데이터 관리",
+            "데이터 이관",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_DM",
+            "UI_FRT_INSTMNGR_DM_DTTRNS",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "운영 관리",
+            "사용자권한요청 관리",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_USRATHREQMNG",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "기관담당자",
+            "운영 관리",
+            "가공설정 관리",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR",
+            "UI_FRT_INSTMNGR_PROCSETMNG",
+            "삭제",
+            "X",
+            "X",
+            "O",
+            "공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)"
+          ],
+          [
+            null,
+            "공통",
+            "로그인",
+            "아이디/비밀번호",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_LGN",
+            "UI_FRT_CMN_LGN_IDPW",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "사용자등록",
+            null,
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_UREG",
+            "UI_FRT_CMN_UREG",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "아이디 찾기",
+            null,
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_IDFD",
+            "UI_FRT_CMN_IDFD",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "비밀번호 찾기",
+            null,
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_PWFD",
+            "UI_FRT_CMN_PWFD",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "홈(메인)",
+            null,
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MAT",
+            "UI_FRT_CMN_MAT",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "나의 정보",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_MYINFO",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "관심 데이터",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_FAVDT",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "다운로드",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_DL",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "API 신청",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_APIRQ",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "지정 공개",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_DSGOPN",
+            "신규",
+            "O",
+            "O",
+            "O",
+            "리스트(조회), 상세"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "데이터 요청",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_DTRQ",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "활용사례",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_UC",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "알림",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_NOTI",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ],
+          [
+            null,
+            "공통",
+            "마이페이지",
+            "게시글",
+            "UI_FRT_CMN",
+            "UI_FRT_CMN_MP",
+            "UI_FRT_CMN_MP_TBBS",
+            "유지",
+            "O",
+            "O",
+            "O"
+          ]
+        ],
+        "메뉴구조도(CMS)": [
+          [],
+          [
+            "1. 메뉴구조도"
+          ],
+          [],
+          [
+            "메뉴레벨",
+            null,
+            null,
+            null,
+            "메뉴 목록",
+            null,
+            "화면 ID",
+            "메뉴 권한",
+            null,
+            "메뉴 변경 유무",
+            "비고"
+          ],
+          [
+            "1 Depth",
+            "2 Depth",
+            "Tab (3depth)",
+            "Tab (4depth)",
+            "상위메뉴 ID",
+            "하위메뉴 ID",
+            null,
+            "시스템 관리자",
+            "운영 관리자"
+          ],
+          [
+            "대시보드",
+            "서비스 현황",
+            null,
+            null,
+            "UI_CMS_DBRD",
+            "UI_JTS_DBRD_SRVSTAT",
+            "UI_JTS_DBRD_SRVSTAT",
+            "O",
+            "O",
+            "수정"
+          ],
+          [
+            "대시보드",
+            "데이터 현황",
+            null,
+            null,
+            "UI_CMS_DBRD",
+            "UI_JTS_DBRD_DTSTAT",
+            "UI_JTS_DBRD_DTSTAT",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "대시보드",
+            "장애 현황",
+            null,
+            null,
+            "UI_CMS_DBRD",
+            "UI_CMS_DBRD_ERRMNG",
+            "UI_CMS_DBRD_ERRMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "대시보드",
+            "시스템 현황",
+            null,
+            null,
+            "UI_CMS_DBRD",
+            "UI_CMS_DBRD_SYSSTAT",
+            "UI_CMS_DBRD_SYSSTAT",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영 모니터링",
+            "데이터 모니터링",
+            null,
+            null,
+            "UI_CMS_DTMON",
+            "UI_CMS_DTMON_DT",
+            "UI_CMS_DTMON_DT",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영 모니터링",
+            "수집 모니터링",
+            null,
+            null,
+            "UI_CMS_DTMON",
+            "UI_CMS_DTMON_COL",
+            "UI_CMS_DTMON_COL",
+            "O",
+            "O",
+            "수정"
+          ],
+          [
+            null,
+            "연계 모니터링",
+            null,
+            null,
+            "UI_CMS_DTMON",
+            "UI_CMS_DTMON_LSMOR",
+            "UI_CMS_DTMON_LSMOR",
+            "O",
+            "O",
+            "수정"
+          ],
+          [
+            "운영 모니터링",
+            "가공 모니터링",
+            null,
+            null,
+            "UI_CMS_DTMON",
+            "UI_CMS_DTMON_RCVREQ",
+            "UI_CMS_DTMON_RCVREQ",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영 모니터링",
+            "이용내역 조회",
+            null,
+            null,
+            "UI_CMS_DTMON",
+            "UI_CMS_DTMON_NSLNK",
+            "UI_CMS_DTMON_NSLNK",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영 모니터링",
+            "연계 현황 모니터링",
+            null,
+            null,
+            "UI_CMS_DTMON",
+            "UI_CMS_DTMON_LSMOR",
+            "UI_CMS_DTMON_LSMOR",
+            "O",
+            "O",
+            "신규",
+            "공공데이터포털 수집 모니터링 > 연계현황 모니터링으로 명칭 변경"
+          ],
+          [
+            "시스템 모니터링",
+            "기관공유시스템 모니터링",
+            null,
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_IS",
+            "UI_CMS_SYSMON_IS",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "API키 발급현황",
+            "기관별",
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_APIKEY",
+            "UI_CMS_SYSMON_APIKEY_INST",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "API키 발급현황",
+            "API별",
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_APIKEY",
+            "UI_CMS_SYSMON_APIKEY_API",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "API키 발급현황",
+            "API 통계현황",
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_APIKEY",
+            "UI_CMS_SYSMON_APIKEY_STAT",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "저장소 모니터링",
+            null,
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_STRG",
+            "UI_CMS_SYSMON_STRG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "개인정보조회 모니터링",
+            null,
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_PRIVACC",
+            "UI_CMS_SYSMON_PRIVACC",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "서버상태 모니터링",
+            null,
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_SRV",
+            "UI_CMS_SYSMON_SRV",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "자원 모니터링",
+            null,
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_RSRC ",
+            "UI_CMS_SYSMON_RSRC ",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "동기화 모니터링",
+            "운영관리",
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_SYNC",
+            "UI_CMS_SYSMON_SYNC_OPMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템 모니터링",
+            "동기화 모니터링",
+            "데이터세트",
+            null,
+            "UI_CMS_SYSMON",
+            "UI_CMS_SYSMON_SYNC",
+            "UI_CMS_SYSMON_SYNC_DTSET",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "사용자 관리",
+            "국가공유데이터플랫폼",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_USERMNG",
+            "UI_CMS_OPMNG_USERMNG_NDSP",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "사용자 관리",
+            "연계사이트",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_USERMNG",
+            "UI_CMS_OPMNG_USERMNG_LNK",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "권한관리",
+            null,
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_AUTHMNG",
+            "UI_CMS_OPMNG_AUTHMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "기관공유시스템 관리",
+            null,
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_INSTSHR",
+            "UI_CMS_OPMNG_INSTSHR",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "이용안내 관리",
+            "Q&A",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_UGMNG",
+            "UI_CMS_OPMNG_UGMNG_QNA",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "이용안내 관리",
+            "자료실",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_UGMNG",
+            "UI_CMS_OPMNG_UGMNG_DATAROOM",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "이용안내 관리",
+            "공지사항",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_UGMNG",
+            "UI_CMS_OPMNG_UGMNG_NTC",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "이용안내 관리",
+            "오류신고",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_UGMNG",
+            "UI_CMS_OPMNG_UGMNG_ERRRPT",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "이용안내 관리",
+            "시스템 개선요청",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_UGMNG",
+            "UI_CMS_OPMNG_UGMNG_IMPREQ",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "장애관리",
+            null,
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_ERRMNG",
+            "UI_CMS_OPMNG_ERRMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "운영관리",
+            "주요데이터 관리",
+            null,
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_COREDT",
+            "UI_CMS_OPMNG_COREDT",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            null,
+            "요청데이터 관리",
+            "공유 요청",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_REQDT",
+            "UI_CMS_OPMNG_REQDT_SHR",
+            "O",
+            "O",
+            "수정"
+          ],
+          [
+            "운영관리",
+            "요청데이터 관리",
+            "개방 요청",
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_REQDT",
+            "UI_CMS_OPMNG_REQDT_OPN",
+            "O",
+            "O",
+            "수정"
+          ],
+          [
+            "운영관리",
+            "활용사례 관리",
+            null,
+            null,
+            "UI_CMS_OPMNG",
+            "UI_CMS_OPMNG_UCMNG",
+            "UI_CMS_OPMNG_UCMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "메뉴관리",
+            "포탈",
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_MENUMNG",
+            "UI_CMS_SYSMNG_MENUMNG_PORTAL",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "메뉴관리",
+            "운영관리",
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_MENUMNG",
+            "UI_CMS_SYSMNG_MENUMNG_OPMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "작업관리",
+            null,
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_TASKMNG",
+            "UI_CMS_SYSMNG_TASKMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "공통코드관리",
+            null,
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_CMCDMNG",
+            "UI_CMS_SYSMNG_CMCDMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "저장소관리",
+            null,
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_REPMNG",
+            "UI_CMS_SYSMNG_REPMNG",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "표준API관리",
+            null,
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_STDAPI",
+            "UI_CMS_SYSMNG_STDAPI",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "제공기관 관리",
+            null,
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_PROVINST",
+            "UI_CMS_SYSMNG_PROVINST",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "시스템관리",
+            "ESB GPKI 현황",
+            null,
+            null,
+            "UI_CMS_SYSMNG",
+            "UI_CMS_SYSMNG_ESBGPKI",
+            "UI_CMS_SYSMNG_ESBGPKI",
+            "O",
+            "O",
+            "유지"
+          ],
+          [
+            "행정평가관리",
+            "심의현황",
+            null,
+            null,
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_DBRD",
+            "UI_CMS_ADMEVMNG_DBRD",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "중장기 계획 심의",
+            null,
+            "공유계획",
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_MIDPLNDLB",
+            "UI_CMS_ADMEVMNG_MIDPLNDLB_SHR",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "중장기 계획 심의",
+            null,
+            "개방계획",
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_MIDPLNDLB",
+            "UI_CMS_ADMEVMNG_MIDPLNDLB_OPN",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "데이터 심의",
+            null,
+            "공유데이터",
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_DTDLB",
+            "UI_CMS_ADMEVMNG_DTDLB_SHR",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "데이터 심의",
+            null,
+            "개방데이터",
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_DTDLB",
+            "UI_CMS_ADMEVMNG_DTDLB_OPN",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "심의항목 관리",
+            null,
+            "중장기 공유 계획",
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_DLBITMNG",
+            "UI_CMS_ADMEVMNG_DLBITMNG_MIDPLNDLB",
+            "O",
+            "O",
+            "신규",
+            "평가항목 관리 > 심의항목 관리로 명칭 변경,메뉴위치도 공유데이터 심의 다음순"
+          ],
+          [
+            "행정평가관리",
+            "심의항목 관리",
+            null,
+            "공유데이터",
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_DLBITMNG",
+            "UI_CMS_ADMEVMNG_DLBITMNG_SHR",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "평가지표 관리",
+            null,
+            null,
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_EVALIDX",
+            "UI_CMS_ADMEVMNG_EVALIDX",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "평가기관 관리",
+            null,
+            null,
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_EVALINST ",
+            "UI_CMS_ADMEVMNG_EVALINST ",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "평가일정 관리",
+            null,
+            null,
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_EVALSCHD ",
+            "UI_CMS_ADMEVMNG_EVALSCHD ",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "평가결과 관리",
+            null,
+            null,
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_EVALRES",
+            "UI_CMS_ADMEVMNG_EVALRES",
+            "O",
+            "O",
+            "신규"
+          ],
+          [
+            "행정평가관리",
+            "이의신청 관리",
+            null,
+            null,
+            "UI_CMS_ADMEVMNG",
+            "UI_CMS_ADMEVMNG_OBJREQMNG",
+            "UI_CMS_ADMEVMNG_OBJREQMNG",
+            "O",
+            "O",
+            "신규"
+          ],
+          []
+        ],
+        "헤더(삭제금지)": [
+          [],
+          [
+            "프로젝트명",
+            "2025년 국가공유데이터 플랫폼 구축사업(2차)",
+            "작성일",
+            46013,
+            "작성자",
+            "김진"
+          ],
+          [
+            "문서명",
+            "정보구조도(국가공유)",
+            "개정번호",
+            "Ver.1.3",
+            "문서코드",
+            "DN25-NIA-NSDP-DP01"
+          ],
+          [],
+          [],
+          [
+            "고정적으로 사용되는 헤더 파트입니다."
+          ],
+          [
+            "표지 : 헤더 변경 시 표지 내용이 변경됩니다."
+          ],
+          [
+            "작성일,버전 : 개정이력 변경 시 자동으로 변경됩니다"
+          ],
+          [],
+          []
+        ]
+      },
+      "sheetNames": [
+        "표지",
+        "개정이력",
+        "용어",
+        "메뉴구조도(FRONT)",
+        "메뉴구조도(CMS)",
+        "헤더(삭제금지)"
+      ],
+      "text": "\n\n\n\n\n\n2025년 국가공유데이터 플랫폼 구축사업(2차)\n\n정보구조도(국가공유)\n\n\n\n\n\n\n\n\n문서코드 DN25-NIA-NSDP-DP01\n개정번호 Ver.1.3\n작성일자 46013\n\n\n\n\n\nCopyright © 2025 데이터누리 컨소시엄\n\n\n개정이력\n\n버전 작성일 변경 내용 작성자 검토자 비고\n1.0 2025.12.12 최종본(v1.0) 공유 김진\n1.1 2025.12.15 CMS 메뉴 수정/변경\r\n- 행정평가관리 (데이터심의 > 공유데이터, 개방데이터 탭 추가) 김진\n1.2 2025.12.16 CMS 메뉴 수정/변경\r\n- 행정평가관리 (심의항목 관리 > 중장기 공유 계획, 공유데이터 탭 추가) 김진\n1.3 2025.12.22 심의 수정사항 업데이트 김진\n\n\n\n\n\n\n용어 영문명 약어 물리용어 설명\nAPI 데이터 활용방법 API Data Usage Guide APIUSE API_DATA_UTILIZE_GUIDE 메뉴명: API 데이터 활용방법\nAPI 활용신청 API Usage Request APIREQ API_USAGE_REQUEST 메뉴명: API 활용신청\nID찾기 ID Find IDFD\nONE-윈도우 OWIN ONE_WINDOW 메뉴명: ONE-윈도우\nPW찾기 PW Find PWFD\nQ&A QnA QNA QNA\n가공 Process PRC\n개요 OTLN OTLN 개요, 소개\n게시글 Board / Post TBBS TBBS 게시글\n공유 데이터 맵 Shared Data Map SDMAP SHARED_DATA_MAP 메뉴명: 공유 데이터 맵\n공유데이터 Shared Data SDT\n공유데이터 생성 Shared Data Create SDTCRT SHARED_DATA_CREATE 메뉴명: 공유데이터 생성\n공유데이터 요청 Shared Data Request SDTREQ SHARED_DATA_REQUEST 메뉴명: 공유데이터 요청\n공지사항 Notice NTC NOTICE 메뉴명: 공지사항\n관계도맵 RM 관계도맵\n관심 데이터 Favorite Data FAVDT 메뉴명: 관심 데이터\n국가공유 National Share NS NAT_SHARE\n국가공유플랫폼 National Data Sharing Platform NDSP 메뉴명: 국가공유플랫폼\n기관공유 instrution_Shar IS INST_SHRN\n기관담당자 Institution Manager INSTMNGR INSTITUTION_MANAGER 기관담당자\n나의 정보 My Info MYINFO 메뉴명: 나의 정보\n대시보드 Dashboard DBRD 대시보드\n데이터 목록 정보 Data List Information DTLIST DT_LIST_INFO 메뉴명: 데이터 목록 정보\n데이터 종료/폐기 관리 Data End/Discard Management DTENDDISCMNG DATA_END_DISCARD_MANAGEMENT 메뉴명: 데이터 종료/폐기 관리\n데이터 종료/폐기 신청 Data End/Discard Request DTENDDISCREQ DATA_END_DISCARD_REQUEST 메뉴명: 데이터 종료/폐기 신청\n데이터검색 Data Search SRCH 메뉴명: 데이터검색\n데이터결합 Data Join DTJOIN DATA_JOIN\n데이터등록 DR DT_REG 메뉴명: 데이터등록\n데이터요청 DD DT_DMND 메뉴명: 데이터요청\n데이터요청 등록 Data Demand Registration DDREG 메뉴명: 데이터요청 등록\n데이터이관 DTTRNS DT_TRNS\n데이터찾기 Data_Search DTSRCH DT_SRCH 메뉴명: 데이터찾기\n등록 Register REG REG 등록\n로그인 Login LGN LGN 로그인\n마이페이지 My Page MP 메뉴명: 마이페이지\n메인 Main MAT\n사용자 등록 UREG USR_REG 사용자 등록\n상세 Detail DTL DTL 상세\n상세목록 Detail List DTLIST\n수신요청 Receive Request RCVREQ\n수집 Collection COL\n시스템 개선요청 Improvement Request IMPREQ\n시스템 모니터링 SYSMON 메뉴명: 시스템 모니터링\n시스템현황 System Status SYSSTAT SYSTEM_STATUS 시스템 자원, 서버, 프로세스 등 운영 상태를 조회하는 기능\n알림 Notification NOTI 알림\n연계 Link LNK\n이용안내 UG UTZTN_GD 메뉴명: 이용안내\n자료실 RPSTR RPSTR 자료실\n정보 INFO INFO\n정보 Information INFO INFO 데이터에 대한 세부 내용\n중앙메타 Meta Management MMT\n중앙메타데이터 MMDT CENTRAL_METADATA 메뉴: 중앙메타데이터\n지정공개 Designated Open DSGOPN DESIGNATED_OPEN\n찾기 Find FD 찾기\n커뮤니티 Community COMM CMNTY 커뮤니티 (국가공유: 소통마당)\n파일 데이터 활용방법 File Data Usage Guide FILEUSE FILE_DATA_UTILIZE_GUIDE 메뉴명: 파일 데이터 활용방법\n파일다운로드 File Download FDOWN 파일다운로드\n플랫폼 소개 Platform PF 메뉴명: 플랫폼 소개\n확장맵 Expansion Map EM EXPANSION_MAP 확장맵\n활용방법 Utilize Guide UG UTLZ_GUIDE\n활용사례 UC UTLZ_CASE\n활용사례 결과 등록 Use Case Registration UCREG\n중장기 공유계획 Mid/Long-term Sharing Plan MLSHRPLAN\n심의 Deliberation/Plan DLB\n평가기관 Evaluation Institution EVALINST\n평가일정 Evaluation Schedule EVALSCHD\n평가결과 Evaluation Result EVALRES\n평가항목 Evaluation Item EVALITEM\nAI 대화형 검색 AI Conversational Search AICSRCH AI_CNV_SRCH 메뉴명 : AI 대화형 검색\n최근 대화 Chat CHAT CHAT 사용자가 주고받은 최근 대화 내역\n자료 Reference REF REFERENCE AI 검색과 연계된 자료 목록/참조\n가공설정 관리 Processing Configuration Management PROCSETMNG 메뉴명: 가공설정 관리\n사용자권한요청 관리 User Authority Request Management USRATHREQMNG 메뉴명: 사용자권한요청 관리\n심의항목 관리 Deliberation Item Management DLBITMNG DLB_ITEM_MNG 메뉴명 : 심의항목 관리\n연계현황 모니터링 Linkage Status Monitoring LSMOR LNK_STAT_MOR 메뉴명 : 연계현황 모니터링\n모바일 공무원증 Mobile Government ID MBLGOVID MBL_GOVID 메뉴명 : 모바일 공무원증\n내가 본 데이터 The Data Observed DTOSV DT_OSV AI 검색과 연계된 자료 목록\n자료 추적 중 Tracking Data TD 어떤 데이터를 추적하고 있다' 는 진행형 문장\n이관데이터 Transfer Data TRNSDT TRNS_DT 메뉴명 : 이관데이터\n공유 요청 Share Request SHR SHR_RQ\n개방 요청 Open Request OPNRQ OPEN_RQ\n\n1. 메뉴구조도\n\n메뉴레벨 메뉴 목록 화면 ID 메뉴 변경 유무 메뉴별 권한 비고\n1 Depth 2 Depth 3 Depth (Tab) 상위메뉴 ID 하위메뉴 ID 일반사용자 기관업무담당자 기관총괄담당자\nAI 대화형 검색 AI 대화형 검색 UI_FRT_AICSRCH UI_FRT_AICSRCH_SRCH  UI_FRT_AICSRCH_SRCH 신규 O O O 좌측상단 로고(홈)', 사이드바 내 '새대화 시작 버튼' 클릭 시 화면 우측에 대화형 패널 노출 / 데이터 찾기>데이터 검색 메뉴 이관\nAI 대화형 검색 최근 대화 UI_FRT_AICSRCH UI_FRT_AICSRCH_SRCH UI_FRT_AICSRCH_CHAT 신규 O O O\nAI 대화형 검색 내가 본 데이터 UI_FRT_AICSRCH UI_FRT_AICSRCH_SRCH UI_FRT_AICSRCH_DTOSV 신규 O O O\n플랫폼 소개 개요 UI_FRT_PF UI_FRT_PF_INTRO UI_FRT_PF_INTRO 유지 O O O\n플랫폼 소개 이용안내 데이터 목록 정보 UI_FRT_PF UI_FRT_PF_UG UI_FRT_PF_UG_DTLIST 유지 O O O\n플랫폼 소개 이용안내 파일 데이터 활용방법 UI_FRT_PF UI_FRT_PF_UG UI_FRT_PF_UG_FILEUSE 유지 O O O\n플랫폼 소개 이용안내 API 데이터 활용방법 UI_FRT_PF UI_FRT_PF_UG UI_FRT_PF_UG_APIUSE 유지 O O O\n플랫폼 소개 이용안내 공유 데이터 맵 이용방법 UI_FRT_PF UI_FRT_PF_UG UI_FRT_PF_UG_SDMAP 유지 O O O\n플랫폼 소개 이용안내 활용사례 UI_FRT_PF UI_FRT_PF_UG UI_FRT_PF_UG_UC 유지 O O O\n공유 데이터 맵 관계도 맵 UI_FRT_SDMAP UI_FRT_SDMAP_RM UI_FRT_SDMAP_RM 수정 O O O 1Depth로 변경\n공유 데이터 맵 확장 맵 UI_FRT_SDMAP UI_FRT_SDMAP_EM UI_FRT_SDMAP_EM 수정 O O O 1Depth로 변경\n공유 데이터 맵 상세목록 UI_FRT_SDMAP UI_FRT_SDMAP_DTLIST UI_FRT_SDMAP_DTLIST 수정 O O O 1Depth로 변경\n데이터 요청 개요 UI_FRT_DD UI_FRT_DD_INTRO UI_FRT_DD_INTRO 유지 O O O\n데이터 요청 데이터 요청 등록 UI_FRT_DD UI_FRT_DD_DDREG UI_FRT_DD_DDREG 유지 O O O\n소통마당 공지사항 UI_FRT_CMT UI_FRT_CMT_NTC UI_FRT_CMT_NTC 유지 O O O\n소통마당 활용사례 UI_FRT_CMT UI_FRT_CMT_UC UI_FRT_CMT_UC 유지 O O O\n소통마당 자료실 UI_FRT_CMT UI_FRT_CMT_RPSTR UI_FRT_CMT_RPSTR 유지 O O O\n소통마당 Q&A UI_FRT_CMT UI_FRT_CMT_QNA UI_FRT_CMT_QNA 유지 O O O\n소통마당 시스템 개선요청 등록 UI_FRT_CMT UI_FRT_CMT_SYS_IMPREQREG UI_FRT_CMT_SYS_IMPREQREG 유지 O O O\n기관담당자 공유데이터 생성 데이터 등록 UI_FRT_INSTMNGR UI_FRT_INSTMNGR_SDTCRT UI_FRT_INSTMNGR_SDTCRT_DR 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 공유데이터 생성 데이터 가공 UI_FRT_INSTMNGR UI_FRT_INSTMNGR_SDTCRT UI_FRT_INSTMNGR_SDTCRT_DMP 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 공유데이터 생성 데이터 결합 UI_FRT_INSTMNGR UI_FRT_INSTMNGR_SDTCRT UI_FRT_INSTMNGR_SDTCRT_DTJOIN 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 데이터 관리 데이터 종료·폐기 신청 UI_FRT_INSTMNGR UI_FRT_INSTMNGR_DM UI_FRT_INSTMNGR_DM_DTENDDISCREQ 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 데이터 관리 데이터 종료·폐기 관리 UI_FRT_INSTMNGR UI_FRT_INSTMNGR_DM UI_FRT_INSTMNGR_DM_DTENDDISCMNG 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 데이터 관리 데이터 이관 UI_FRT_INSTMNGR UI_FRT_INSTMNGR_DM UI_FRT_INSTMNGR_DM_DTTRNS 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 운영 관리 사용자권한요청 관리 UI_FRT_INSTMNGR UI_FRT_INSTMNGR UI_FRT_INSTMNGR_USRATHREQMNG 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n기관담당자 운영 관리 가공설정 관리 UI_FRT_INSTMNGR UI_FRT_INSTMNGR UI_FRT_INSTMNGR_PROCSETMNG 삭제 X X O 공동공유 시스템으로 이관 (국가공유 화면에서 히든처리)\n공통 로그인 아이디/비밀번호 UI_FRT_CMN UI_FRT_CMN_LGN UI_FRT_CMN_LGN_IDPW 유지 O O O\n공통 사용자등록 UI_FRT_CMN UI_FRT_CMN_UREG UI_FRT_CMN_UREG 유지 O O O\n공통 아이디 찾기 UI_FRT_CMN UI_FRT_CMN_IDFD UI_FRT_CMN_IDFD 유지 O O O\n공통 비밀번호 찾기 UI_FRT_CMN UI_FRT_CMN_PWFD UI_FRT_CMN_PWFD 유지 O O O\n공통 홈(메인) UI_FRT_CMN UI_FRT_CMN_MAT UI_FRT_CMN_MAT 유지 O O O\n공통 마이페이지 나의 정보 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_MYINFO 유지 O O O\n공통 마이페이지 관심 데이터 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_FAVDT 유지 O O O\n공통 마이페이지 다운로드 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_DL 유지 O O O\n공통 마이페이지 API 신청 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_APIRQ 유지 O O O\n공통 마이페이지 지정 공개 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_DSGOPN 신규 O O O 리스트(조회), 상세\n공통 마이페이지 데이터 요청 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_DTRQ 유지 O O O\n공통 마이페이지 활용사례 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_UC 유지 O O O\n공통 마이페이지 알림 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_NOTI 유지 O O O\n공통 마이페이지 게시글 UI_FRT_CMN UI_FRT_CMN_MP UI_FRT_CMN_MP_TBBS 유지 O O O\n\n1. 메뉴구조도\n\n메뉴레벨 메뉴 목록 화면 ID 메뉴 권한 메뉴 변경 유무 비고\n1 Depth 2 Depth Tab (3depth) Tab (4depth) 상위메뉴 ID 하위메뉴 ID 시스템 관리자 운영 관리자\n대시보드 서비스 현황 UI_CMS_DBRD UI_JTS_DBRD_SRVSTAT UI_JTS_DBRD_SRVSTAT O O 수정\n대시보드 데이터 현황 UI_CMS_DBRD UI_JTS_DBRD_DTSTAT UI_JTS_DBRD_DTSTAT O O 유지\n대시보드 장애 현황 UI_CMS_DBRD UI_CMS_DBRD_ERRMNG UI_CMS_DBRD_ERRMNG O O 유지\n대시보드 시스템 현황 UI_CMS_DBRD UI_CMS_DBRD_SYSSTAT UI_CMS_DBRD_SYSSTAT O O 유지\n운영 모니터링 데이터 모니터링 UI_CMS_DTMON UI_CMS_DTMON_DT UI_CMS_DTMON_DT O O 유지\n운영 모니터링 수집 모니터링 UI_CMS_DTMON UI_CMS_DTMON_COL UI_CMS_DTMON_COL O O 수정\n연계 모니터링 UI_CMS_DTMON UI_CMS_DTMON_LSMOR UI_CMS_DTMON_LSMOR O O 수정\n운영 모니터링 가공 모니터링 UI_CMS_DTMON UI_CMS_DTMON_RCVREQ UI_CMS_DTMON_RCVREQ O O 유지\n운영 모니터링 이용내역 조회 UI_CMS_DTMON UI_CMS_DTMON_NSLNK UI_CMS_DTMON_NSLNK O O 유지\n운영 모니터링 연계 현황 모니터링 UI_CMS_DTMON UI_CMS_DTMON_LSMOR UI_CMS_DTMON_LSMOR O O 신규 공공데이터포털 수집 모니터링 > 연계현황 모니터링으로 명칭 변경\n시스템 모니터링 기관공유시스템 모니터링 UI_CMS_SYSMON UI_CMS_SYSMON_IS UI_CMS_SYSMON_IS O O 유지\n시스템 모니터링 API키 발급현황 기관별 UI_CMS_SYSMON UI_CMS_SYSMON_APIKEY UI_CMS_SYSMON_APIKEY_INST O O 유지\n시스템 모니터링 API키 발급현황 API별 UI_CMS_SYSMON UI_CMS_SYSMON_APIKEY UI_CMS_SYSMON_APIKEY_API O O 유지\n시스템 모니터링 API키 발급현황 API 통계현황 UI_CMS_SYSMON UI_CMS_SYSMON_APIKEY UI_CMS_SYSMON_APIKEY_STAT O O 유지\n시스템 모니터링 저장소 모니터링 UI_CMS_SYSMON UI_CMS_SYSMON_STRG UI_CMS_SYSMON_STRG O O 유지\n시스템 모니터링 개인정보조회 모니터링 UI_CMS_SYSMON UI_CMS_SYSMON_PRIVACC UI_CMS_SYSMON_PRIVACC O O 유지\n시스템 모니터링 서버상태 모니터링 UI_CMS_SYSMON UI_CMS_SYSMON_SRV UI_CMS_SYSMON_SRV O O 유지\n시스템 모니터링 자원 모니터링 UI_CMS_SYSMON UI_CMS_SYSMON_RSRC  UI_CMS_SYSMON_RSRC  O O 유지\n시스템 모니터링 동기화 모니터링 운영관리 UI_CMS_SYSMON UI_CMS_SYSMON_SYNC UI_CMS_SYSMON_SYNC_OPMNG O O 유지\n시스템 모니터링 동기화 모니터링 데이터세트 UI_CMS_SYSMON UI_CMS_SYSMON_SYNC UI_CMS_SYSMON_SYNC_DTSET O O 유지\n운영관리 사용자 관리 국가공유데이터플랫폼 UI_CMS_OPMNG UI_CMS_OPMNG_USERMNG UI_CMS_OPMNG_USERMNG_NDSP O O 유지\n운영관리 사용자 관리 연계사이트 UI_CMS_OPMNG UI_CMS_OPMNG_USERMNG UI_CMS_OPMNG_USERMNG_LNK O O 유지\n운영관리 권한관리 UI_CMS_OPMNG UI_CMS_OPMNG_AUTHMNG UI_CMS_OPMNG_AUTHMNG O O 유지\n운영관리 기관공유시스템 관리 UI_CMS_OPMNG UI_CMS_OPMNG_INSTSHR UI_CMS_OPMNG_INSTSHR O O 유지\n운영관리 이용안내 관리 Q&A UI_CMS_OPMNG UI_CMS_OPMNG_UGMNG UI_CMS_OPMNG_UGMNG_QNA O O 유지\n운영관리 이용안내 관리 자료실 UI_CMS_OPMNG UI_CMS_OPMNG_UGMNG UI_CMS_OPMNG_UGMNG_DATAROOM O O 유지\n운영관리 이용안내 관리 공지사항 UI_CMS_OPMNG UI_CMS_OPMNG_UGMNG UI_CMS_OPMNG_UGMNG_NTC O O 유지\n운영관리 이용안내 관리 오류신고 UI_CMS_OPMNG UI_CMS_OPMNG_UGMNG UI_CMS_OPMNG_UGMNG_ERRRPT O O 유지\n운영관리 이용안내 관리 시스템 개선요청 UI_CMS_OPMNG UI_CMS_OPMNG_UGMNG UI_CMS_OPMNG_UGMNG_IMPREQ O O 유지\n운영관리 장애관리 UI_CMS_OPMNG UI_CMS_OPMNG_ERRMNG UI_CMS_OPMNG_ERRMNG O O 유지\n운영관리 주요데이터 관리 UI_CMS_OPMNG UI_CMS_OPMNG_COREDT UI_CMS_OPMNG_COREDT O O 유지\n요청데이터 관리 공유 요청 UI_CMS_OPMNG UI_CMS_OPMNG_REQDT UI_CMS_OPMNG_REQDT_SHR O O 수정\n운영관리 요청데이터 관리 개방 요청 UI_CMS_OPMNG UI_CMS_OPMNG_REQDT UI_CMS_OPMNG_REQDT_OPN O O 수정\n운영관리 활용사례 관리 UI_CMS_OPMNG UI_CMS_OPMNG_UCMNG UI_CMS_OPMNG_UCMNG O O 유지\n시스템관리 메뉴관리 포탈 UI_CMS_SYSMNG UI_CMS_SYSMNG_MENUMNG UI_CMS_SYSMNG_MENUMNG_PORTAL O O 유지\n시스템관리 메뉴관리 운영관리 UI_CMS_SYSMNG UI_CMS_SYSMNG_MENUMNG UI_CMS_SYSMNG_MENUMNG_OPMNG O O 유지\n시스템관리 작업관리 UI_CMS_SYSMNG UI_CMS_SYSMNG_TASKMNG UI_CMS_SYSMNG_TASKMNG O O 유지\n시스템관리 공통코드관리 UI_CMS_SYSMNG UI_CMS_SYSMNG_CMCDMNG UI_CMS_SYSMNG_CMCDMNG O O 유지\n시스템관리 저장소관리 UI_CMS_SYSMNG UI_CMS_SYSMNG_REPMNG UI_CMS_SYSMNG_REPMNG O O 유지\n시스템관리 표준API관리 UI_CMS_SYSMNG UI_CMS_SYSMNG_STDAPI UI_CMS_SYSMNG_STDAPI O O 유지\n시스템관리 제공기관 관리 UI_CMS_SYSMNG UI_CMS_SYSMNG_PROVINST UI_CMS_SYSMNG_PROVINST O O 유지\n시스템관리 ESB GPKI 현황 UI_CMS_SYSMNG UI_CMS_SYSMNG_ESBGPKI UI_CMS_SYSMNG_ESBGPKI O O 유지\n행정평가관리 심의현황 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_DBRD UI_CMS_ADMEVMNG_DBRD O O 신규\n행정평가관리 중장기 계획 심의 공유계획 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_MIDPLNDLB UI_CMS_ADMEVMNG_MIDPLNDLB_SHR O O 신규\n행정평가관리 중장기 계획 심의 개방계획 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_MIDPLNDLB UI_CMS_ADMEVMNG_MIDPLNDLB_OPN O O 신규\n행정평가관리 데이터 심의 공유데이터 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_DTDLB UI_CMS_ADMEVMNG_DTDLB_SHR O O 신규\n행정평가관리 데이터 심의 개방데이터 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_DTDLB UI_CMS_ADMEVMNG_DTDLB_OPN O O 신규\n행정평가관리 심의항목 관리 중장기 공유 계획 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_DLBITMNG UI_CMS_ADMEVMNG_DLBITMNG_MIDPLNDLB O O 신규 평가항목 관리 > 심의항목 관리로 명칭 변경,메뉴위치도 공유데이터 심의 다음순\n행정평가관리 심의항목 관리 공유데이터 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_DLBITMNG UI_CMS_ADMEVMNG_DLBITMNG_SHR O O 신규\n행정평가관리 평가지표 관리 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_EVALIDX UI_CMS_ADMEVMNG_EVALIDX O O 신규\n행정평가관리 평가기관 관리 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_EVALINST  UI_CMS_ADMEVMNG_EVALINST  O O 신규\n행정평가관리 평가일정 관리 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_EVALSCHD  UI_CMS_ADMEVMNG_EVALSCHD  O O 신규\n행정평가관리 평가결과 관리 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_EVALRES UI_CMS_ADMEVMNG_EVALRES O O 신규\n행정평가관리 이의신청 관리 UI_CMS_ADMEVMNG UI_CMS_ADMEVMNG_OBJREQMNG UI_CMS_ADMEVMNG_OBJREQMNG O O 신규\n\n\n프로젝트명 2025년 국가공유데이터 플랫폼 구축사업(2차) 작성일 46013 작성자 김진\n문서명 정보구조도(국가공유) 개정번호 Ver.1.3 문서코드 DN25-NIA-NSDP-DP01\n\n\n고정적으로 사용되는 헤더 파트입니다.\n표지 : 헤더 변경 시 표지 내용이 변경됩니다.\n작성일,버전 : 개정이력 변경 시 자동으로 변경됩니다\n\n\n"
+    },
+    "analyzedAt": "2025-12-29T04:24:09.847Z",
+    "fileName": "DN25-NIA-NSDP-DP01-정보구조도(국가공유)_v1.3.xlsx"
   }
 }

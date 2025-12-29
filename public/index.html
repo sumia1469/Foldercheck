@@ -853,12 +853,21 @@
                         </div>
                     </div>
 
-                    <!-- 다운로드 진행 상황 -->
-                    <div id="whisperDownloadProgress" class="download-progress" style="display: none;">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="whisperProgressBar" style="width: 0%;"></div>
+                    <!-- 다운로드 진행 상황 (인라인 로딩 박스) -->
+                    <div id="whisperDownloadProgress" class="inline-download-box" style="display: none;">
+                        <div class="inline-download-header">
+                            <div class="inline-spinner"></div>
+                            <span class="inline-download-title" id="whisperDownloadTitle">음성 인식 설치 중</span>
                         </div>
-                        <span class="progress-text" id="whisperProgressText">다운로드 중...</span>
+                        <div class="inline-download-body">
+                            <div class="inline-progress-row">
+                                <div class="inline-progress-bar">
+                                    <div class="inline-progress-fill" id="whisperProgressBar"></div>
+                                </div>
+                                <span class="inline-progress-percent" id="whisperProgressPercent">0%</span>
+                            </div>
+                            <p class="inline-download-status" id="whisperProgressText">준비 중...</p>
+                        </div>
                     </div>
 
                     <!-- 설치 버튼 -->
@@ -879,6 +888,30 @@
                             <span class="status-label">상태:</span>
                             <span class="status-value" id="ollamaStatus">확인 중...</span>
                         </div>
+                    </div>
+
+                    <!-- 모델 다운로드 진행 상황 (인라인 로딩 박스) -->
+                    <div id="ollamaDownloadProgress" class="inline-download-box" style="display: none;">
+                        <div class="inline-download-header">
+                            <div class="inline-spinner"></div>
+                            <span class="inline-download-title" id="ollamaDownloadTitle">AI 모델 설치 중</span>
+                        </div>
+                        <div class="inline-download-body">
+                            <div class="inline-progress-row">
+                                <div class="inline-progress-bar">
+                                    <div class="inline-progress-fill" id="ollamaProgressBar"></div>
+                                </div>
+                                <span class="inline-progress-percent" id="ollamaProgressPercent">0%</span>
+                            </div>
+                            <p class="inline-download-status" id="ollamaProgressText">준비 중...</p>
+                        </div>
+                    </div>
+
+                    <!-- 모델 설치 버튼 -->
+                    <div id="ollamaInstallSection" style="margin-top: 15px;">
+                        <button id="ollamaInstallBtn" class="btn btn-primary" style="display: none;">
+                            🔽 AI 모델 설치 (~2GB)
+                        </button>
                     </div>
                 </div>
 

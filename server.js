@@ -12,8 +12,14 @@ const { execSync, spawn } = require('child_process');
 
 // Windows 콘솔 UTF-8 인코딩 설정
 if (process.platform === 'win32') {
+    // 환경변수로 UTF-8 강제 설정
+    process.env.LANG = 'ko_KR.UTF-8';
+    process.env.LC_ALL = 'ko_KR.UTF-8';
+    process.env.PYTHONIOENCODING = 'utf-8';
+
+    // chcp 65001 실행하여 콘솔 코드페이지 변경
     try {
-        execSync('chcp 65001', { stdio: 'ignore' });
+        execSync('chcp 65001', { stdio: 'pipe', encoding: 'utf8' });
     } catch (e) {
         // 무시
     }
@@ -69,9 +75,9 @@ if (!fs.existsSync(WHISPER_CLI_DIR)) {
 // Whisper 모델 다운로드 URL
 const WHISPER_MODEL_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin';
 const WHISPER_CLI_URLS = {
-    win32: 'https://github.com/ggerganov/whisper.cpp/releases/download/v1.7.3/whisper-bin-x64.zip',
+    win32: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip',
     darwin: null, // macOS는 homebrew로 설치 권장
-    linux: 'https://github.com/ggerganov/whisper.cpp/releases/download/v1.7.3/whisper-bin-x64.zip'
+    linux: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip'
 };
 
 // 다운로드 진행 상태
@@ -218,56 +224,70 @@ function checkWhisperModel() {
 // 파일 다운로드 함수 (진행률 콜백 지원)
 function downloadFile(url, destPath, progressCallback) {
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(destPath);
+        console.log('다운로드 시작:', url);
 
-        const request = (url.startsWith('https') ? https : http).get(url, (response) => {
-            // 리다이렉트 처리
-            if (response.statusCode === 301 || response.statusCode === 302) {
-                file.close();
-                fs.unlinkSync(destPath);
-                return downloadFile(response.headers.location, destPath, progressCallback)
-                    .then(resolve)
-                    .catch(reject);
-            }
+        const makeRequest = (downloadUrl) => {
+            const protocol = downloadUrl.startsWith('https') ? https : http;
 
-            if (response.statusCode !== 200) {
-                file.close();
-                fs.unlinkSync(destPath);
-                reject(new Error(`다운로드 실패: HTTP ${response.statusCode}`));
-                return;
-            }
-
-            const totalSize = parseInt(response.headers['content-length'], 10);
-            let downloadedSize = 0;
-
-            response.on('data', (chunk) => {
-                downloadedSize += chunk.length;
-                if (progressCallback && totalSize) {
-                    const progress = Math.round((downloadedSize / totalSize) * 100);
-                    progressCallback(progress, downloadedSize, totalSize);
+            const request = protocol.get(downloadUrl, (response) => {
+                // 리다이렉트 처리 (301, 302, 303, 307, 308)
+                if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
+                    const redirectUrl = response.headers.location;
+                    console.log('리다이렉트:', redirectUrl);
+                    makeRequest(redirectUrl);
+                    return;
                 }
+
+                if (response.statusCode !== 200) {
+                    reject(new Error(`다운로드 실패: HTTP ${response.statusCode}`));
+                    return;
+                }
+
+                const file = fs.createWriteStream(destPath);
+                const totalSize = parseInt(response.headers['content-length'], 10);
+                let downloadedSize = 0;
+
+                response.on('data', (chunk) => {
+                    downloadedSize += chunk.length;
+                    if (progressCallback && totalSize) {
+                        const progress = Math.round((downloadedSize / totalSize) * 100);
+                        progressCallback(progress, downloadedSize, totalSize);
+                    }
+                });
+
+                response.pipe(file);
+
+                file.on('finish', () => {
+                    file.close(() => {
+                        console.log('다운로드 완료:', destPath);
+                        resolve(destPath);
+                    });
+                });
+
+                file.on('error', (err) => {
+                    file.close();
+                    if (fs.existsSync(destPath)) {
+                        fs.unlinkSync(destPath);
+                    }
+                    reject(err);
+                });
             });
 
-            response.pipe(file);
-
-            file.on('finish', () => {
-                file.close();
-                resolve(destPath);
+            request.on('error', (err) => {
+                console.error('다운로드 오류:', err.message);
+                if (fs.existsSync(destPath)) {
+                    fs.unlinkSync(destPath);
+                }
+                reject(err);
             });
-        });
 
-        request.on('error', (err) => {
-            file.close();
-            if (fs.existsSync(destPath)) {
-                fs.unlinkSync(destPath);
-            }
-            reject(err);
-        });
+            request.setTimeout(600000, () => { // 10분 타임아웃 (대용량 파일)
+                request.destroy();
+                reject(new Error('다운로드 시간 초과 (10분)'));
+            });
+        };
 
-        request.setTimeout(300000, () => { // 5분 타임아웃
-            request.destroy();
-            reject(new Error('다운로드 시간 초과'));
-        });
+        makeRequest(url);
     });
 }
 
@@ -469,17 +489,23 @@ async function transcribeAudio(audioPath) {
 
         console.log('실행 명령:', WHISPER_CLI_PATH, args.join(' '));
 
-        const whisperProcess = spawn(WHISPER_CLI_PATH, args);
+        const whisperProcess = spawn(WHISPER_CLI_PATH, args, {
+            env: { ...process.env, LANG: 'ko_KR.UTF-8', LC_ALL: 'ko_KR.UTF-8' }
+        });
         let stdout = '';
         let stderr = '';
 
+        // UTF-8 인코딩 설정
+        if (whisperProcess.stdout) whisperProcess.stdout.setEncoding('utf8');
+        if (whisperProcess.stderr) whisperProcess.stderr.setEncoding('utf8');
+
         whisperProcess.stdout.on('data', (data) => {
-            stdout += data.toString();
+            stdout += data;
         });
 
         whisperProcess.stderr.on('data', (data) => {
-            stderr += data.toString();
-            console.log('음성 인식:', data.toString().trim());
+            stderr += data;
+            console.log('음성 인식:', data.trim());
         });
 
         whisperProcess.on('close', (code) => {
@@ -1973,18 +1999,132 @@ async function checkOllamaStatus() {
             res.on('end', () => {
                 try {
                     const result = JSON.parse(data);
-                    const hasModel = result.models?.some(m => m.name.startsWith(CURRENT_AI_MODEL));
-                    resolve({ ready: true, hasModel, models: result.models || [], currentModel: CURRENT_AI_MODEL });
+                    const models = result.models || [];
+                    const hasModel = models.some(m => m.name.startsWith(CURRENT_AI_MODEL.split(':')[0]));
+                    // ready는 Ollama가 실행 중이고 모델도 있어야 true
+                    resolve({
+                        ready: hasModel,
+                        ollamaRunning: true,
+                        hasModel,
+                        models,
+                        currentModel: CURRENT_AI_MODEL,
+                        error: hasModel ? null : '모델이 설치되지 않았습니다. 설정에서 모델을 설치해주세요.'
+                    });
                 } catch (e) {
-                    resolve({ ready: false, error: 'JSON 파싱 오류' });
+                    resolve({ ready: false, ollamaRunning: false, error: 'JSON 파싱 오류' });
                 }
             });
         });
-        req.on('error', () => resolve({ ready: false, error: '내장 AI 연결 실패' }));
+        req.on('error', () => resolve({ ready: false, ollamaRunning: false, error: '내장 AI 연결 실패' }));
         req.setTimeout(3000, () => {
             req.destroy();
-            resolve({ ready: false, error: '타임아웃' });
+            resolve({ ready: false, ollamaRunning: false, error: '타임아웃' });
         });
+    });
+}
+
+// Ollama 모델 다운로드 진행 상태
+let ollamaDownloadProgress = {
+    downloading: false,
+    model: null,
+    progress: 0,
+    status: '',
+    error: null
+};
+
+// Ollama 모델 다운로드 (pull)
+async function pullOllamaModel(modelName) {
+    if (ollamaDownloadProgress.downloading) {
+        throw new Error('이미 다운로드 중입니다.');
+    }
+
+    ollamaDownloadProgress = {
+        downloading: true,
+        model: modelName,
+        progress: 0,
+        status: '다운로드 시작...',
+        error: null
+    };
+
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
+            name: modelName,
+            stream: true
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 11434,
+            path: '/api/pull',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let buffer = '';
+
+            res.on('data', (chunk) => {
+                buffer += chunk.toString();
+
+                // 줄 단위로 JSON 파싱 (스트리밍 응답)
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // 마지막 불완전한 줄은 버퍼에 유지
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+
+                        if (data.status) {
+                            ollamaDownloadProgress.status = data.status;
+                        }
+
+                        if (data.completed && data.total) {
+                            ollamaDownloadProgress.progress = Math.round((data.completed / data.total) * 100);
+                        }
+
+                        if (data.error) {
+                            ollamaDownloadProgress.error = data.error;
+                            ollamaDownloadProgress.downloading = false;
+                            reject(new Error(data.error));
+                            return;
+                        }
+
+                        console.log(`[Ollama Pull] ${data.status || ''} ${ollamaDownloadProgress.progress}%`);
+                    } catch (e) {
+                        // JSON 파싱 오류 무시
+                    }
+                }
+            });
+
+            res.on('end', () => {
+                ollamaDownloadProgress.downloading = false;
+                ollamaDownloadProgress.progress = 100;
+                ollamaDownloadProgress.status = '설치 완료';
+                console.log(`모델 다운로드 완료: ${modelName}`);
+                resolve({ success: true, model: modelName });
+            });
+        });
+
+        req.on('error', (err) => {
+            ollamaDownloadProgress.downloading = false;
+            ollamaDownloadProgress.error = err.message;
+            console.error('모델 다운로드 오류:', err);
+            reject(err);
+        });
+
+        req.setTimeout(1800000, () => { // 30분 타임아웃
+            req.destroy();
+            ollamaDownloadProgress.downloading = false;
+            ollamaDownloadProgress.error = '다운로드 시간 초과';
+            reject(new Error('다운로드 시간 초과 (30분)'));
+        });
+
+        req.write(postData);
+        req.end();
     });
 }
 
@@ -3742,6 +3882,63 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // API: Ollama 모델 다운로드 (pull)
+        if (pathname === '/api/ollama/pull' && req.method === 'POST') {
+            try {
+                const { model } = await parseBody(req);
+                const modelName = model || CURRENT_AI_MODEL;
+
+                console.log(`모델 다운로드 시작: ${modelName}`);
+
+                // 내장 AI가 실행 중인지 확인
+                const status = await checkOllamaStatus();
+                if (!status.ollamaRunning) {
+                    res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: '내장 AI가 실행 중이 아닙니다. 앱을 재시작해주세요.'
+                    }));
+                    return;
+                }
+
+                // 이미 모델이 있는지 확인
+                if (status.hasModel) {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        success: true,
+                        message: '모델이 이미 설치되어 있습니다.',
+                        model: modelName
+                    }));
+                    return;
+                }
+
+                // 모델 다운로드 시작 (비동기)
+                pullOllamaModel(modelName).catch(err => {
+                    console.error('모델 다운로드 오류:', err);
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    message: '모델 다운로드가 시작되었습니다.',
+                    model: modelName,
+                    downloading: true
+                }));
+            } catch (error) {
+                console.error('모델 다운로드 요청 오류:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: false, error: error.message }));
+            }
+            return;
+        }
+
+        // API: Ollama 모델 다운로드 진행 상황
+        if (pathname === '/api/ollama/pull/progress' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(ollamaDownloadProgress));
+            return;
+        }
+
         // API: 변경 내용 AI 분석
         if (pathname === '/api/analyze/change' && req.method === 'POST') {
             try {
@@ -3914,13 +4111,20 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
-                // Ollama 상태 확인
+                // 내장 AI 상태 확인
                 const ollamaStatus = await checkOllamaStatus();
                 if (!ollamaStatus.ready) {
+                    let errorMsg = '내장 AI가 준비되지 않았습니다.';
+                    if (!ollamaStatus.ollamaRunning) {
+                        errorMsg = '내장 AI가 실행되지 않았습니다. 앱을 재시작해주세요.';
+                    } else if (!ollamaStatus.hasModel) {
+                        errorMsg = 'AI 모델이 설치되지 않았습니다. 설정에서 모델을 설치해주세요.';
+                    }
                     res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         success: false,
-                        error: '내장 AI가 실행 중이 아닙니다.'
+                        error: errorMsg,
+                        details: ollamaStatus
                     }));
                     return;
                 }

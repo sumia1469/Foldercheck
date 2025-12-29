@@ -8,8 +8,14 @@ const net = require('net');
 
 // Windows 콘솔 UTF-8 인코딩 설정
 if (process.platform === 'win32') {
+    // 환경변수로 UTF-8 강제 설정
+    process.env.LANG = 'ko_KR.UTF-8';
+    process.env.LC_ALL = 'ko_KR.UTF-8';
+    process.env.PYTHONIOENCODING = 'utf-8';
+
+    // chcp 65001 실행하여 콘솔 코드페이지 변경
     try {
-        execSync('chcp 65001', { stdio: 'ignore' });
+        execSync('chcp 65001', { stdio: 'pipe', encoding: 'utf8' });
     } catch (e) {
         // 무시
     }
@@ -47,6 +53,16 @@ if (!fs.existsSync(LOG_DIR)) {
 
 const LOG_FILE = path.join(LOG_DIR, `docwatch-${new Date().toISOString().slice(0, 10)}.log`);
 
+// UTF-8 BOM (Byte Order Mark) - Windows에서 UTF-8 파일 인식용
+const UTF8_BOM = '\ufeff';
+
+// 로그 파일 초기화 (UTF-8 BOM 추가)
+function initLogFile() {
+    if (!fs.existsSync(LOG_FILE)) {
+        fs.writeFileSync(LOG_FILE, UTF8_BOM, { encoding: 'utf8' });
+    }
+}
+
 // 기존 console 함수 저장
 const originalConsoleLog = console.log.bind(console);
 const originalConsoleError = console.error.bind(console);
@@ -55,6 +71,8 @@ function writeLog(level, message) {
     const timestamp = new Date().toISOString();
     const logLine = `[${timestamp}] [${level}] ${message}`;
     try {
+        // 로그 파일 초기화 (BOM 추가)
+        initLogFile();
         fs.appendFileSync(LOG_FILE, logLine + '\n', { encoding: 'utf8' });
     } catch (e) {
         // 로그 쓰기 실패 시 무시
@@ -120,6 +138,121 @@ async function isOllamaRunning() {
     });
 }
 
+// 기본 AI 모델 설정
+const DEFAULT_AI_MODEL = 'qwen2.5:3b';
+
+// 모델 설치 여부 확인
+async function checkModelInstalled() {
+    return new Promise((resolve) => {
+        const req = http.get(`http://localhost:${OLLAMA_PORT}/api/tags`, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    const models = result.models || [];
+                    const hasModel = models.some(m => m.name.startsWith(DEFAULT_AI_MODEL.split(':')[0]));
+                    resolve({ hasModel, models });
+                } catch (e) {
+                    resolve({ hasModel: false, models: [] });
+                }
+            });
+        });
+        req.on('error', () => resolve({ hasModel: false, models: [] }));
+        req.setTimeout(5000, () => {
+            req.destroy();
+            resolve({ hasModel: false, models: [] });
+        });
+    });
+}
+
+// 모델 자동 다운로드
+async function autoDownloadModel() {
+    console.log(`기본 AI 모델(${DEFAULT_AI_MODEL}) 설치 확인 중...`);
+
+    const { hasModel } = await checkModelInstalled();
+
+    if (hasModel) {
+        console.log('AI 모델이 이미 설치되어 있습니다.');
+        return true;
+    }
+
+    console.log(`AI 모델(${DEFAULT_AI_MODEL}) 다운로드 시작...`);
+    console.log('※ 첫 실행 시 약 2GB 다운로드가 필요합니다. 잠시 기다려주세요...');
+
+    return new Promise((resolve) => {
+        const postData = JSON.stringify({
+            name: DEFAULT_AI_MODEL,
+            stream: true
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: OLLAMA_PORT,
+            path: '/api/pull',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let buffer = '';
+            let lastProgress = 0;
+
+            res.on('data', (chunk) => {
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+
+                        if (data.completed && data.total) {
+                            const progress = Math.round((data.completed / data.total) * 100);
+                            // 10% 단위로만 로그 출력
+                            if (progress >= lastProgress + 10) {
+                                console.log(`AI 모델 다운로드: ${progress}%`);
+                                lastProgress = progress;
+                            }
+                        }
+
+                        if (data.error) {
+                            console.error('모델 다운로드 오류:', data.error);
+                            resolve(false);
+                            return;
+                        }
+                    } catch (e) {
+                        // JSON 파싱 오류 무시
+                    }
+                }
+            });
+
+            res.on('end', () => {
+                console.log('AI 모델 다운로드 완료!');
+                resolve(true);
+            });
+        });
+
+        req.on('error', (err) => {
+            console.error('모델 다운로드 요청 오류:', err.message);
+            resolve(false);
+        });
+
+        req.setTimeout(1800000, () => { // 30분 타임아웃
+            console.error('모델 다운로드 시간 초과');
+            req.destroy();
+            resolve(false);
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
 // 시스템 Ollama 찾기
 function findSystemOllama() {
     try {
@@ -166,7 +299,9 @@ async function startEmbeddedOllama() {
     const env = {
         ...process.env,
         OLLAMA_MODELS: getOllamaModelsPath(),
-        OLLAMA_HOST: `localhost:${OLLAMA_PORT}`
+        OLLAMA_HOST: `localhost:${OLLAMA_PORT}`,
+        LANG: 'ko_KR.UTF-8',
+        LC_ALL: 'ko_KR.UTF-8'
     };
 
     return new Promise((resolve) => {
@@ -178,12 +313,16 @@ async function startEmbeddedOllama() {
                 detached: false
             });
 
+            // UTF-8 인코딩 설정
+            if (ollamaProcess.stdout) ollamaProcess.stdout.setEncoding('utf8');
+            if (ollamaProcess.stderr) ollamaProcess.stderr.setEncoding('utf8');
+
             ollamaProcess.stdout.on('data', (data) => {
-                console.log('[Ollama]', data.toString().trim());
+                console.log('[Ollama]', data.trim());
             });
 
             ollamaProcess.stderr.on('data', (data) => {
-                console.log('[Ollama]', data.toString().trim());
+                console.log('[Ollama]', data.trim());
             });
 
             ollamaProcess.on('error', (err) => {
@@ -439,6 +578,17 @@ if (!gotTheLock) {
         const ollamaStarted = await startEmbeddedOllama();
         if (ollamaStarted) {
             console.log('AI 엔진 준비 완료');
+
+            // 모델 자동 다운로드 (백그라운드에서 진행)
+            autoDownloadModel().then(success => {
+                if (success) {
+                    console.log('AI 모델 준비 완료');
+                } else {
+                    console.log('AI 모델 다운로드 실패. 설정에서 수동으로 설치해주세요.');
+                }
+            }).catch(err => {
+                console.error('AI 모델 다운로드 오류:', err.message);
+            });
         } else {
             console.log('AI 엔진을 시작할 수 없습니다. 일부 기능이 제한됩니다.');
         }

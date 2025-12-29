@@ -1,3 +1,74 @@
+// ========================================
+// 인라인 다운로드 박스 유틸리티
+// ========================================
+const InlineDownload = {
+    // type: 'whisper' 또는 'ollama'
+    show(type, title, status = '준비 중...') {
+        const prefix = type === 'whisper' ? 'whisper' : 'ollama';
+        const box = document.getElementById(`${prefix}DownloadProgress`);
+        const titleEl = document.getElementById(`${prefix}DownloadTitle`);
+        const progressEl = document.getElementById(`${prefix}ProgressBar`);
+        const percentEl = document.getElementById(`${prefix}ProgressPercent`);
+        const statusEl = document.getElementById(`${prefix}ProgressText`);
+
+        if (box) {
+            box.style.display = 'block';
+            box.className = 'inline-download-box';
+        }
+        if (titleEl) titleEl.textContent = title;
+        if (progressEl) progressEl.style.width = '0%';
+        if (percentEl) percentEl.textContent = '0%';
+        if (statusEl) statusEl.textContent = status;
+    },
+
+    update(type, status, progress = 0) {
+        const prefix = type === 'whisper' ? 'whisper' : 'ollama';
+        const progressEl = document.getElementById(`${prefix}ProgressBar`);
+        const percentEl = document.getElementById(`${prefix}ProgressPercent`);
+        const statusEl = document.getElementById(`${prefix}ProgressText`);
+
+        if (progressEl) progressEl.style.width = `${progress}%`;
+        if (percentEl) percentEl.textContent = `${Math.round(progress)}%`;
+        if (statusEl) statusEl.textContent = status;
+    },
+
+    success(type, message = '완료되었습니다!') {
+        const prefix = type === 'whisper' ? 'whisper' : 'ollama';
+        const box = document.getElementById(`${prefix}DownloadProgress`);
+        const titleEl = document.getElementById(`${prefix}DownloadTitle`);
+        const progressEl = document.getElementById(`${prefix}ProgressBar`);
+        const percentEl = document.getElementById(`${prefix}ProgressPercent`);
+        const statusEl = document.getElementById(`${prefix}ProgressText`);
+
+        if (box) box.className = 'inline-download-box success';
+        if (titleEl) titleEl.textContent = '설치 완료';
+        if (progressEl) progressEl.style.width = '100%';
+        if (percentEl) percentEl.textContent = '100%';
+        if (statusEl) statusEl.textContent = message;
+
+        setTimeout(() => this.hide(type), 3000);
+    },
+
+    error(type, message = '오류가 발생했습니다.') {
+        const prefix = type === 'whisper' ? 'whisper' : 'ollama';
+        const box = document.getElementById(`${prefix}DownloadProgress`);
+        const titleEl = document.getElementById(`${prefix}DownloadTitle`);
+        const statusEl = document.getElementById(`${prefix}ProgressText`);
+
+        if (box) box.className = 'inline-download-box error';
+        if (titleEl) titleEl.textContent = '설치 실패';
+        if (statusEl) statusEl.textContent = message;
+
+        setTimeout(() => this.hide(type), 5000);
+    },
+
+    hide(type) {
+        const prefix = type === 'whisper' ? 'whisper' : 'ollama';
+        const box = document.getElementById(`${prefix}DownloadProgress`);
+        if (box) box.style.display = 'none';
+    }
+};
+
 // DOM 요소
 const folderInput = document.getElementById('folderInput');
 const addBtn = document.getElementById('addBtn');
@@ -1144,17 +1215,39 @@ async function loadAiModelStatus() {
         const status = await statusRes.json();
 
         const aiStatusEl = document.getElementById('ollamaStatus');
+        const installBtn = document.getElementById('ollamaInstallBtn');
+        const progressDiv = document.getElementById('ollamaDownloadProgress');
 
-        // 내장 AI 상태 표시
+        // 상태 표시 (단순화: 준비됨/설치 필요/준비 중)
         if (aiStatusEl) {
-            if (status.ready) {
-                aiStatusEl.textContent = '동작 중 ✓';
+            if (status.ready && status.hasModel) {
+                aiStatusEl.textContent = '준비됨';
                 aiStatusEl.style.color = 'var(--success)';
+            } else if (status.ollamaRunning && !status.hasModel) {
+                aiStatusEl.textContent = '설치 필요';
+                aiStatusEl.style.color = 'var(--warning)';
+            } else if (!status.ollamaRunning) {
+                aiStatusEl.textContent = '준비 중';
+                aiStatusEl.style.color = 'var(--text-secondary)';
             } else {
-                aiStatusEl.textContent = '연결 실패';
+                aiStatusEl.textContent = status.error || '연결 실패';
                 aiStatusEl.style.color = 'var(--danger)';
             }
         }
+
+        // 설치 버튼 표시/숨김 (내장 AI 실행 중이고 모델 없을 때만)
+        if (installBtn) {
+            if (status.ollamaRunning && !status.hasModel) {
+                installBtn.style.display = 'inline-block';
+            } else {
+                installBtn.style.display = 'none';
+            }
+        }
+
+        // 다운로드 진행 상황 확인
+        await checkOllamaDownloadProgress();
+
+        return status;
     } catch (e) {
         console.error('내장 AI 상태 확인 실패:', e);
         const aiStatusEl = document.getElementById('ollamaStatus');
@@ -1162,8 +1255,134 @@ async function loadAiModelStatus() {
             aiStatusEl.textContent = '확인 실패';
             aiStatusEl.style.color = 'var(--danger)';
         }
+        return null;
     }
 }
+
+// 내장 AI 모델 다운로드 진행 상황 확인
+async function checkOllamaDownloadProgress() {
+    try {
+        const res = await fetch('/api/ollama/pull/progress');
+        const progress = await res.json();
+
+        const progressDiv = document.getElementById('ollamaDownloadProgress');
+        const progressBar = document.getElementById('ollamaProgressBar');
+        const progressText = document.getElementById('ollamaProgressText');
+        const installBtn = document.getElementById('ollamaInstallBtn');
+        const aiStatusEl = document.getElementById('ollamaStatus');
+
+        if (progress.downloading) {
+            if (progressDiv) progressDiv.style.display = 'block';
+            if (progressBar) progressBar.style.width = `${progress.progress}%`;
+            if (progressText) progressText.textContent = `${progress.status} (${progress.progress}%)`;
+            if (installBtn) {
+                installBtn.style.display = 'inline-block';
+                installBtn.disabled = true;
+                installBtn.textContent = '⏳ 다운로드 중...';
+            }
+            if (aiStatusEl) {
+                aiStatusEl.textContent = `다운로드 중 ${progress.progress}%`;
+                aiStatusEl.style.color = 'var(--info)';
+            }
+        } else {
+            if (progressDiv) progressDiv.style.display = 'none';
+            if (installBtn) {
+                installBtn.disabled = false;
+                installBtn.textContent = '🔽 AI 모델 설치 (~2GB)';
+            }
+        }
+
+        return progress;
+    } catch (e) {
+        return null;
+    }
+}
+
+// 내장 AI 모델 설치 시작
+async function installOllamaModel() {
+    const installBtn = document.getElementById('ollamaInstallBtn');
+    if (installBtn) {
+        installBtn.disabled = true;
+        installBtn.style.display = 'none';
+    }
+
+    // 인라인 로딩 박스 표시
+    InlineDownload.show('ollama', 'AI 모델 설치 중', '서버에 연결 중...');
+
+    try {
+        const res = await fetch('/api/ollama/pull', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            InlineDownload.update('ollama', '다운로드 시작 중...', 0);
+            // 진행 상황 폴링 시작
+            startOllamaProgressPolling();
+        } else {
+            InlineDownload.error('ollama', '설치 시작 실패: ' + (data.error || '알 수 없는 오류'));
+            if (installBtn) {
+                installBtn.disabled = false;
+                installBtn.style.display = 'inline-flex';
+            }
+        }
+    } catch (e) {
+        InlineDownload.error('ollama', '설치 요청 실패: ' + e.message);
+        if (installBtn) {
+            installBtn.disabled = false;
+            installBtn.style.display = 'inline-flex';
+        }
+    }
+}
+
+// 내장 AI 다운로드 진행 상황 폴링
+let ollamaProgressInterval = null;
+
+function startOllamaProgressPolling() {
+    if (ollamaProgressInterval) return;
+
+    ollamaProgressInterval = setInterval(async () => {
+        const progress = await checkOllamaDownloadProgress();
+
+        if (progress) {
+            // 진행률 계산 및 인라인 박스 업데이트
+            const percent = progress.progress || 0;
+            let statusText = progress.status || '다운로드 중...';
+
+            if (progress.completed && progress.total) {
+                const completedMB = (progress.completed / 1024 / 1024).toFixed(1);
+                const totalMB = (progress.total / 1024 / 1024).toFixed(1);
+                statusText = `${statusText} (${completedMB} / ${totalMB} MB)`;
+            }
+
+            InlineDownload.update('ollama', statusText, percent);
+        }
+
+        if (progress && !progress.downloading) {
+            clearInterval(ollamaProgressInterval);
+            ollamaProgressInterval = null;
+
+            // 설치 완료 확인
+            const status = await loadAiModelStatus();
+            if (status?.ready) {
+                InlineDownload.success('ollama', 'AI 모델이 설치되었습니다!');
+            } else if (progress.error) {
+                InlineDownload.error('ollama', '설치 중 오류: ' + progress.error);
+                const installBtn = document.getElementById('ollamaInstallBtn');
+                if (installBtn) {
+                    installBtn.disabled = false;
+                    installBtn.style.display = 'inline-flex';
+                }
+            }
+        }
+    }, 500);
+}
+
+// 내장 AI 설치 버튼 이벤트 연결
+document.addEventListener('DOMContentLoaded', () => {
+    const ollamaInstallBtn = document.getElementById('ollamaInstallBtn');
+    if (ollamaInstallBtn) {
+        ollamaInstallBtn.addEventListener('click', installOllamaModel);
+    }
+});
 
 // 설정 저장
 async function saveSettings() {
@@ -3139,7 +3358,7 @@ function copyMeetingSummary(meetingId) {
     }
 }
 
-// Ollama 상태 확인
+// 내장 AI 상태 확인
 async function checkOllamaStatus() {
     try {
         const res = await fetch('/api/ollama/status');
@@ -3280,28 +3499,32 @@ async function installWhisper() {
     const installBtn = document.getElementById('whisperInstallBtn');
     if (installBtn) {
         installBtn.disabled = true;
-        installBtn.textContent = '⏳ 설치 시작 중...';
+        installBtn.style.display = 'none';
     }
+
+    // 인라인 로딩 박스 표시
+    InlineDownload.show('whisper', '음성 인식 설치 중', '서버에 연결 중...');
 
     try {
         const res = await fetch('/api/whisper/install', { method: 'POST' });
         const data = await res.json();
 
         if (data.success) {
+            InlineDownload.update('whisper', '다운로드 시작 중...', 0);
             // 진행 상황 폴링 시작
             startWhisperProgressPolling();
         } else {
-            alert('설치 시작 실패: ' + (data.error || '알 수 없는 오류'));
+            InlineDownload.error('whisper', '설치 시작 실패: ' + (data.error || '알 수 없는 오류'));
             if (installBtn) {
                 installBtn.disabled = false;
-                installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
+                installBtn.style.display = 'inline-flex';
             }
         }
     } catch (e) {
-        alert('설치 요청 실패: ' + e.message);
+        InlineDownload.error('whisper', '설치 요청 실패: ' + e.message);
         if (installBtn) {
             installBtn.disabled = false;
-            installBtn.textContent = '🔽 음성 인식 설치 (~500MB)';
+            installBtn.style.display = 'inline-flex';
         }
     }
 }
@@ -3318,16 +3541,59 @@ function startWhisperProgressPolling() {
         if (data) {
             const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
 
+            // 진행률 계산 및 인라인 박스 업데이트
+            if (isDownloading) {
+                const modelProgress = data.downloadProgress?.model?.progress || 0;
+                const cliProgress = data.downloadProgress?.cli?.progress || 0;
+                const modelDownloading = data.downloadProgress?.model?.downloading;
+                const cliDownloading = data.downloadProgress?.cli?.downloading;
+
+                let statusText = '다운로드 중...';
+                let totalProgress = 0;
+
+                if (modelDownloading && cliDownloading) {
+                    statusText = '모델 및 CLI 다운로드 중...';
+                    totalProgress = (modelProgress + cliProgress) / 2;
+                } else if (modelDownloading) {
+                    statusText = '음성 인식 모델 다운로드 중...';
+                    totalProgress = modelProgress;
+                } else if (cliDownloading) {
+                    statusText = 'CLI 도구 다운로드 중...';
+                    totalProgress = cliProgress;
+                }
+
+                InlineDownload.update('whisper', statusText, totalProgress);
+            }
+
             if (!isDownloading) {
                 clearInterval(whisperProgressInterval);
                 whisperProgressInterval = null;
 
                 // 설치 완료 확인
                 if (data.ready) {
-                    alert('✅ 음성 인식 설치가 완료되었습니다!');
+                    InlineDownload.success('whisper', '음성 인식이 설치되었습니다!');
                 } else if (data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error) {
-                    const error = data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error;
-                    alert('❌ 설치 중 오류 발생: ' + error);
+                    const modelError = data.downloadProgress?.model?.error;
+                    const cliError = data.downloadProgress?.cli?.error;
+                    let errorMsg = '설치 중 오류 발생';
+                    if (cliError) errorMsg = 'CLI 다운로드 실패: ' + cliError;
+                    else if (modelError) errorMsg = '모델 다운로드 실패: ' + modelError;
+                    InlineDownload.error('whisper', errorMsg);
+
+                    // 버튼 다시 활성화
+                    const installBtn = document.getElementById('whisperInstallBtn');
+                    if (installBtn) {
+                        installBtn.disabled = false;
+                        installBtn.style.display = 'inline-flex';
+                    }
+                } else if (!data.modelExists) {
+                    // 다운로드는 끝났는데 모델이 없는 경우 (이상한 상태)
+                    InlineDownload.error('whisper', '설치가 완료되지 않았습니다. 다시 시도해주세요.');
+                    const installBtn = document.getElementById('whisperInstallBtn');
+                    if (installBtn) {
+                        installBtn.disabled = false;
+                        installBtn.style.display = 'inline-flex';
+                    }
                 }
             }
         }
@@ -4143,6 +4409,12 @@ function applyFeatureRestrictions(status) {
     const whisperSettingsCard = document.getElementById('whisperStatusSettings')?.closest('.settings-card');
     const aiModelSettingsCard = document.getElementById('aiModelStatusSettings')?.closest('.settings-card');
 
+    // 스마트 어시스트(LLM) 관련 요소
+    const llmNavItem = document.querySelector('.nav-item[data-section="llm"]');
+    const llmSection = document.getElementById('llm');
+    const rightPanelLlmTab = document.querySelector('.panel-tab[data-panel-tab="llm-chat"]');
+    const rightPanelLlmContent = document.getElementById('panelLlmChat');
+
     if (!status.features.meetingTranscription) {
         // 회의 녹음 기능 제한 - 메뉴 숨김
         if (meetingNavItem) {
@@ -4179,9 +4451,36 @@ function applyFeatureRestrictions(status) {
         if (aiModelSettingsCard) {
             aiModelSettingsCard.style.display = 'none';
         }
+        // 스마트 어시스트 메뉴 및 섹션 숨김
+        if (llmNavItem) {
+            llmNavItem.style.display = 'none';
+        }
+        if (llmSection) {
+            llmSection.style.display = 'none';
+        }
+        // 우측 패널 스마트 어시스트 탭 숨김
+        if (rightPanelLlmTab) {
+            rightPanelLlmTab.style.display = 'none';
+        }
+        if (rightPanelLlmContent) {
+            rightPanelLlmContent.style.display = 'none';
+        }
     } else {
         if (aiModelSettingsCard) {
             aiModelSettingsCard.style.display = '';
+        }
+        // 스마트 어시스트 표시
+        if (llmNavItem) {
+            llmNavItem.style.display = '';
+        }
+        if (llmSection) {
+            llmSection.style.display = '';
+        }
+        if (rightPanelLlmTab) {
+            rightPanelLlmTab.style.display = '';
+        }
+        if (rightPanelLlmContent) {
+            rightPanelLlmContent.style.display = '';
         }
     }
 }

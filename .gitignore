@@ -15,9 +15,15 @@ dist-ssr
 # Large AI model files
 models/*.bin
 
+# Whisper CLI binaries (음성인식 바이너리)
+bin/
+
 # Embedded Ollama (내장 AI - 용량이 큼)
 resources/ollama/
 offline-install/
+
+# Temporary/build files
+nul
 
 # Audio files (회의 녹음)
 *.wav

@@ -73,7 +73,12 @@
       "Bash(export APPLE_APP_PASSWORD=\"wlzk-kave-vkmn-xsgd\")",
       "Bash(sudo sntp:*)",
       "Bash(export APPLE_APP_SPECIFIC_PASSWORD=\"wlzk-kave-vkmn-xsgd\")",
-      "Bash(whisper-cli:*)"
+      "Bash(whisper-cli:*)",
+      "Bash(timeout 60 bash -c:*)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(cmd /c \"ping -n 8 localhost >nul && type C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-D101-check-docwatch\\\\tasks\\\\b334ac3.output\")",
+      "Bash(cmd /c \"ping -n 6 localhost >nul && type C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-D101-check-docwatch\\\\tasks\\\\be304b0.output\")"
     ]
   }
 }

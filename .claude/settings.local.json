@@ -78,7 +78,16 @@
       "Bash(timeout:*)",
       "Bash(ping:*)",
       "Bash(cmd /c \"ping -n 8 localhost >nul && type C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-D101-check-docwatch\\\\tasks\\\\b334ac3.output\")",
-      "Bash(cmd /c \"ping -n 6 localhost >nul && type C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-D101-check-docwatch\\\\tasks\\\\be304b0.output\")"
+      "Bash(cmd /c \"ping -n 6 localhost >nul && type C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-D101-check-docwatch\\\\tasks\\\\be304b0.output\")",
+      "Bash(cmd /c \"ping -n 6 localhost >nul && type C:\\\\Users\\\\D101\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-D101-check-docwatch\\\\tasks\\\\b14a9a6.output\")",
+      "Bash(cmd /c \"taskkill /F /IM electron.exe\")",
+      "Bash(cmd /c \"taskkill /F /IM electron.exe /T\")",
+      "Bash(cmd /c \"ping -n 6 localhost >nul && tasklist | findstr electron\")",
+      "Bash(cmd /c \"ping -n 8 localhost >nul && tasklist | findstr electron\")",
+      "Bash(node_modules\\\\.bin\\\\electron.cmd --version)",
+      "Bash(cmd /c \"node_modules\\\\.bin\\\\electron.cmd --version\")",
+      "Bash(cmd /c \"npm start\")",
+      "Bash(cmd /c \"ping -n 10 localhost >nul && tasklist | findstr electron\")"
     ]
   }
 }

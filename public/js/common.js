@@ -3507,73 +3507,78 @@ async function installWhisper() {
     }
 }
 
-// 다운로드 진행 상황 폴링
+// 다운로드 진행 상황 폴링 (직접 API 호출)
 let whisperProgressInterval = null;
 
 function startWhisperProgressPolling() {
     if (whisperProgressInterval) return;
 
     whisperProgressInterval = setInterval(async () => {
-        const data = await checkWhisperStatus();
+        try {
+            const res = await fetch('/api/whisper/status');
+            const data = await res.json();
 
-        if (data) {
-            const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
+            if (data) {
+                const isDownloading = data.downloadProgress?.model?.downloading || data.downloadProgress?.cli?.downloading;
 
-            // 진행률 계산 및 인라인 박스 업데이트
-            if (isDownloading) {
-                const modelProgress = data.downloadProgress?.model?.progress || 0;
-                const cliProgress = data.downloadProgress?.cli?.progress || 0;
-                const modelDownloading = data.downloadProgress?.model?.downloading;
-                const cliDownloading = data.downloadProgress?.cli?.downloading;
+                // 진행률 계산 및 인라인 박스 업데이트
+                if (isDownloading) {
+                    const modelProgress = data.downloadProgress?.model?.progress || 0;
+                    const cliProgress = data.downloadProgress?.cli?.progress || 0;
+                    const modelDownloading = data.downloadProgress?.model?.downloading;
+                    const cliDownloading = data.downloadProgress?.cli?.downloading;
 
-                let statusText = '다운로드 중...';
-                let totalProgress = 0;
+                    let statusText = '다운로드 중...';
+                    let totalProgress = 0;
 
-                if (modelDownloading && cliDownloading) {
-                    statusText = '모델 및 CLI 다운로드 중...';
-                    totalProgress = (modelProgress + cliProgress) / 2;
-                } else if (modelDownloading) {
-                    statusText = '음성 인식 모델 다운로드 중...';
-                    totalProgress = modelProgress;
-                } else if (cliDownloading) {
-                    statusText = 'CLI 도구 다운로드 중...';
-                    totalProgress = cliProgress;
+                    if (modelDownloading && cliDownloading) {
+                        statusText = '모델 및 CLI 다운로드 중...';
+                        totalProgress = (modelProgress + cliProgress) / 2;
+                    } else if (modelDownloading) {
+                        statusText = '음성 인식 모델 다운로드 중...';
+                        totalProgress = modelProgress;
+                    } else if (cliDownloading) {
+                        statusText = 'CLI 도구 다운로드 중...';
+                        totalProgress = cliProgress;
+                    }
+
+                    InlineDownload.update('whisper', statusText, totalProgress);
                 }
 
-                InlineDownload.update('whisper', statusText, totalProgress);
-            }
+                if (!isDownloading) {
+                    clearInterval(whisperProgressInterval);
+                    whisperProgressInterval = null;
 
-            if (!isDownloading) {
-                clearInterval(whisperProgressInterval);
-                whisperProgressInterval = null;
+                    // 설치 완료 확인
+                    if (data.ready) {
+                        InlineDownload.success('whisper', '음성 인식이 설치되었습니다!');
+                    } else if (data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error) {
+                        const modelError = data.downloadProgress?.model?.error;
+                        const cliError = data.downloadProgress?.cli?.error;
+                        let errorMsg = '설치 중 오류 발생';
+                        if (cliError) errorMsg = 'CLI 다운로드 실패: ' + cliError;
+                        else if (modelError) errorMsg = '모델 다운로드 실패: ' + modelError;
+                        InlineDownload.error('whisper', errorMsg);
 
-                // 설치 완료 확인
-                if (data.ready) {
-                    InlineDownload.success('whisper', '음성 인식이 설치되었습니다!');
-                } else if (data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error) {
-                    const modelError = data.downloadProgress?.model?.error;
-                    const cliError = data.downloadProgress?.cli?.error;
-                    let errorMsg = '설치 중 오류 발생';
-                    if (cliError) errorMsg = 'CLI 다운로드 실패: ' + cliError;
-                    else if (modelError) errorMsg = '모델 다운로드 실패: ' + modelError;
-                    InlineDownload.error('whisper', errorMsg);
-
-                    // 버튼 다시 활성화
-                    const installBtn = document.getElementById('whisperInstallBtn');
-                    if (installBtn) {
-                        installBtn.disabled = false;
-                        installBtn.style.display = 'inline-flex';
-                    }
-                } else if (!data.modelExists) {
-                    // 다운로드는 끝났는데 모델이 없는 경우 (이상한 상태)
-                    InlineDownload.error('whisper', '설치가 완료되지 않았습니다. 다시 시도해주세요.');
-                    const installBtn = document.getElementById('whisperInstallBtn');
-                    if (installBtn) {
-                        installBtn.disabled = false;
-                        installBtn.style.display = 'inline-flex';
+                        // 버튼 다시 활성화
+                        const installBtn = document.getElementById('whisperInstallBtn');
+                        if (installBtn) {
+                            installBtn.disabled = false;
+                            installBtn.style.display = 'inline-block';
+                        }
+                    } else if (!data.modelExists) {
+                        // 다운로드는 끝났는데 모델이 없는 경우 (이상한 상태)
+                        InlineDownload.error('whisper', '설치가 완료되지 않았습니다. 다시 시도해주세요.');
+                        const installBtn = document.getElementById('whisperInstallBtn');
+                        if (installBtn) {
+                            installBtn.disabled = false;
+                            installBtn.style.display = 'inline-flex';
+                        }
                     }
                 }
             }
+        } catch (e) {
+            console.error('Whisper 상태 확인 중 오류:', e);
         }
     }, 1000);
 }

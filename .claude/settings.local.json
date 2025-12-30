@@ -100,7 +100,10 @@
       "Bash(cmd /c \"tasklist | findstr ollama\")",
       "Bash(cmd /c \"taskkill /F /IM ollama_llama_server.exe /T\")",
       "Bash(powershell -Command \"Get-Process | Where-Object {$_Path -like ''*docwatch*'' -or $_Path -like ''*ollama*'' -or $_Path -like ''*electron*''} | Stop-Process -Force\")",
-      "Bash(cmd /c \"dir %LOCALAPPDATA%\\\\docwatch 2>nul\")"
+      "Bash(cmd /c \"dir %LOCALAPPDATA%\\\\docwatch 2>nul\")",
+      "Bash(dir \"%APPDATA%\\\\docwatch\\\\meetings\")",
+      "Bash(cmd /c \"dir %APPDATA%\\\\docwatch\\\\meetings\")",
+      "Bash(powershell -Command:*)"
     ]
   }
 }

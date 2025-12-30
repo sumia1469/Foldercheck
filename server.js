@@ -7,7 +7,11 @@ const XLSX = require('xlsx');
 const unzipper = require('unzipper');
 const xml2js = require('xml2js');
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
+let ffmpegPath = require('ffmpeg-static');
+// 패키징된 앱에서 ffmpeg 경로 수정 (app.asar.unpacked 사용)
+if (ffmpegPath && ffmpegPath.includes('app.asar')) {
+    ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+}
 const { execSync, spawn } = require('child_process');
 
 // Windows 콘솔 UTF-8 인코딩 설정

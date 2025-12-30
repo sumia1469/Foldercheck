@@ -3,6 +3,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, systemPref
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
 const { execSync, spawn } = require('child_process');
 const net = require('net');
 

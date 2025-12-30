@@ -37,7 +37,7 @@ function getUserDataDir() {
     if (process.platform === 'darwin') {
         return path.join(os.homedir(), 'Library', 'Application Support', appName);
     } else if (process.platform === 'win32') {
-        return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), appName);
+        return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), appName);
     } else {
         return path.join(os.homedir(), '.config', appName);
     }

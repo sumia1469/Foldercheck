@@ -40,13 +40,13 @@ let USER_DATA_DIR;
 if (isPackaged) {
     // main.js에서 설정한 환경변수 또는 process.resourcesPath 상위 경로 사용
     // macOS: ~/Library/Application Support/docwatch
-    // Windows: %APPDATA%/docwatch
+    // Windows: %LOCALAPPDATA%/docwatch
     const os = require('os');
     const appName = 'docwatch';
     if (process.platform === 'darwin') {
         USER_DATA_DIR = path.join(os.homedir(), 'Library', 'Application Support', appName);
     } else if (process.platform === 'win32') {
-        USER_DATA_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), appName);
+        USER_DATA_DIR = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), appName);
     } else {
         USER_DATA_DIR = path.join(os.homedir(), '.config', appName);
     }
@@ -607,6 +607,32 @@ let watchedFolders = [];
 let changeLog = [];
 let watchers = {};
 
+// 변경 로그 파일 경로
+const CHANGE_LOG_FILE = path.join(USER_DATA_DIR, 'changeLog.json');
+
+// 변경 로그 저장
+function saveChangeLog() {
+    try {
+        fs.writeFileSync(CHANGE_LOG_FILE, JSON.stringify(changeLog, null, 2), 'utf8');
+    } catch (e) {
+        console.error('변경 로그 저장 실패:', e.message);
+    }
+}
+
+// 변경 로그 로드
+function loadChangeLog() {
+    try {
+        if (fs.existsSync(CHANGE_LOG_FILE)) {
+            const data = fs.readFileSync(CHANGE_LOG_FILE, 'utf8');
+            changeLog = JSON.parse(data) || [];
+            console.log('변경 로그 로드 완료: ' + changeLog.length + '개');
+        }
+    } catch (e) {
+        console.error('변경 로그 로드 실패:', e.message);
+        changeLog = [];
+    }
+}
+
 // 회의록 처리 진행 상황
 let processingProgress = {
     active: false,
@@ -982,6 +1008,7 @@ function startWatching(targetPath) {
                 logEntry.changeSummary = analysis;
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
+                saveChangeLog();
 
                 updateStats(action, targetFilename);
                 console.log(`[${action}] ${targetPath}${logEntry.changeSummary ? ` (${logEntry.changeSummary.summary})` : ''}`);
@@ -1059,6 +1086,7 @@ function startWatching(targetPath) {
                 logEntry.changeSummary = analysis;
                 changeLog.unshift(logEntry);
                 if (changeLog.length > 500) changeLog.pop();
+                saveChangeLog();
 
                 updateStats(action, filename);
                 console.log(`[${action}] ${fullPath}${logEntry.changeSummary ? ` (${logEntry.changeSummary.summary})` : ''}`);
@@ -3417,6 +3445,7 @@ const server = http.createServer(async (req, res) => {
 
         if (pathname === '/api/logs' && req.method === 'DELETE') {
             changeLog = [];
+            saveChangeLog();
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
             return;
@@ -4376,7 +4405,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const files = fs.readdirSync(MEETINGS_DIR);
                 const recordings = files
-                    .filter(f => (f.endsWith('.wav') || f.endsWith('.webm')) && !f.includes('_converted'))
+                    .filter(f => (f.endsWith('.wav') || f.endsWith('.webm') || f.endsWith('.m4a') || f.endsWith('.mp3') || f.endsWith('.ogg')) && !f.includes('_converted'))
                     .map(f => {
                         const filePath = path.join(MEETINGS_DIR, f);
                         const stat = fs.statSync(filePath);
@@ -4408,7 +4437,7 @@ const server = http.createServer(async (req, res) => {
                 const stat = fs.statSync(filePath);
                 const fileSize = stat.size;
                 const ext = path.extname(filename).toLowerCase();
-                const mimeType = ext === '.wav' ? 'audio/wav' : 'audio/webm';
+                const mimeTypes = { '.wav': 'audio/wav', '.webm': 'audio/webm', '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg' }; const mimeType = mimeTypes[ext] || 'audio/mpeg';
 
                 const range = req.headers.range;
 
@@ -4557,7 +4586,7 @@ const server = http.createServer(async (req, res) => {
 
                 // 회의록 메타데이터 생성
                 const meetingId = generateId();
-                const title = filename.replace(/^audio_[^_]+_/, '').replace(/\.[^.]+$/, '') || '회의녹음';
+                const title = path.basename(filename, path.extname(filename)) || '회의녹음';
 
                 const meeting = {
                     id: meetingId,
@@ -4619,8 +4648,23 @@ const server = http.createServer(async (req, res) => {
 
                 updateProgress('📤 파일 업로드', 5);
                 const fileData = await parseMultipart(req);
-                const audioId = generateId();
-                const audioPath = path.join(MEETINGS_DIR, `audio_${audioId}_${fileData.filename}`);
+
+                // 원본 파일명 정리 (특수문자 제거)
+                const originalName = fileData.filename || 'recording.wav';
+                const ext = path.extname(originalName) || '.wav';
+                const baseName = path.basename(originalName, ext)
+                    .replace(/[\\/:*?"<>|]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim() || '회의녹음';
+
+                // 같은 이름 파일이 있으면 타임스탬프 추가
+                let audioFilename = `${baseName}${ext}`;
+                let audioPath = path.join(MEETINGS_DIR, audioFilename);
+                if (fs.existsSync(audioPath)) {
+                    const timestamp = Date.now();
+                    audioFilename = `${baseName}_${timestamp}${ext}`;
+                    audioPath = path.join(MEETINGS_DIR, audioFilename);
+                }
                 fs.writeFileSync(audioPath, fileData.content);
 
                 console.log('음성 파일 저장됨:', audioPath);
@@ -4806,6 +4850,7 @@ const server = http.createServer(async (req, res) => {
 
 // 서버 시작
 loadConfig();
+loadChangeLog();
 loadSettings();
 loadMeetings();
 loadDocHistory();

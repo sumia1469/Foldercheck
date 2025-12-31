@@ -624,11 +624,13 @@ function showChangeSummary(event, fileName, summaryData) {
     const bottomChanges = document.getElementById('bottomChanges');
     const bottomPanelFileInfo = document.getElementById('bottomPanelFileInfo');
     const mainContent = document.querySelector('.main-content');
+    const toggleBtn = document.getElementById('toggleBottomPanelBtn');
 
     if (!bottomPanel || !bottomChanges) return;
 
     bottomPanel.classList.add('open');
     if (mainContent) mainContent.classList.add('with-bottom-panel');
+    if (toggleBtn) toggleBtn.classList.add('active');
 
     // 타입별 아이콘과 색상
     let typeIcon, typeText, typeClass;
@@ -4963,14 +4965,27 @@ initRightPanelResize();
 function initBottomPanel() {
     const bottomPanel = document.getElementById('bottomPanel');
     const closeBtn = document.getElementById('closeBottomPanelBtn');
+    const toggleBtn = document.getElementById('toggleBottomPanelBtn');
     const mainContent = document.querySelector('.main-content');
 
     if (!bottomPanel) return;
+
+    // 패널 토글 (상단 버튼)
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            const isOpen = bottomPanel.classList.toggle('open');
+            toggleBtn.classList.toggle('active', isOpen);
+            if (mainContent) {
+                mainContent.classList.toggle('with-bottom-panel', isOpen);
+            }
+        });
+    }
 
     // 패널 닫기
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             bottomPanel.classList.remove('open');
+            if (toggleBtn) toggleBtn.classList.remove('active');
             if (mainContent) {
                 mainContent.classList.remove('with-bottom-panel');
             }

@@ -2305,13 +2305,14 @@ async function summarizeChunk(text, type, chunkNum = 0, totalChunks = 0) {
     const systemPrompt = `당신은 10년 경력의 전문 회의록 작성자입니다.
 
 [절대 규칙]
-1. 반드시 한국어로만 응답 (한자/중국어 문자 절대 사용 금지, 예: 會議 → 회의)
-2. 오직 제공된 녹취록 내용만 사용하여 작성
-3. 녹취록에 없는 내용은 절대 추가하지 않음
-4. 예시나 가상의 내용을 만들어내지 않음
-5. 녹취 내용이 부족하면 "녹취 내용 부족"이라고 표시
-6. 숫자/금액/수량/비율/날짜는 녹취록에 있는 것만 기재
-7. 화자별 발언을 구분하여 정리 (SPEAKER_A, SPEAKER_B 등이 있는 경우)`;
+1. 반드시 한국어로만 응답 (한자/중국어 문자 절대 사용 금지, 예: 會議→회의, 有任何问题→질문이 있으시면)
+2. 응답 끝에 중국어 문구(如有问题, 请随时, 有任何 등) 절대 사용 금지
+3. 오직 제공된 녹취록 내용만 사용하여 작성
+4. 녹취록에 없는 내용은 절대 추가하지 않음
+5. 예시나 가상의 내용을 만들어내지 않음
+6. 녹취 내용이 부족하면 "녹취 내용 부족"이라고 표시
+7. 숫자/금액/수량/비율/날짜는 녹취록에 있는 것만 기재
+8. 화자별 발언을 구분하여 정리 (SPEAKER_A, SPEAKER_B 등이 있는 경우)`;
 
     const prompts = {
         meeting: `[중요] 아래 녹취록 내용만을 바탕으로 회의록을 작성하세요.
@@ -2389,7 +2390,9 @@ ${text}
 [파트별 정리 끝]
 
 위 내용만으로 통합 회의록 작성:`,
-        document: `[지시사항] 반드시 한국어로 작성하세요. (한자/중국어 문자 절대 사용 금지)
+        document: `[지시사항] 반드시 한국어로만 작성하세요.
+- 한자(漢字)나 중국어 문자 절대 사용 금지 (예: 會議→회의, 有任何→있으시면)
+- 응답 끝에 중국어 문구(如有问题, 请随时 등) 절대 금지
 
 다음 문서의 핵심 내용을 정리해주세요:
 - 문서의 목적
@@ -2399,7 +2402,9 @@ ${text}
 ${text}
 
 [문서 정리]:`,
-        document_changes: `[지시사항] 반드시 한국어로 작성하세요. (한자/중국어 문자 절대 사용 금지)
+        document_changes: `[지시사항] 반드시 한국어로만 작성하세요.
+- 한자(漢字)나 중국어 문자 절대 사용 금지 (예: 會議→회의, 有任何→있으시면)
+- 응답 끝에 중국어 문구(如有问题, 请随时 등) 절대 금지
 
 문서 변경사항을 정리해주세요:
 
@@ -2466,7 +2471,7 @@ function searchDocHistory(query) {
     const results = [];
     const lowerQuery = query.toLowerCase();
 
-    for (const [key, value] of Object.entries(docHistory)) {
+    for (const [key, value] of Object.entries(documentHistory)) {
         const fileName = value.fileName || key;
         const content = value.content?.text || JSON.stringify(value.content);
         const changes = value.changes || [];
@@ -2531,7 +2536,7 @@ function searchMeetings(query) {
 }
 
 function getRecentDocuments(limit = 5) {
-    const docs = Object.entries(docHistory)
+    const docs = Object.entries(documentHistory)
         .map(([key, value]) => ({
             fileName: value.fileName || key,
             analyzedAt: value.analyzedAt,
@@ -2568,7 +2573,7 @@ function getMeetingDetails(meetingId) {
 }
 
 function getDocumentChanges(fileName) {
-    for (const [key, value] of Object.entries(docHistory)) {
+    for (const [key, value] of Object.entries(documentHistory)) {
         if ((value.fileName || key).includes(fileName)) {
             return {
                 fileName: value.fileName || key,
@@ -3042,11 +3047,13 @@ ${currentContext}
 - 도움말: "도움말", "사용법"
 
 [응답 규칙]
-1. 반드시 한국어로 응답하세요 (한자/중국어 문자 절대 사용 금지)
-2. 간결하고 명확하게 답변하세요
-3. 데이터가 제공되면 그 데이터를 기반으로 답변하세요
-4. 기능 사용법을 친절하게 안내하세요
-5. 모르는 내용은 솔직히 모른다고 말하세요`;
+1. 반드시 한국어로만 응답하세요
+2. 절대로 한자(漢字)나 중국어 문자를 사용하지 마세요 (예: 會議→회의, 有任何问题→질문이 있으시면, 请→부디)
+3. 간결하고 명확하게 답변하세요
+4. 데이터가 제공되면 그 데이터를 기반으로 답변하세요
+5. 기능 사용법을 친절하게 안내하세요
+6. 모르는 내용은 솔직히 모른다고 말하세요
+7. 응답 끝에 중국어 문구(如有问题, 请随时, 有任何 등) 절대 사용 금지`;
 
     // 대화 기록을 프롬프트로 변환
     let conversationContext = '';

@@ -567,7 +567,8 @@ function createWindow() {
         return true;
     });
 
-    mainWindow = new BrowserWindow({
+    // 플랫폼별 윈도우 설정
+    const windowOptions = {
         width: 1000,
         height: 700,
         minWidth: 600,
@@ -575,18 +576,27 @@ function createWindow() {
         title: 'DocWatch',
         center: true,
         frame: false,
-        titleBarStyle: 'hidden',
-        trafficLightPosition: { x: 12, y: 12 },
-        transparent: true,
-        backgroundColor: '#00000000',
-        vibrancy: 'under-window',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
         show: true
-    });
+    };
+
+    // macOS 전용 설정
+    if (process.platform === 'darwin') {
+        windowOptions.titleBarStyle = 'hidden';
+        windowOptions.trafficLightPosition = { x: 12, y: 12 };
+        windowOptions.transparent = true;
+        windowOptions.backgroundColor = '#00000000';
+        windowOptions.vibrancy = 'under-window';
+    } else {
+        // Windows/Linux: 커스텀 타이틀바 사용
+        windowOptions.backgroundColor = '#1a1f2e';
+    }
+
+    mainWindow = new BrowserWindow(windowOptions);
 
     // 서버 로드 시 오류 처리
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {

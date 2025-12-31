@@ -4721,6 +4721,55 @@ function initTitlebarControls() {
             window.electronAPI.closeWindow();
         });
     }
+
+    // 타이틀바 더블클릭으로 창 크기 토글 (Windows/Mac 표준 동작)
+    const titlebar = document.querySelector('.custom-titlebar');
+    const titlebarTitle = document.querySelector('.titlebar-title');
+
+    // -webkit-app-region: drag 영역에서는 dblclick 이벤트가 차단되므로
+    // 타이머 기반 더블클릭 감지 사용
+    let lastClickTime = 0;
+    const DOUBLE_CLICK_DELAY = 300; // ms
+
+    const handleTitlebarClick = (e) => {
+        // 버튼이나 입력 필드 등 인터랙티브 요소 클릭 시 무시
+        if (e.target.closest('button, input, .titlebar-controls, .titlebar-actions, .titlebar-search, .titlebar-left-actions')) {
+            return;
+        }
+
+        const currentTime = Date.now();
+        if (currentTime - lastClickTime < DOUBLE_CLICK_DELAY) {
+            // 더블클릭 감지
+            console.log('[Titlebar] 더블클릭 감지 - 창 크기 토글');
+            if (window.electronAPI && window.electronAPI.maximizeWindow) {
+                window.electronAPI.maximizeWindow();
+            }
+            lastClickTime = 0; // 리셋
+        } else {
+            lastClickTime = currentTime;
+        }
+    };
+
+    // 일반 dblclick 이벤트 (no-drag 영역용)
+    const handleDoubleClick = (e) => {
+        if (e.target.closest('button, input, .titlebar-controls, .titlebar-actions, .titlebar-search, .titlebar-left-actions')) {
+            return;
+        }
+        console.log('[Titlebar] dblclick 이벤트 - 창 크기 토글');
+        if (window.electronAPI && window.electronAPI.maximizeWindow) {
+            window.electronAPI.maximizeWindow();
+        }
+    };
+
+    if (titlebar) {
+        // 클릭 기반 더블클릭 감지 (드래그 영역 포함)
+        titlebar.addEventListener('click', handleTitlebarClick);
+        // 일반 dblclick 이벤트 (no-drag 영역)
+        titlebar.addEventListener('dblclick', handleDoubleClick);
+    }
+    if (titlebarTitle) {
+        titlebarTitle.addEventListener('dblclick', handleDoubleClick);
+    }
 }
 
 initTitlebarControls();

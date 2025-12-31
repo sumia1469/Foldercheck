@@ -8,6 +8,9 @@ const unzipper = require('unzipper');
 const xml2js = require('xml2js');
 const ffmpeg = require('fluent-ffmpeg');
 let ffmpegPath = require('ffmpeg-static');
+
+// 회의록 파이프라인 모듈 (VAD + 화자분리 + Merge)
+const { MeetingPipeline, PIPELINE_CONFIG } = require('./meetingPipeline');
 // 패키징된 앱에서 ffmpeg 경로 수정 (app.asar.unpacked 사용)
 if (ffmpegPath && ffmpegPath.includes('app.asar')) {
     ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
@@ -95,7 +98,15 @@ const OLLAMA_HOST = 'http://localhost:11434';
 
 // 사용 가능한 AI 모델 목록 (로컬 전용 - 폐쇄망 환경)
 const AVAILABLE_MODELS = {
-    // 로컬 모델 (저사양 PC 호환)
+    // 고품질 모델 (권장)
+    'qwen2.5:7b-instruct-q4_K_M': {
+        name: 'Qwen 2.5 (7B Q4)',
+        description: '고품질 AI 모델 - 한국어 최적화 (4.5GB, 8GB RAM 이상 권장)',
+        size: '4.5GB',
+        type: 'local',
+        recommended: true
+    },
+    // 경량 모델 (저사양 PC용)
     'qwen2.5:3b': {
         name: 'Qwen 2.5 (3B)',
         description: '경량 AI 모델 - 저사양 PC 호환 (1.9GB, 4GB RAM 이상)',
@@ -104,8 +115,8 @@ const AVAILABLE_MODELS = {
     }
 };
 
-// 기본 AI 모델
-let CURRENT_AI_MODEL = 'qwen2.5:3b';
+// 기본 AI 모델 (고품질 모델로 변경)
+let CURRENT_AI_MODEL = 'qwen2.5:7b-instruct-q4_K_M';
 
 const PORT = 4400;
 
@@ -449,8 +460,8 @@ function convertToWav(inputPath, outputPath) {
     });
 }
 
-// 로컬 Whisper로 음성을 텍스트로 변환
-async function transcribeAudio(audioPath) {
+// 로컬 Whisper로 음성을 텍스트로 변환 (화자 분리 포함)
+async function transcribeAudio(audioPath, options = {}) {
     if (!checkWhisperModel()) {
         throw new Error('음성 인식 모델이 없습니다. models/ggml-small.bin 파일이 필요합니다.');
     }
@@ -475,6 +486,26 @@ async function transcribeAudio(audioPath) {
     console.log('로컬 음성 인식 시작...');
     console.log('WAV 파일:', wavPath);
 
+    // 화자 분리 활성화 여부 (기본: true)
+    const enableDiarization = options.enableDiarization !== false;
+    let pipelineResult = null;
+
+    // 화자 분리 파이프라인 실행 (VAD + Diarization)
+    if (enableDiarization) {
+        try {
+            console.log('[Pipeline] 화자 분리 파이프라인 시작...');
+            const pipeline = new MeetingPipeline({
+                onProgress: (stage, percent, message) => {
+                    updateProgress(stage, percent, message);
+                }
+            });
+            pipelineResult = await pipeline.process(wavPath);
+            console.log('[Pipeline] 화자 분리 완료:', pipelineResult.stages.diarization?.numSpeakers || 1, '명 감지');
+        } catch (e) {
+            console.log('[Pipeline] 화자 분리 실패 (계속 진행):', e.message);
+        }
+    }
+
     // 예상되는 JSON 출력 경로 - 이전 실행에서 남은 파일이 있으면 삭제
     const expectedJsonPath = wavPath + '.json';
     if (fs.existsSync(expectedJsonPath)) {
@@ -493,12 +524,16 @@ async function transcribeAudio(audioPath) {
             return reject(new Error('Whisper CLI를 찾을 수 없습니다. 설정에서 음성 인식을 설치해주세요.'));
         }
 
+        // Whisper 최적화 옵션 추가
         const args = [
             '-m', WHISPER_MODEL_PATH,
             '-f', wavPath,
             '-l', 'ko',
             '-oj',  // JSON 출력
-            '-pp'   // 진행상황 표시
+            '-pp',  // 진행상황 표시
+            '--beam-size', '5',  // CPU 최적 빔 크기
+            '--entropy-thold', '2.4',  // 품질 임계값
+            '--no-timestamps', 'false'  // 타임스탬프 활성화
         ];
 
         console.log('실행 명령:', cliPath, args.join(' '));
@@ -552,6 +587,7 @@ async function transcribeAudio(audioPath) {
                 // JSON 출력 파싱
                 const jsonPath = wavPath + '.json';
                 let result = '';
+                let sttSegments = [];  // STT 세그먼트 (화자 분리용)
 
                 if (fs.existsSync(jsonPath)) {
                     const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
@@ -560,13 +596,39 @@ async function transcribeAudio(audioPath) {
                     if (jsonData.transcription && Array.isArray(jsonData.transcription)) {
                         for (const seg of jsonData.transcription) {
                             const start = seg.offsets?.from || 0;
+                            const end = seg.offsets?.to || start;
                             const startSec = Math.floor(start / 1000);
+                            const endSec = Math.floor(end / 1000);
                             const minutes = Math.floor(startSec / 60);
                             const seconds = startSec % 60;
-                            const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
                             const text = (seg.text || '').trim();
+
                             if (text) {
-                                result += `${timestamp} ${text}\n`;
+                                // STT 세그먼트 저장 (화자 분리 Merge용)
+                                sttSegments.push({
+                                    start: startSec,
+                                    end: endSec,
+                                    text: text,
+                                    confidence: 0.9
+                                });
+                            }
+                        }
+
+                        // 화자 분리 결과와 병합
+                        if (pipelineResult && pipelineResult.stages.diarization) {
+                            const pipeline = new MeetingPipeline();
+                            const mergeResult = pipeline.mergeWithSTT(sttSegments, pipelineResult);
+
+                            // 화자별로 구조화된 결과 생성
+                            result = mergeResult.text;
+                            console.log('[Merge] 화자 분리 병합 완료');
+                        } else {
+                            // 화자 분리 없이 기본 형식
+                            for (const seg of sttSegments) {
+                                const minutes = Math.floor(seg.start / 60);
+                                const seconds = seg.start % 60;
+                                const timestamp = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}]`;
+                                result += `${timestamp} ${seg.text}\n`;
                             }
                         }
                     }
@@ -585,7 +647,13 @@ async function transcribeAudio(audioPath) {
 
                 console.log('음성 인식 완료, 결과 길이:', result.length);
                 console.log('음성 인식 결과 미리보기:', result.substring(0, 100));
-                resolve({ text: result.trim() || '(인식된 텍스트 없음)', wavPath });
+
+                resolve({
+                    text: result.trim() || '(인식된 텍스트 없음)',
+                    wavPath,
+                    diarization: pipelineResult?.stages?.diarization || null,
+                    numSpeakers: pipelineResult?.stages?.diarization?.numSpeakers || 1
+                });
             } catch (e) {
                 console.error('결과 파싱 오류:', e);
                 reject(e);
@@ -662,7 +730,7 @@ let settings = {
         botToken: '',
         chatId: ''
     },
-    aiModel: 'qwen2.5:3b'  // 현재 선택된 AI 모델
+    aiModel: 'qwen2.5:7b-instruct-q4_K_M'  // 현재 선택된 AI 모델 (고품질)
 };
 let stats = {
     created: 0,
@@ -2242,12 +2310,14 @@ async function summarizeChunk(text, type, chunkNum = 0, totalChunks = 0) {
 3. 녹취록에 없는 내용은 절대 추가하지 않음
 4. 예시나 가상의 내용을 만들어내지 않음
 5. 녹취 내용이 부족하면 "녹취 내용 부족"이라고 표시
-6. 숫자/금액/수량/비율/날짜는 녹취록에 있는 것만 기재`;
+6. 숫자/금액/수량/비율/날짜는 녹취록에 있는 것만 기재
+7. 화자별 발언을 구분하여 정리 (SPEAKER_A, SPEAKER_B 등이 있는 경우)`;
 
     const prompts = {
         meeting: `[중요] 아래 녹취록 내용만을 바탕으로 회의록을 작성하세요.
 녹취록에 없는 내용은 절대 추가하지 마세요.
 내용이 부족하면 해당 항목에 "내용 없음" 또는 "녹취 내용 부족"이라고 적으세요.
+화자(SPEAKER_A, B, C 등)가 구분되어 있다면 화자별로 발언을 정리하세요.
 
 ========================================
                  회 의 록
@@ -2256,22 +2326,25 @@ async function summarizeChunk(text, type, chunkNum = 0, totalChunks = 0) {
 1. 회의 개요
    - 회의명:
    - 일시:
-   - 참석자:
+   - 참석자: (화자별 역할 추정)
    - 회의 목적:
 
 2. 안건 및 논의 내용
    [안건]
    ▶ 현황
-   ▶ 논의 내용
+   ▶ 논의 내용 (화자별 발언 정리)
    ▶ 제안/대안
 
 3. 주요 수치 및 데이터
 
 4. 결정 사항
 
-5. 향후 계획
+5. 액션 아이템 (담당자, 할일, 기한)
+   - [담당자] 할일 - 기한
 
-6. 특이사항
+6. 향후 계획
+
+7. 특이사항
 
 ========================================
 
@@ -4720,10 +4793,11 @@ const server = http.createServer(async (req, res) => {
                 const meeting = {
                     id: audioId,
                     title: `회의록_${new Date().toISOString().split('T')[0]}`,
-                    audioFile: fileData.filename,
+                    audioFile: audioFilename,  // 실제 저장된 파일명 사용
                     wavFile: transcribeResult.wavPath ? path.basename(transcribeResult.wavPath) : null,
                     transcript,
                     analysis,
+                    numSpeakers: transcribeResult.numSpeakers || 1,  // 화자 수 추가
                     aiSummary,
                     summarizedAt: aiSummary ? new Date().toISOString() : null,
                     createdAt: new Date().toISOString()

@@ -2890,19 +2890,17 @@ function executeCommand(command) {
                     startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
             }
 
+            // changeLog (폴더 감시 변경 로그)에서 검색
             const results = [];
-            for (const key of Object.keys(documentHistory)) {
-                const doc = documentHistory[key];
-                if (doc.changes && doc.changes.length > 0) {
-                    doc.changes.forEach(change => {
-                        const changeDate = new Date(change.timestamp || change.analyzedAt);
-                        if (changeDate >= startDate && changeDate <= endDate) {
-                            results.push({
-                                fileName: doc.fileName,
-                                timestamp: changeDate,
-                                summary: change.summary || change.aiSummary || '요약 없음'
-                            });
-                        }
+            for (const log of changeLog) {
+                const changeDate = new Date(log.timestamp);
+                if (changeDate >= startDate && changeDate <= endDate) {
+                    results.push({
+                        fileName: log.file,
+                        folder: log.folder,
+                        action: log.action,
+                        timestamp: changeDate,
+                        summary: log.changeSummary?.summary || log.changeSummary?.aiSummary || '요약 없음'
                     });
                 }
             }
@@ -2917,9 +2915,13 @@ function executeCommand(command) {
             results.sort((a, b) => b.timestamp - a.timestamp);
             let response = `문서 변경 내역 (${results.length}건):\n\n`;
             results.slice(0, 10).forEach((r, i) => {
-                response += `${i+1}. ${r.fileName}\n`;
+                response += `${i+1}. [${r.action}] ${r.fileName}\n`;
                 response += `   - 시간: ${r.timestamp.toLocaleString('ko-KR')}\n`;
-                response += `   - 요약: ${r.summary.substring(0, 100)}\n\n`;
+                response += `   - 폴더: ${r.folder}\n`;
+                if (r.summary !== '요약 없음') {
+                    response += `   - 요약: ${r.summary.substring(0, 100)}\n`;
+                }
+                response += '\n';
             });
             return response;
         }

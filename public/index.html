@@ -190,6 +190,14 @@
                     </span>
                     <span class="nav-text">알림</span>
                 </a>
+                <a href="#" class="nav-item" data-section="messenger">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">메신저</span>
+                </a>
                 <a href="#" class="nav-item" data-section="extensions">
                     <span class="nav-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1023,6 +1031,208 @@
                             <span class="info-value">4400</span>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- P2P 메신저 섹션 -->
+            <section id="messenger" class="content-section">
+                <div class="section-header">
+                    <h1>P2P 메신저</h1>
+                    <div class="header-actions">
+                        <span class="messenger-status-badge" id="messengerStatusBadge">
+                            <span class="status-dot offline"></span>
+                            <span class="status-text">오프라인</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 연결 설정 카드 -->
+                <div class="settings-card messenger-connection-card" id="messengerConnectionCard">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                        </svg>
+                        연결 설정
+                    </h3>
+                    <p class="help-text">폐쇄망에서 P2P 방식으로 통신합니다. 호스트가 서버를 열면 게스트가 접속합니다.</p>
+
+                    <!-- 모드 선택 탭 -->
+                    <div class="messenger-mode-tabs">
+                        <button class="mode-tab active" data-mode="host">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            호스트 모드
+                        </button>
+                        <button class="mode-tab" data-mode="guest">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            게스트 모드
+                        </button>
+                    </div>
+
+                    <!-- 호스트 모드 설정 -->
+                    <div class="messenger-mode-content" id="hostModeContent">
+                        <div class="form-group">
+                            <label>닉네임</label>
+                            <input type="text" id="hostNickname" placeholder="호스트 이름 입력" value="호스트">
+                        </div>
+                        <div class="form-group">
+                            <label>포트 번호</label>
+                            <input type="number" id="hostPort" placeholder="9900" value="9900" min="1024" max="65535">
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" id="startHostBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                서버 시작
+                            </button>
+                            <button class="btn btn-danger" id="stopHostBtn" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <rect x="6" y="6" width="12" height="12"/>
+                                </svg>
+                                서버 중지
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 게스트 모드 설정 -->
+                    <div class="messenger-mode-content" id="guestModeContent" style="display: none;">
+                        <div class="form-group">
+                            <label>닉네임</label>
+                            <input type="text" id="guestNickname" placeholder="내 이름 입력">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2;">
+                                <label>호스트 IP</label>
+                                <input type="text" id="hostAddress" placeholder="예: 192.168.1.100">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>포트</label>
+                                <input type="number" id="guestPort" placeholder="9900" value="9900">
+                            </div>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" id="connectBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+                                    <polyline points="10 17 15 12 10 7"/>
+                                    <line x1="15" y1="12" x2="3" y2="12"/>
+                                </svg>
+                                연결
+                            </button>
+                            <button class="btn btn-danger" id="disconnectBtn" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                                    <polyline points="16 17 21 12 16 7"/>
+                                    <line x1="21" y1="12" x2="9" y2="12"/>
+                                </svg>
+                                연결 해제
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 채팅 영역 (연결 후 표시) -->
+                <div class="messenger-chat-area" id="messengerChatArea" style="display: none;">
+                    <div class="messenger-layout">
+                        <!-- 사용자 목록 사이드바 -->
+                        <div class="messenger-users-sidebar">
+                            <div class="users-header">
+                                <h4>접속자 목록</h4>
+                                <span class="user-count" id="userCount">0명</span>
+                            </div>
+                            <div class="users-list" id="usersList">
+                                <!-- 사용자 목록이 여기에 동적으로 추가됨 -->
+                            </div>
+                        </div>
+
+                        <!-- 채팅 메인 영역 -->
+                        <div class="messenger-chat-main">
+                            <!-- 채팅 메시지 영역 -->
+                            <div class="chat-messages" id="chatMessages">
+                                <div class="chat-welcome">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                                    </svg>
+                                    <p>메시지를 주고받으세요</p>
+                                </div>
+                            </div>
+
+                            <!-- 파일 전송 진행 상태 -->
+                            <div class="file-transfer-status" id="fileTransferStatus" style="display: none;">
+                                <div class="file-transfer-info">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                        <path d="M14 2v6h6"/>
+                                    </svg>
+                                    <span class="file-name" id="transferFileName">파일명.ext</span>
+                                    <span class="file-progress" id="transferProgress">0%</span>
+                                </div>
+                                <div class="file-progress-bar">
+                                    <div class="file-progress-fill" id="transferProgressBar"></div>
+                                </div>
+                            </div>
+
+                            <!-- 메시지 입력 영역 -->
+                            <div class="chat-input-area">
+                                <button class="btn btn-icon" id="attachFileBtn" title="파일 첨부">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                                    </svg>
+                                </button>
+                                <textarea id="chatInput" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+                                <button class="btn btn-primary btn-send" id="sendMessageBtn">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13"/>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 다운로드 폴더 -->
+                <div class="settings-card">
+                    <h3>다운로드 폴더</h3>
+                    <p class="help-text">수신한 파일이 저장되는 위치입니다.</p>
+                    <div class="download-folder-info">
+                        <code id="downloadFolderPath">%APPDATA%/docwatch/p2p-downloads</code>
+                        <button class="btn btn-secondary btn-sm" id="openDownloadFolderBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                            </svg>
+                            폴더 열기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 안내 -->
+                <div class="settings-card">
+                    <h3>사용 안내</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">호스트</span>
+                            <span class="info-value">서버를 열고 다른 사용자가 접속하길 기다립니다</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">게스트</span>
+                            <span class="info-value">호스트의 IP와 포트로 접속합니다</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">파일 공유</span>
+                            <span class="info-value">클립 버튼으로 파일을 선택하여 전송합니다</span>
+                        </div>
+                    </div>
+                    <p class="help-text" style="margin-top: 15px; font-size: 11px;">
+                        * 폐쇄망 환경에서 동일 네트워크 내의 PC 간 통신만 가능합니다.
+                    </p>
                 </div>
             </section>
 

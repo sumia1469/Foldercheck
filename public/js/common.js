@@ -6303,4 +6303,499 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.extensionAPI) {
         initExtensionsUI();
     }
+
+    // P2P 메신저 초기화
+    if (window.p2pAPI) {
+        initMessengerUI();
+    }
 });
+
+/* ========================================
+   P2P 메신저 시스템
+   ======================================== */
+
+// 메신저 상태 관리
+const messengerState = {
+    mode: 'offline', // 'offline' | 'host' | 'guest'
+    nickname: '',
+    users: [],
+    messages: []
+};
+
+// 메신저 UI 초기화
+function initMessengerUI() {
+    console.log('P2P 메신저 UI 초기화');
+
+    // 모드 탭 전환
+    const modeTabs = document.querySelectorAll('.mode-tab');
+    modeTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const mode = tab.dataset.mode;
+            switchMessengerMode(mode);
+        });
+    });
+
+    // 호스트 모드 버튼
+    const startHostBtn = document.getElementById('startHostBtn');
+    const stopHostBtn = document.getElementById('stopHostBtn');
+    if (startHostBtn) {
+        startHostBtn.addEventListener('click', startHost);
+    }
+    if (stopHostBtn) {
+        stopHostBtn.addEventListener('click', stopHost);
+    }
+
+    // 게스트 모드 버튼
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    if (connectBtn) {
+        connectBtn.addEventListener('click', connectToHost);
+    }
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener('click', disconnectFromHost);
+    }
+
+    // 메시지 전송
+    const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const chatInput = document.getElementById('chatInput');
+    if (sendMessageBtn) {
+        sendMessageBtn.addEventListener('click', sendChatMessage);
+    }
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+        // 자동 높이 조절
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        });
+    }
+
+    // 파일 첨부
+    const attachFileBtn = document.getElementById('attachFileBtn');
+    if (attachFileBtn) {
+        attachFileBtn.addEventListener('click', attachFile);
+    }
+
+    // 다운로드 폴더 열기
+    const openDownloadFolderBtn = document.getElementById('openDownloadFolderBtn');
+    if (openDownloadFolderBtn) {
+        openDownloadFolderBtn.addEventListener('click', () => {
+            window.p2pAPI.openDownloads();
+        });
+    }
+
+    // P2P 이벤트 리스너 등록
+    setupP2PEventListeners();
+}
+
+// 모드 전환
+function switchMessengerMode(mode) {
+    const modeTabs = document.querySelectorAll('.mode-tab');
+    modeTabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+
+    document.getElementById('hostModeContent').style.display = mode === 'host' ? 'block' : 'none';
+    document.getElementById('guestModeContent').style.display = mode === 'guest' ? 'block' : 'none';
+}
+
+// 호스트 시작
+async function startHost() {
+    const nickname = document.getElementById('hostNickname').value.trim() || '호스트';
+    const port = parseInt(document.getElementById('hostPort').value) || 9900;
+
+    try {
+        updateMessengerStatus('connecting', '서버 시작 중...');
+        const result = await window.p2pAPI.startHost(port, nickname);
+
+        if (result.success) {
+            messengerState.mode = 'host';
+            messengerState.nickname = nickname;
+
+            updateMessengerStatus('host', `호스트 (포트: ${port})`);
+            document.getElementById('startHostBtn').style.display = 'none';
+            document.getElementById('stopHostBtn').style.display = 'inline-flex';
+            document.getElementById('messengerChatArea').style.display = 'block';
+
+            addSystemMessage(`서버가 시작되었습니다. 포트: ${port}`);
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        console.error('호스트 시작 실패:', error);
+        updateMessengerStatus('offline', '오프라인');
+        alert('서버 시작 실패: ' + error.message);
+    }
+}
+
+// 호스트 중지
+async function stopHost() {
+    try {
+        await window.p2pAPI.stopHost();
+
+        messengerState.mode = 'offline';
+        messengerState.users = [];
+
+        updateMessengerStatus('offline', '오프라인');
+        document.getElementById('startHostBtn').style.display = 'inline-flex';
+        document.getElementById('stopHostBtn').style.display = 'none';
+        document.getElementById('messengerChatArea').style.display = 'none';
+
+        clearChatMessages();
+        updateUsersList([]);
+    } catch (error) {
+        console.error('호스트 중지 실패:', error);
+    }
+}
+
+// 호스트에 연결
+async function connectToHost() {
+    const nickname = document.getElementById('guestNickname').value.trim();
+    const host = document.getElementById('hostAddress').value.trim();
+    const port = parseInt(document.getElementById('guestPort').value) || 9900;
+
+    if (!nickname) {
+        alert('닉네임을 입력해주세요.');
+        return;
+    }
+    if (!host) {
+        alert('호스트 IP를 입력해주세요.');
+        return;
+    }
+
+    try {
+        updateMessengerStatus('connecting', '연결 중...');
+        const result = await window.p2pAPI.connect(host, port, nickname);
+
+        if (result.success) {
+            messengerState.mode = 'guest';
+            messengerState.nickname = nickname;
+
+            updateMessengerStatus('online', `연결됨 (${host}:${port})`);
+            document.getElementById('connectBtn').style.display = 'none';
+            document.getElementById('disconnectBtn').style.display = 'inline-flex';
+            document.getElementById('messengerChatArea').style.display = 'block';
+
+            addSystemMessage(`${host}:${port}에 연결되었습니다.`);
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        console.error('연결 실패:', error);
+        updateMessengerStatus('offline', '오프라인');
+        alert('연결 실패: ' + error.message);
+    }
+}
+
+// 연결 해제
+async function disconnectFromHost() {
+    try {
+        await window.p2pAPI.disconnect();
+
+        messengerState.mode = 'offline';
+        messengerState.users = [];
+
+        updateMessengerStatus('offline', '오프라인');
+        document.getElementById('connectBtn').style.display = 'inline-flex';
+        document.getElementById('disconnectBtn').style.display = 'none';
+        document.getElementById('messengerChatArea').style.display = 'none';
+
+        clearChatMessages();
+        updateUsersList([]);
+    } catch (error) {
+        console.error('연결 해제 실패:', error);
+    }
+}
+
+// 상태 업데이트
+function updateMessengerStatus(status, text) {
+    const badge = document.getElementById('messengerStatusBadge');
+    if (badge) {
+        const dot = badge.querySelector('.status-dot');
+        const textEl = badge.querySelector('.status-text');
+
+        dot.className = 'status-dot ' + status;
+        textEl.textContent = text;
+    }
+}
+
+// 메시지 전송
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const content = input.value.trim();
+
+    if (!content) return;
+
+    try {
+        await window.p2pAPI.sendMessage(content);
+        input.value = '';
+        input.style.height = 'auto';
+    } catch (error) {
+        console.error('메시지 전송 실패:', error);
+    }
+}
+
+// 파일 첨부
+async function attachFile() {
+    try {
+        const result = await window.p2pAPI.selectFile();
+        if (result.success && result.filePath) {
+            const sendResult = await window.p2pAPI.sendFile(result.filePath);
+            if (!sendResult.success) {
+                alert('파일 전송 실패: ' + sendResult.error);
+            }
+        }
+    } catch (error) {
+        console.error('파일 첨부 실패:', error);
+    }
+}
+
+// 채팅 메시지 추가
+function addChatMessage(data) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    // 환영 메시지 제거
+    const welcome = container.querySelector('.chat-welcome');
+    if (welcome) welcome.remove();
+
+    const isOwn = data.sender === messengerState.nickname;
+    const messageEl = document.createElement('div');
+    messageEl.className = `chat-message${isOwn ? ' own' : ''}`;
+
+    const initial = data.sender ? data.sender.charAt(0).toUpperCase() : '?';
+    const time = new Date(data.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+    if (data.type === 'file') {
+        // 파일 메시지
+        const fileSize = formatFileSize(data.fileSize || 0);
+        messageEl.innerHTML = `
+            <div class="message-avatar">${initial}</div>
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="message-sender">${escapeHtml(data.sender)}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-file">
+                    <div class="message-file-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                        </svg>
+                    </div>
+                    <div class="message-file-info">
+                        <div class="message-file-name">${escapeHtml(data.fileName)}</div>
+                        <div class="message-file-size">${fileSize}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        // 일반 텍스트 메시지
+        messageEl.innerHTML = `
+            <div class="message-avatar">${initial}</div>
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="message-sender">${escapeHtml(data.sender)}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-bubble">${escapeHtml(data.content)}</div>
+            </div>
+        `;
+    }
+
+    container.appendChild(messageEl);
+    container.scrollTop = container.scrollHeight;
+}
+
+// 시스템 메시지 추가
+function addSystemMessage(text) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    // 환영 메시지 제거
+    const welcome = container.querySelector('.chat-welcome');
+    if (welcome) welcome.remove();
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'chat-message system';
+    messageEl.innerHTML = `
+        <div class="message-bubble">${escapeHtml(text)}</div>
+    `;
+
+    container.appendChild(messageEl);
+    container.scrollTop = container.scrollHeight;
+}
+
+// 채팅 메시지 초기화
+function clearChatMessages() {
+    const container = document.getElementById('chatMessages');
+    if (container) {
+        container.innerHTML = `
+            <div class="chat-welcome">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                </svg>
+                <p>메시지를 주고받으세요</p>
+            </div>
+        `;
+    }
+}
+
+// 사용자 목록 업데이트
+function updateUsersList(users) {
+    const container = document.getElementById('usersList');
+    const countEl = document.getElementById('userCount');
+
+    if (!container) return;
+
+    messengerState.users = users;
+
+    if (countEl) {
+        countEl.textContent = users.length + '명';
+    }
+
+    if (users.length === 0) {
+        container.innerHTML = '<div class="empty-hint" style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px;">접속자 없음</div>';
+        return;
+    }
+
+    container.innerHTML = users.map(user => {
+        const initial = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
+        const isHost = user.isHost;
+        return `
+            <div class="user-item${isHost ? ' host' : ''}">
+                <div class="user-avatar">${initial}</div>
+                <span class="user-name">${escapeHtml(user.nickname)}</span>
+                ${isHost ? '<span class="user-badge">호스트</span>' : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// 파일 전송 진행률 표시
+function showFileTransferProgress(fileName, progress) {
+    const statusEl = document.getElementById('fileTransferStatus');
+    const fileNameEl = document.getElementById('transferFileName');
+    const progressEl = document.getElementById('transferProgress');
+    const progressBarEl = document.getElementById('transferProgressBar');
+
+    if (!statusEl) return;
+
+    statusEl.style.display = 'block';
+    fileNameEl.textContent = fileName;
+    progressEl.textContent = Math.round(progress) + '%';
+    progressBarEl.style.width = progress + '%';
+
+    if (progress >= 100) {
+        setTimeout(() => {
+            statusEl.style.display = 'none';
+        }, 1500);
+    }
+}
+
+// P2P 이벤트 리스너 설정
+function setupP2PEventListeners() {
+    if (!window.p2pAPI) return;
+
+    // 상태 변경
+    window.p2pAPI.onStatus((data) => {
+        console.log('P2P 상태:', data);
+        if (data.mode === 'offline') {
+            updateMessengerStatus('offline', '오프라인');
+        }
+    });
+
+    // 메시지 수신
+    window.p2pAPI.onMessage((data) => {
+        console.log('메시지 수신:', data);
+        addChatMessage(data);
+    });
+
+    // 사용자 입장
+    window.p2pAPI.onUserJoined((data) => {
+        console.log('사용자 입장:', data);
+        addSystemMessage(`${data.nickname}님이 입장했습니다.`);
+    });
+
+    // 사용자 퇴장
+    window.p2pAPI.onUserLeft((data) => {
+        console.log('사용자 퇴장:', data);
+        addSystemMessage(`${data.nickname}님이 퇴장했습니다.`);
+    });
+
+    // 사용자 목록 업데이트
+    window.p2pAPI.onUserList((data) => {
+        console.log('사용자 목록:', data);
+        updateUsersList(data.users || []);
+    });
+
+    // 에러
+    window.p2pAPI.onError((data) => {
+        console.error('P2P 에러:', data);
+        alert('오류: ' + data.message);
+    });
+
+    // 연결 해제
+    window.p2pAPI.onDisconnected((data) => {
+        console.log('연결 해제:', data);
+        messengerState.mode = 'offline';
+        updateMessengerStatus('offline', '연결 끊김');
+        document.getElementById('connectBtn').style.display = 'inline-flex';
+        document.getElementById('disconnectBtn').style.display = 'none';
+        addSystemMessage('연결이 끊어졌습니다: ' + (data.reason || ''));
+    });
+
+    // 파일 전송 시작
+    window.p2pAPI.onFileStart((data) => {
+        console.log('파일 전송 시작:', data);
+        showFileTransferProgress(data.fileName, 0);
+    });
+
+    // 파일 전송 진행
+    window.p2pAPI.onFileProgress((data) => {
+        showFileTransferProgress(data.fileName, data.progress);
+    });
+
+    // 파일 수신 완료
+    window.p2pAPI.onFileReceived((data) => {
+        console.log('파일 수신 완료:', data);
+        showFileTransferProgress(data.fileName, 100);
+        addChatMessage({
+            type: 'file',
+            sender: data.from,
+            fileName: data.fileName,
+            fileSize: data.size,
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    // 파일 전송 완료
+    window.p2pAPI.onFileSent((data) => {
+        console.log('파일 전송 완료:', data);
+        showFileTransferProgress(data.fileName, 100);
+    });
+}
+
+// 파일 크기 포맷
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// HTML 이스케이프 (기존 함수가 없으면 추가)
+if (typeof escapeHtml !== 'function') {
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}

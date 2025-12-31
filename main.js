@@ -1053,6 +1053,179 @@ ipcMain.on('inputbox:result', (event, { id, value }) => {
     }
 });
 
+// ========================================
+// P2P Messenger IPC Handlers
+// ========================================
+
+/**
+ * P2P 메신저 초기화
+ */
+function initializeP2PMessenger() {
+    if (p2pMessenger) return;
+
+    p2pMessenger = new P2PMessenger();
+
+    // 이벤트 리스너 설정
+    p2pMessenger.on('status', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:status', data);
+        }
+    });
+
+    p2pMessenger.on('message', (msg) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:message', msg);
+        }
+    });
+
+    p2pMessenger.on('user_joined', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:user-joined', data);
+        }
+    });
+
+    p2pMessenger.on('user_left', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:user-left', data);
+        }
+    });
+
+    p2pMessenger.on('user_list', (users) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:user-list', users);
+        }
+    });
+
+    p2pMessenger.on('error', (err) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:error', err);
+        }
+    });
+
+    p2pMessenger.on('disconnected', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:disconnected', data);
+        }
+    });
+
+    p2pMessenger.on('file_start', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:file-start', data);
+        }
+    });
+
+    p2pMessenger.on('file_progress', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:file-progress', data);
+        }
+    });
+
+    p2pMessenger.on('file_received', (data) => {
+        // 파일 저장 경로 결정
+        const downloadsDir = path.join(getUserDataDir(), 'p2p-downloads');
+        if (!fs.existsSync(downloadsDir)) {
+            fs.mkdirSync(downloadsDir, { recursive: true });
+        }
+
+        const savePath = path.join(downloadsDir, data.filename);
+        fs.writeFileSync(savePath, data.data);
+
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:file-received', {
+                filename: data.filename,
+                size: data.size,
+                from: data.from,
+                savedPath: savePath
+            });
+        }
+    });
+
+    p2pMessenger.on('file_sent', (data) => {
+        if (mainWindow) {
+            mainWindow.webContents.send('p2p:file-sent', data);
+        }
+    });
+
+    console.log('[P2P] 메신저 시스템 초기화 완료');
+}
+
+// 호스트 시작
+ipcMain.handle('p2p:startHost', async (event, port, nickname) => {
+    initializeP2PMessenger();
+    return await p2pMessenger.startHost(port, nickname);
+});
+
+// 호스트 중지
+ipcMain.handle('p2p:stopHost', async () => {
+    if (!p2pMessenger) return;
+    return await p2pMessenger.stopHost();
+});
+
+// 서버 연결 (게스트)
+ipcMain.handle('p2p:connect', async (event, host, port, nickname) => {
+    initializeP2PMessenger();
+    return await p2pMessenger.connect(host, port, nickname);
+});
+
+// 연결 해제
+ipcMain.handle('p2p:disconnect', async () => {
+    if (!p2pMessenger) return;
+    return await p2pMessenger.disconnect();
+});
+
+// 메시지 전송
+ipcMain.handle('p2p:sendMessage', (event, content) => {
+    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+    return p2pMessenger.sendMessage(content);
+});
+
+// 파일 전송
+ipcMain.handle('p2p:sendFile', async (event, filePath) => {
+    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+    return await p2pMessenger.sendFile(filePath);
+});
+
+// 상태 조회
+ipcMain.handle('p2p:getStatus', () => {
+    if (!p2pMessenger) return { mode: 'offline', nickname: '', port: 9900, connectedUsers: [], userCount: 0 };
+    return p2pMessenger.getStatus();
+});
+
+// 사용자 목록 조회
+ipcMain.handle('p2p:getUsers', () => {
+    if (!p2pMessenger) return [];
+    return p2pMessenger.getUsers();
+});
+
+// 메시지 히스토리 조회
+ipcMain.handle('p2p:getHistory', () => {
+    if (!p2pMessenger) return [];
+    return p2pMessenger.getHistory();
+});
+
+// 파일 선택 다이얼로그
+ipcMain.handle('p2p:selectFile', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        title: '전송할 파일 선택'
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+        return null;
+    }
+
+    return result.filePaths[0];
+});
+
+// P2P 다운로드 폴더 열기
+ipcMain.handle('p2p:openDownloads', () => {
+    const downloadsDir = path.join(getUserDataDir(), 'p2p-downloads');
+    if (!fs.existsSync(downloadsDir)) {
+        fs.mkdirSync(downloadsDir, { recursive: true });
+    }
+    require('electron').shell.openPath(downloadsDir);
+});
+
 // 앱 종료 시 확장 시스템 정리
 app.on('before-quit', async () => {
     if (extensionManager) {
@@ -1060,5 +1233,13 @@ app.on('before-quit', async () => {
     }
     if (extensionHost) {
         await extensionHost.shutdown();
+    }
+    // P2P 메신저 정리
+    if (p2pMessenger) {
+        if (p2pMessenger.mode === 'host') {
+            await p2pMessenger.stopHost();
+        } else if (p2pMessenger.mode === 'guest') {
+            await p2pMessenger.disconnect();
+        }
     }
 });

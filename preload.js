@@ -75,3 +75,84 @@ contextBridge.exposeInMainWorld('extensionAPI', {
     // InputBox 결과 전송
     sendInputBoxResult: (id, value) => ipcRenderer.send('inputbox:result', { id, value })
 });
+
+// P2P Messenger API
+contextBridge.exposeInMainWorld('p2pAPI', {
+    // 호스트 모드
+    startHost: (port, nickname) => ipcRenderer.invoke('p2p:startHost', port, nickname),
+    stopHost: () => ipcRenderer.invoke('p2p:stopHost'),
+
+    // 게스트 모드
+    connect: (host, port, nickname) => ipcRenderer.invoke('p2p:connect', host, port, nickname),
+    disconnect: () => ipcRenderer.invoke('p2p:disconnect'),
+
+    // 메시징
+    sendMessage: (content) => ipcRenderer.invoke('p2p:sendMessage', content),
+    getHistory: () => ipcRenderer.invoke('p2p:getHistory'),
+
+    // 파일 전송
+    selectFile: () => ipcRenderer.invoke('p2p:selectFile'),
+    sendFile: (filePath) => ipcRenderer.invoke('p2p:sendFile', filePath),
+    openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
+
+    // 상태
+    getStatus: () => ipcRenderer.invoke('p2p:getStatus'),
+    getUsers: () => ipcRenderer.invoke('p2p:getUsers'),
+
+    // 이벤트 리스너
+    onStatus: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:status', handler);
+        return () => ipcRenderer.removeListener('p2p:status', handler);
+    },
+    onMessage: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:message', handler);
+        return () => ipcRenderer.removeListener('p2p:message', handler);
+    },
+    onUserJoined: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:user-joined', handler);
+        return () => ipcRenderer.removeListener('p2p:user-joined', handler);
+    },
+    onUserLeft: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:user-left', handler);
+        return () => ipcRenderer.removeListener('p2p:user-left', handler);
+    },
+    onUserList: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:user-list', handler);
+        return () => ipcRenderer.removeListener('p2p:user-list', handler);
+    },
+    onError: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:error', handler);
+        return () => ipcRenderer.removeListener('p2p:error', handler);
+    },
+    onDisconnected: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:disconnected', handler);
+        return () => ipcRenderer.removeListener('p2p:disconnected', handler);
+    },
+    onFileStart: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:file-start', handler);
+        return () => ipcRenderer.removeListener('p2p:file-start', handler);
+    },
+    onFileProgress: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:file-progress', handler);
+        return () => ipcRenderer.removeListener('p2p:file-progress', handler);
+    },
+    onFileReceived: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:file-received', handler);
+        return () => ipcRenderer.removeListener('p2p:file-received', handler);
+    },
+    onFileSent: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('p2p:file-sent', handler);
+        return () => ipcRenderer.removeListener('p2p:file-sent', handler);
+    }
+});

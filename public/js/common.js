@@ -2765,6 +2765,7 @@ async function addFolderByPath(path) {
 
         const data = await res.json();
         if (data.success) {
+            loadSidebarFolders();
             loadFolders();
         } else {
             alert(data.error || '추가 실패: ' + path);

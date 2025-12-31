@@ -1,0 +1,34 @@
+[
+  {
+    "timestamp": "2025-12-31T04:08:48.907Z",
+    "folder": "Z:\\2차사업\\100.타란",
+    "file": "공동공유화면개발_WBS_20251124.xlsx",
+    "action": "수정",
+    "fullPath": "Z:\\2차사업\\100.타란\\공동공유화면개발_WBS_20251124.xlsx",
+    "extension": ".xlsx",
+    "isFile": true,
+    "changeSummary": {
+      "type": "modified",
+      "summary": "내용 변경됨 (+1항목)",
+      "details": {
+        "lengthDiff": 5,
+        "prevLength": 15404,
+        "currLength": 15409,
+        "added": [
+          "테스트중"
+        ],
+        "removed": [],
+        "addedCount": 1,
+        "removedCount": 0,
+        "fileTypeInfo": {
+          "type": "xlsx",
+          "prevSheets": 1,
+          "currSheets": 1,
+          "sheetDiff": 0,
+          "newSheets": [],
+          "removedSheets": []
+        }
+      }
+    }
+  }
+]

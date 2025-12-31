@@ -5161,6 +5161,16 @@ let llmConversationHistory = [];
 let currentConversationId = null;
 let conversationsList = [];
 
+// LLM 응답 포맷팅 함수
+function formatLLMResponse(content) {
+    if (!content) return '';
+    return content
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+}
+
 // 대화 목록 로드
 async function loadConversationsList() {
     try {

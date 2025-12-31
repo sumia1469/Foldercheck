@@ -291,38 +291,64 @@ function updateSidebar(section) {
     }
 }
 
-// 모니터링 사이드바 (폴더 관리)
+// 모니터링 사이드바 (VSCode Explorer 스타일)
 function renderMonitorSidebar(container) {
     container.innerHTML = `
-        <div class="sidebar-section">
-            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
-                <span>감시 폴더/파일</span>
-            </div>
-            <div class="sidebar-section-items" id="sidebarFolderList">
-                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
-                    로딩 중...
-                </div>
+        <!-- Explorer 헤더 with 액션 버튼들 -->
+        <div class="explorer-header">
+            <span class="explorer-title">감시 폴더</span>
+            <div class="explorer-actions">
+                <button class="explorer-action-btn" onclick="openFileDialog()" title="파일 추가">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                </button>
+                <button class="explorer-action-btn" onclick="openFolderDialog()" title="폴더 추가">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        <line x1="12" y1="11" x2="12" y2="17"/>
+                        <line x1="9" y1="14" x2="15" y2="14"/>
+                    </svg>
+                </button>
+                <button class="explorer-action-btn" onclick="loadSidebarFolders()" title="새로고침">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2v6h-6"/>
+                        <path d="M3 12a9 9 0 0115-6.7L21 8"/>
+                        <path d="M3 22v-6h6"/>
+                        <path d="M21 12a9 9 0 01-15 6.7L3 16"/>
+                    </svg>
+                </button>
+                <button class="explorer-action-btn" onclick="collapseAllFolders()" title="모두 접기">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M7 10l5 5 5-5"/>
+                        <path d="M7 6l5 5 5-5"/>
+                    </svg>
+                </button>
             </div>
         </div>
-        <div class="sidebar-section">
-            <div class="sidebar-section-header" style="cursor: pointer;" onclick="openFolderDialog()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                </svg>
-                <span>폴더 추가</span>
+
+        <!-- 트리 뷰 영역 -->
+        <div class="tree-view" id="sidebarFolderList">
+            <div style="padding: 12px; color: var(--text-muted); font-size: 12px; text-align: center;">
+                로딩 중...
             </div>
         </div>
-        <div class="sidebar-section">
-            <div class="sidebar-section-header" style="cursor: pointer;" onclick="openFileDialog()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                    <polyline points="14,2 14,8 20,8"/>
-                </svg>
-                <span>파일 추가</span>
-            </div>
+
+        <!-- 빠른 액션 -->
+        <div style="border-top: 1px solid var(--border-color); margin-top: auto;">
+            <button class="quick-action-btn" onclick="openSettingsCategory('monitoring')">
+                <span class="btn-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                    모니터링 설정
+                </span>
+                <span class="btn-shortcut">Ctrl+,</span>
+            </button>
         </div>
     `;
     loadSidebarFolders();
@@ -405,7 +431,7 @@ function showFileInputModal() {
     }
 }
 
-// 사이드바 폴더 목록 로드
+// 사이드바 폴더 목록 로드 (트리 뷰 스타일)
 async function loadSidebarFolders() {
     try {
         const res = await fetch('/api/folders');
@@ -413,10 +439,19 @@ async function loadSidebarFolders() {
         const container = document.getElementById('sidebarFolderList');
         if (!container) return;
 
+        // 전역으로 저장하여 상세 정보에서 사용
+        window.watchedFoldersList = data.folders;
+
         if (data.folders.length === 0) {
             container.innerHTML = `
-                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
-                    감시 중인 폴더가 없습니다
+                <div style="padding: 20px 12px; text-align: center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 12px;">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                    </svg>
+                    <p style="color: var(--text-muted); font-size: 12px; margin: 0 0 12px 0;">감시 중인 폴더가 없습니다</p>
+                    <button class="btn btn-sm btn-primary" onclick="openFolderDialog()" style="font-size: 12px; padding: 6px 12px;">
+                        폴더 추가
+                    </button>
                 </div>
             `;
             return;
@@ -424,16 +459,24 @@ async function loadSidebarFolders() {
 
         container.innerHTML = data.folders.map((folder, idx) => {
             const name = folder.split(/[/\\]/).pop();
-            const isFile = folder.includes('.');
+            const isFile = name.includes('.');
+            const escapedPath = escapeHtml(folder).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             return `
-                <div class="sidebar-item" data-folder-idx="${idx}" title="${escapeHtml(folder)}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        ${isFile ?
-                            '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>' :
-                            '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
-                        }
-                    </svg>
-                    <span class="sidebar-item-text">${escapeHtml(name)}</span>
+                <div class="tree-item" data-folder-idx="${idx}" data-folder-path="${escapeHtml(folder)}" title="${escapeHtml(folder)}" onclick="showFolderDetail(${idx}, '${escapedPath}')">
+                    <span class="tree-item-arrow" ${isFile ? 'style="visibility: hidden;"' : ''}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                    </span>
+                    <span class="tree-item-icon ${isFile ? 'file' : 'folder'}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            ${isFile ?
+                                '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>' :
+                                '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+                            }
+                        </svg>
+                    </span>
+                    <span class="tree-item-label">${escapeHtml(name)}</span>
                     <span class="sidebar-remove-btn" onclick="event.stopPropagation(); removeFolderByIndex(${idx})" title="삭제">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                             <path d="M18 6L6 18M6 6l12 12"/>
@@ -444,6 +487,310 @@ async function loadSidebarFolders() {
         }).join('');
     } catch (err) {
         console.error('사이드바 폴더 로드 실패:', err);
+    }
+}
+
+// 모든 폴더 접기
+function collapseAllFolders() {
+    document.querySelectorAll('.tree-item.expanded').forEach(item => {
+        item.classList.remove('expanded');
+    });
+}
+
+// 폴더/파일 상세 정보 표시 (하단 패널에)
+async function showFolderDetail(idx, folderPath) {
+    // 선택 상태 표시 (tree-item으로 변경)
+    const items = document.querySelectorAll('#sidebarFolderList .tree-item');
+    items.forEach(item => item.classList.remove('selected'));
+    const selectedItem = document.querySelector(`#sidebarFolderList .tree-item[data-folder-idx="${idx}"]`);
+    if (selectedItem) selectedItem.classList.add('selected');
+
+    // 하단 패널 표시
+    const bottomPanel = document.getElementById('bottomPanel');
+    if (bottomPanel && !bottomPanel.classList.contains('open')) {
+        bottomPanel.classList.add('open');
+    }
+
+    // 상세 정보 탭 활성화 또는 생성
+    activateFolderDetailTab(folderPath);
+
+    // 상세 정보 로드
+    await loadFolderDetailContent(folderPath);
+}
+
+// 폴더 상세 탭 활성화
+function activateFolderDetailTab(folderPath) {
+    const tabList = document.querySelector('.bottom-tabs');
+    const tabContent = document.getElementById('bottomPanelContent');
+    if (!tabList || !tabContent) return;
+
+    // 기존 폴더 상세 탭 제거
+    const existingTab = tabList.querySelector('.bottom-tab[data-tab="folder-detail"]');
+    if (existingTab) existingTab.remove();
+
+    // 기존 폴더 상세 콘텐츠 제거
+    const existingContent = tabContent.querySelector('.tab-pane[data-pane="folder-detail"]');
+    if (existingContent) existingContent.remove();
+
+    // 새 탭 생성
+    const name = folderPath.split(/[/\\]/).pop();
+    const newTab = document.createElement('button');
+    newTab.className = 'bottom-tab active';
+    newTab.dataset.tab = 'folder-detail';
+    newTab.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+        </svg>
+        <span>${escapeHtml(name)}</span>
+        <span class="tab-close" onclick="event.stopPropagation(); closeFolderDetailTab()">×</span>
+    `;
+
+    // 다른 탭 비활성화
+    tabList.querySelectorAll('.bottom-tab').forEach(tab => tab.classList.remove('active'));
+
+    // 새 탭 추가
+    tabList.appendChild(newTab);
+
+    // 콘텐츠 영역 생성
+    const tabPanes = tabContent.querySelectorAll('.tab-pane');
+    tabPanes.forEach(pane => pane.classList.remove('active'));
+
+    const newPane = document.createElement('div');
+    newPane.className = 'tab-pane active';
+    newPane.dataset.pane = 'folder-detail';
+    newPane.innerHTML = `
+        <div class="folder-detail-loading">
+            <div class="loading-spinner"></div>
+            <span>정보 로딩 중...</span>
+        </div>
+    `;
+    tabContent.appendChild(newPane);
+
+    // 탭 클릭 이벤트
+    newTab.addEventListener('click', () => {
+        tabList.querySelectorAll('.bottom-tab').forEach(t => t.classList.remove('active'));
+        tabContent.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        newTab.classList.add('active');
+        newPane.classList.add('active');
+    });
+}
+
+// 폴더 상세 탭 닫기
+function closeFolderDetailTab() {
+    const tabList = document.querySelector('.bottom-tabs');
+    const tabContent = document.getElementById('bottomPanelContent');
+
+    const tab = tabList?.querySelector('.bottom-tab[data-tab="folder-detail"]');
+    const pane = tabContent?.querySelector('.tab-pane[data-pane="folder-detail"]');
+
+    if (tab) tab.remove();
+    if (pane) pane.remove();
+
+    // 첫 번째 탭 활성화
+    const firstTab = tabList?.querySelector('.bottom-tab');
+    const firstPane = tabContent?.querySelector('.tab-pane');
+    if (firstTab) firstTab.classList.add('active');
+    if (firstPane) firstPane.classList.add('active');
+
+    // 선택 상태 제거
+    document.querySelectorAll('#sidebarFolderList .sidebar-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+}
+
+// 폴더 상세 정보 로드
+async function loadFolderDetailContent(folderPath) {
+    const pane = document.querySelector('.tab-pane[data-pane="folder-detail"]');
+    if (!pane) return;
+
+    try {
+        // 파일/폴더 정보 가져오기
+        const infoRes = await fetch('/api/folder-info?path=' + encodeURIComponent(folderPath));
+        const info = await infoRes.json();
+
+        // 최근 변경 로그 가져오기
+        const logsRes = await fetch('/api/changes');
+        const logsData = await logsRes.json();
+        const relatedLogs = (logsData.changes || [])
+            .filter(log => log.path && log.path.startsWith(folderPath))
+            .slice(0, 10);
+
+        const name = folderPath.split(/[/\\]/).pop();
+        const isFile = folderPath.includes('.') && !info.isDirectory;
+        const escapedPath = escapeHtml(folderPath).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        pane.innerHTML = `
+            <div class="folder-detail-container">
+                <div class="folder-detail-header">
+                    <div class="folder-detail-icon ${isFile ? 'file' : 'folder'}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            ${isFile ?
+                                '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>' :
+                                '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+                            }
+                        </svg>
+                    </div>
+                    <div class="folder-detail-title">
+                        <h3>${escapeHtml(name)}</h3>
+                        <span class="folder-detail-path">${escapeHtml(folderPath)}</span>
+                    </div>
+                    <div class="folder-detail-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="openInExplorer('${escapedPath}')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                            탐색기에서 열기
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="removeFolderFromDetail('${escapedPath}')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                            감시 해제
+                        </button>
+                    </div>
+                </div>
+
+                <div class="folder-detail-info">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">유형</span>
+                            <span class="info-value">${isFile ? '파일' : '폴더'}</span>
+                        </div>
+                        ${info.size !== undefined ? `
+                        <div class="info-item">
+                            <span class="info-label">크기</span>
+                            <span class="info-value">${formatBytesDetail(info.size)}</span>
+                        </div>
+                        ` : ''}
+                        ${info.created ? `
+                        <div class="info-item">
+                            <span class="info-label">생성일</span>
+                            <span class="info-value">${formatDateDetail(info.created)}</span>
+                        </div>
+                        ` : ''}
+                        ${info.modified ? `
+                        <div class="info-item">
+                            <span class="info-label">수정일</span>
+                            <span class="info-value">${formatDateDetail(info.modified)}</span>
+                        </div>
+                        ` : ''}
+                        ${info.fileCount !== undefined ? `
+                        <div class="info-item">
+                            <span class="info-label">파일 수</span>
+                            <span class="info-value">${info.fileCount}개</span>
+                        </div>
+                        ` : ''}
+                        ${info.folderCount !== undefined ? `
+                        <div class="info-item">
+                            <span class="info-label">폴더 수</span>
+                            <span class="info-value">${info.folderCount}개</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="folder-detail-logs">
+                    <h4>최근 변경 내역</h4>
+                    ${relatedLogs.length > 0 ? `
+                        <div class="detail-log-list">
+                            ${relatedLogs.map(log => `
+                                <div class="detail-log-item ${log.type}">
+                                    <span class="log-type-badge ${log.type}">${log.type}</span>
+                                    <span class="log-filename">${escapeHtml(log.path.split(/[/\\]/).pop())}</span>
+                                    <span class="log-time">${formatTimeAgoDetail(log.timestamp)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <div class="empty-logs">
+                            <p>변경 내역이 없습니다</p>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        console.error('폴더 상세 정보 로드 실패:', err);
+        pane.innerHTML = `
+            <div class="folder-detail-error">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; opacity: 0.5;">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <p>정보를 불러올 수 없습니다</p>
+            </div>
+        `;
+    }
+}
+
+// 탐색기에서 열기
+async function openInExplorer(folderPath) {
+    try {
+        if (window.electronAPI && window.electronAPI.openPath) {
+            await window.electronAPI.openPath(folderPath);
+        } else {
+            alert('이 기능은 데스크톱 앱에서만 사용 가능합니다.');
+        }
+    } catch (err) {
+        console.error('탐색기 열기 실패:', err);
+    }
+}
+
+// 상세 정보에서 감시 해제
+async function removeFolderFromDetail(folderPath) {
+    if (!confirm('이 항목의 감시를 해제하시겠습니까?')) return;
+
+    try {
+        await removeFolder(folderPath);
+        closeFolderDetailTab();
+        loadSidebarFolders();
+    } catch (err) {
+        console.error('감시 해제 실패:', err);
+    }
+}
+
+// 바이트 포맷 (상세정보용)
+function formatBytesDetail(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 날짜 포맷 (상세정보용)
+function formatDateDetail(dateStr) {
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return dateStr;
+    }
+}
+
+// 상대 시간 포맷 (상세정보용)
+function formatTimeAgoDetail(timestamp) {
+    try {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+
+        if (diff < 60) return '방금 전';
+        if (diff < 3600) return Math.floor(diff / 60) + '분 전';
+        if (diff < 86400) return Math.floor(diff / 3600) + '시간 전';
+        if (diff < 604800) return Math.floor(diff / 86400) + '일 전';
+        return date.toLocaleDateString('ko-KR');
+    } catch {
+        return '';
     }
 }
 
@@ -791,72 +1138,177 @@ function renderMeetingSidebar(container) {
     `;
 }
 
-// P2P 메신저 사이드바
+// P2P 메신저 사이드바 (Git Control 스타일)
 function renderMessengerSidebar(container) {
     container.innerHTML = `
-        <div class="sidebar-section">
+        <!-- 연결 상태 헤더 -->
+        <div class="server-list-header">
+            <span class="server-list-title">연결</span>
+            <div class="server-status-indicator" id="messengerSidebarStatus">
+                <span class="server-status-dot offline"></span>
+                <span>오프라인</span>
+            </div>
+        </div>
+
+        <!-- 서버/연결 리스트 -->
+        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
             <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span>연결 설정</span>
+                <span>서버 리스트</span>
             </div>
-            <div class="sidebar-section-items">
-                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 8px 12px 8px 24px;">
-                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">서버 주소</label>
-                    <input type="text" id="sidebarP2pServer" class="sidebar-input" placeholder="IP:포트" value="localhost:3000">
-                </div>
-                <div class="sidebar-item" onclick="connectP2P()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M8.56 3.69a9 9 0 0 0-2.92 1.95"/>
-                        <path d="M3.69 8.56A9 9 0 0 0 3 12"/>
-                        <path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/>
-                        <path d="M8.56 20.31A9 9 0 0 0 12 21"/>
-                        <path d="M15.44 20.31a9 9 0 0 0 2.92-1.95"/>
-                        <path d="M20.31 15.44A9 9 0 0 0 21 12"/>
-                        <path d="M20.31 8.56a9 9 0 0 0-1.95-2.92"/>
-                        <path d="M15.44 3.69A9 9 0 0 0 12 3"/>
-                        <circle cx="12" cy="12" r="2"/>
-                    </svg>
-                    <span class="sidebar-item-text">연결하기</span>
+            <div class="sidebar-section-items" id="messengerServerList">
+                <!-- 서버 없을 때 -->
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    저장된 서버가 없습니다
                 </div>
             </div>
         </div>
-        <div class="sidebar-section">
+
+        <!-- 빠른 연결 -->
+        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
             <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span>다운로드 폴더</span>
+                <span>빠른 연결</span>
             </div>
             <div class="sidebar-section-items">
-                <div class="sidebar-item" onclick="selectDownloadFolder()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                    </svg>
-                    <span class="sidebar-item-text">폴더 선택</span>
+                <div class="server-item" onclick="startP2PHost()">
+                    <div class="server-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                    </div>
+                    <div class="server-item-info">
+                        <div class="server-item-name">호스트 모드</div>
+                        <div class="server-item-status">서버를 시작하여 다른 사용자의 연결을 받습니다</div>
+                    </div>
                 </div>
-                <div class="sidebar-item" id="sidebarDownloadPath" style="font-size: 11px; color: var(--text-muted);">
-                    <span class="sidebar-item-text">미설정</span>
+                <div class="server-item" onclick="showConnectDialog()">
+                    <div class="server-item-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+                            <polyline points="10 17 15 12 10 7"/>
+                            <line x1="15" y1="12" x2="3" y2="12"/>
+                        </svg>
+                    </div>
+                    <div class="server-item-info">
+                        <div class="server-item-name">게스트 모드</div>
+                        <div class="server-item-status">호스트 서버에 연결합니다</div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="sidebar-section">
+
+        <!-- 접속자 목록 (연결 시 표시) -->
+        <div class="sidebar-section" id="messengerUserSection" style="display: none; border-bottom: 1px solid var(--border-color);">
             <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span>사용 안내</span>
+                <span>접속자</span>
+                <span class="tree-item-badge" id="messengerUserCount">0</span>
             </div>
-            <div class="sidebar-section-items">
-                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 12px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
-                    <p style="margin-bottom: 8px;">1. 동일 네트워크의 PC와 연결</p>
-                    <p style="margin-bottom: 8px;">2. 파일 드래그&드롭으로 전송</p>
-                    <p>3. 실시간 메시지 교환 가능</p>
-                </div>
+            <div class="sidebar-section-items" id="messengerUserList">
+                <!-- 동적으로 채워짐 -->
             </div>
+        </div>
+
+        <!-- 하단 액션 -->
+        <div style="border-top: 1px solid var(--border-color); margin-top: auto;">
+            <button class="quick-action-btn" onclick="openSettingsCategory('messenger')">
+                <span class="btn-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                    메신저 설정
+                </span>
+            </button>
         </div>
     `;
+
+    // 저장된 서버 목록 로드
+    loadMessengerServers();
+}
+
+// 메신저 서버 목록 로드
+async function loadMessengerServers() {
+    try {
+        // 로컬 스토리지에서 저장된 서버 목록 로드
+        const savedServers = JSON.parse(localStorage.getItem('p2pServers') || '[]');
+        const container = document.getElementById('messengerServerList');
+        if (!container) return;
+
+        if (savedServers.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    저장된 서버가 없습니다
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = savedServers.map((server, idx) => `
+            <div class="server-item" onclick="connectToServer('${escapeHtml(server.address)}', ${server.port})">
+                <div class="server-item-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/>
+                        <line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                </div>
+                <div class="server-item-info">
+                    <div class="server-item-name">${escapeHtml(server.name || server.address)}</div>
+                    <div class="server-item-status">${escapeHtml(server.address)}:${server.port}</div>
+                </div>
+                <div class="server-item-actions">
+                    <button class="explorer-action-btn" onclick="event.stopPropagation(); removeServer(${idx})" title="삭제">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('서버 목록 로드 실패:', err);
+    }
+}
+
+// 호스트 모드 시작
+function startP2PHost() {
+    // 메인 패널의 호스트 모드 탭 활성화
+    const hostModeTab = document.querySelector('.mode-tab[data-mode="host"]');
+    if (hostModeTab) hostModeTab.click();
+}
+
+// 연결 다이얼로그 표시
+function showConnectDialog() {
+    // 메인 패널의 게스트 모드 탭 활성화
+    const guestModeTab = document.querySelector('.mode-tab[data-mode="guest"]');
+    if (guestModeTab) guestModeTab.click();
+}
+
+// 서버 삭제
+function removeServer(idx) {
+    const savedServers = JSON.parse(localStorage.getItem('p2pServers') || '[]');
+    savedServers.splice(idx, 1);
+    localStorage.setItem('p2pServers', JSON.stringify(savedServers));
+    loadMessengerServers();
+}
+
+// 서버에 연결
+function connectToServer(address, port) {
+    document.getElementById('hostAddress').value = address;
+    document.getElementById('guestPort').value = port;
+    // 게스트 모드로 전환 후 연결
+    const guestModeTab = document.querySelector('.mode-tab[data-mode="guest"]');
+    if (guestModeTab) guestModeTab.click();
 }
 
 // 알림 사이드바
@@ -7818,3 +8270,229 @@ if (typeof escapeHtml !== 'function') {
         return div.innerHTML;
     }
 }
+
+// ========================================
+// VSCode 스타일 설정 시스템
+// ========================================
+
+// 설정 카테고리 표시
+function showSettingsCategory(category) {
+    // 네비게이션 활성 상태 변경
+    document.querySelectorAll('.settings-nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.category === category) {
+            item.classList.add('active');
+        }
+    });
+
+    // 설정 카테고리 표시/숨김
+    document.querySelectorAll('.settings-category').forEach(cat => {
+        cat.classList.remove('active');
+    });
+    const targetCategory = document.getElementById(`settings-${category}`);
+    if (targetCategory) {
+        targetCategory.classList.add('active');
+    }
+}
+
+// 설정 페이지로 이동하고 특정 카테고리 열기
+function openSettingsCategory(category) {
+    navigateTo('settings');
+    setTimeout(() => {
+        showSettingsCategory(category);
+    }, 100);
+}
+
+// 설정 검색 필터
+function filterSettings(query) {
+    const lowerQuery = query.toLowerCase();
+    document.querySelectorAll('.settings-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+        if (query === '' || text.includes(lowerQuery)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+// ========================================
+// 설정 저장/로드 함수들
+// ========================================
+
+// 메신저 설정 저장
+async function saveMessengerSettings() {
+    const settings = {
+        nickname: document.getElementById('messengerNickname')?.value || '',
+        port: parseInt(document.getElementById('messengerPort')?.value) || 9900,
+        downloadPath: document.getElementById('messengerDownloadPath')?.value || '',
+        notifyMessage: document.getElementById('messengerNotifyMessage')?.checked ?? true,
+        notifyFile: document.getElementById('messengerNotifyFile')?.checked ?? true
+    };
+
+    localStorage.setItem('messengerSettings', JSON.stringify(settings));
+
+    // Electron API가 있으면 백엔드에도 저장
+    if (window.electronAPI && window.electronAPI.saveSettings) {
+        await window.electronAPI.saveSettings('messenger', settings);
+    }
+
+    showToast('메신저 설정이 저장되었습니다', 'success');
+}
+
+// 메신저 설정 로드
+function loadMessengerSettings() {
+    try {
+        const settings = JSON.parse(localStorage.getItem('messengerSettings') || '{}');
+
+        if (settings.nickname) {
+            const nicknameEl = document.getElementById('messengerNickname');
+            if (nicknameEl) nicknameEl.value = settings.nickname;
+        }
+        if (settings.port) {
+            const portEl = document.getElementById('messengerPort');
+            if (portEl) portEl.value = settings.port;
+        }
+        if (settings.downloadPath) {
+            const pathEl = document.getElementById('messengerDownloadPath');
+            if (pathEl) pathEl.value = settings.downloadPath;
+        }
+        if (settings.notifyMessage !== undefined) {
+            const msgEl = document.getElementById('messengerNotifyMessage');
+            if (msgEl) msgEl.checked = settings.notifyMessage;
+        }
+        if (settings.notifyFile !== undefined) {
+            const fileEl = document.getElementById('messengerNotifyFile');
+            if (fileEl) fileEl.checked = settings.notifyFile;
+        }
+    } catch (err) {
+        console.error('메신저 설정 로드 실패:', err);
+    }
+}
+
+// 메신저 다운로드 폴더 선택
+async function selectMessengerDownloadFolder() {
+    try {
+        if (window.electronAPI && window.electronAPI.selectFolder) {
+            const folderPath = await window.electronAPI.selectFolder();
+            if (folderPath) {
+                const pathEl = document.getElementById('messengerDownloadPath');
+                if (pathEl) pathEl.value = folderPath;
+                saveMessengerSettings();
+            }
+        } else {
+            const folderPath = prompt('다운로드 폴더 경로를 입력하세요:');
+            if (folderPath) {
+                const pathEl = document.getElementById('messengerDownloadPath');
+                if (pathEl) pathEl.value = folderPath;
+                saveMessengerSettings();
+            }
+        }
+    } catch (err) {
+        console.error('폴더 선택 실패:', err);
+    }
+}
+
+// 알림 설정 저장
+async function saveNotificationSettings() {
+    const settings = {
+        desktop: document.getElementById('notifyDesktop')?.checked ?? false,
+        sound: document.getElementById('notifySound')?.checked ?? false
+    };
+
+    localStorage.setItem('notificationSettings', JSON.stringify(settings));
+
+    if (window.electronAPI && window.electronAPI.saveSettings) {
+        await window.electronAPI.saveSettings('notifications', settings);
+    }
+
+    showToast('알림 설정이 저장되었습니다', 'success');
+}
+
+// 알림 설정 로드
+function loadNotificationSettingsUI() {
+    try {
+        const settings = JSON.parse(localStorage.getItem('notificationSettings') || '{}');
+
+        const desktopEl = document.getElementById('notifyDesktop');
+        if (desktopEl && settings.desktop !== undefined) desktopEl.checked = settings.desktop;
+
+        const soundEl = document.getElementById('notifySound');
+        if (soundEl && settings.sound !== undefined) soundEl.checked = settings.sound;
+    } catch (err) {
+        console.error('알림 설정 로드 실패:', err);
+    }
+}
+
+// 텔레그램 설정 저장
+async function saveTelegramSettings() {
+    const settings = {
+        enabled: document.getElementById('telegramEnabled')?.checked ?? false,
+        botToken: document.getElementById('telegramBotToken')?.value || '',
+        chatId: document.getElementById('telegramChatId')?.value || ''
+    };
+
+    localStorage.setItem('telegramSettings', JSON.stringify(settings));
+
+    if (window.electronAPI && window.electronAPI.saveSettings) {
+        await window.electronAPI.saveSettings('telegram', settings);
+    }
+
+    showToast('텔레그램 설정이 저장되었습니다', 'success');
+}
+
+// 텔레그램 설정 로드
+function loadTelegramSettings() {
+    try {
+        const settings = JSON.parse(localStorage.getItem('telegramSettings') || '{}');
+
+        const enabledEl = document.getElementById('telegramEnabled');
+        if (enabledEl && settings.enabled !== undefined) enabledEl.checked = settings.enabled;
+
+        const tokenEl = document.getElementById('telegramBotToken');
+        if (tokenEl && settings.botToken) tokenEl.value = settings.botToken;
+
+        const chatIdEl = document.getElementById('telegramChatId');
+        if (chatIdEl && settings.chatId) chatIdEl.value = settings.chatId;
+    } catch (err) {
+        console.error('텔레그램 설정 로드 실패:', err);
+    }
+}
+
+// 토스트 메시지 표시
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+    `;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--info)'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        font-size: 13px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideInUp 0.3s ease;
+    `;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// 페이지 로드 시 설정 로드
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        loadMessengerSettings();
+        loadNotificationSettingsUI();
+        loadTelegramSettings();
+    }, 500);
+});

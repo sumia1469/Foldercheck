@@ -678,199 +678,467 @@
                 </div>
             </section>
 
-            <!-- 설정 섹션 -->
+            <!-- 설정 섹션 (VSCode 스타일) -->
             <section id="settings" class="content-section">
                 <div class="section-header">
                     <h1>설정</h1>
-                </div>
-
-                <div class="settings-card">
-                    <h3>파일 필터</h3>
-                    <p class="help-text">특정 확장자만 감시합니다. 비어있으면 모든 파일을 감시합니다.</p>
-                    <div class="input-group">
-                        <input type="text" id="filterInput" placeholder="확장자 입력 (예: .txt)">
-                        <button id="addFilterBtn" class="btn btn-primary">추가</button>
-                    </div>
-                    <div id="filterList" class="tag-list"></div>
-                </div>
-
-                <div class="settings-card">
-                    <h3>제외 패턴</h3>
-                    <p class="help-text">특정 폴더나 파일을 제외합니다.</p>
-                    <div class="input-group">
-                        <input type="text" id="excludeInput" placeholder="제외 패턴 (예: node_modules)">
-                        <button id="addExcludeBtn" class="btn btn-primary">추가</button>
-                    </div>
-                    <div id="excludeList" class="tag-list"></div>
-                </div>
-
-                <div class="settings-card">
-                    <h3>🎙️ 음성 인식</h3>
-                    <p class="help-text">회의 녹음을 텍스트로 변환합니다. 인터넷 연결 없이 로컬에서 처리됩니다.</p>
-
-                    <div class="whisper-status" id="whisperStatusSettings">
-                        <div class="status-row">
-                            <span class="status-label">상태:</span>
-                            <span class="status-value" id="whisperStateSettings">확인 중...</span>
-                        </div>
-                        <div class="status-row" id="whisperModelRow">
-                            <span class="status-label">모델:</span>
-                            <span class="status-value" id="whisperModelStatus">-</span>
-                        </div>
-                        <div class="status-row" id="whisperCliRow">
-                            <span class="status-label">CLI:</span>
-                            <span class="status-value" id="whisperCliStatus">-</span>
-                        </div>
-                    </div>
-
-                    <!-- 다운로드 진행 상황 (인라인 로딩 박스) -->
-                    <div id="whisperDownloadProgress" class="inline-download-box" style="display: none;">
-                        <div class="inline-download-header">
-                            <div class="inline-spinner"></div>
-                            <span class="inline-download-title" id="whisperDownloadTitle">음성 인식 설치 중</span>
-                        </div>
-                        <div class="inline-download-body">
-                            <div class="inline-progress-row">
-                                <div class="inline-progress-bar">
-                                    <div class="inline-progress-fill" id="whisperProgressBar"></div>
-                                </div>
-                                <span class="inline-progress-percent" id="whisperProgressPercent">0%</span>
-                            </div>
-                            <p class="inline-download-status" id="whisperProgressText">준비 중...</p>
-                        </div>
-                    </div>
-
-                    <!-- 설치 버튼 -->
-                    <div id="whisperInstallSection" style="margin-top: 15px;">
-                        <button id="whisperInstallBtn" class="btn btn-primary" style="display: none;">
-                            🔽 음성 인식 설치 (~500MB)
-                        </button>
-                        <p class="help-text" id="whisperInstallHelp" style="display: none; margin-top: 10px;"></p>
-                    </div>
-                </div>
-
-                <div class="settings-card">
-                    <h3>🤖 내장 AI</h3>
-                    <p class="help-text">문서 요약 및 분석에 사용되는 AI입니다. 모든 처리는 로컬에서 진행되며 외부로 데이터가 전송되지 않습니다.</p>
-
-                    <div class="ai-model-status" id="aiModelStatusSettings">
-                        <div class="status-row">
-                            <span class="status-label">상태:</span>
-                            <span class="status-value" id="ollamaStatus">확인 중...</span>
-                        </div>
-                    </div>
-
-                    <!-- 모델 다운로드 진행 상황 (인라인 로딩 박스) -->
-                    <div id="ollamaDownloadProgress" class="inline-download-box" style="display: none;">
-                        <div class="inline-download-header">
-                            <div class="inline-spinner"></div>
-                            <span class="inline-download-title" id="ollamaDownloadTitle">AI 모델 설치 중</span>
-                        </div>
-                        <div class="inline-download-body">
-                            <div class="inline-progress-row">
-                                <div class="inline-progress-bar">
-                                    <div class="inline-progress-fill" id="ollamaProgressBar"></div>
-                                </div>
-                                <span class="inline-progress-percent" id="ollamaProgressPercent">0%</span>
-                            </div>
-                            <p class="inline-download-status" id="ollamaProgressText">준비 중...</p>
-                        </div>
-                    </div>
-
-                    <!-- 모델 설치 버튼 -->
-                    <div id="ollamaInstallSection" style="margin-top: 15px;">
-                        <button id="ollamaInstallBtn" class="btn btn-primary" style="display: none;">
-                            🔽 AI 모델 설치 (~2GB)
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 라이선스 관리 -->
-                <div class="settings-card" id="licenseCard">
-                    <h3>🔐 라이선스</h3>
-                    <p class="help-text">DocWatch Pro 라이선스를 관리합니다.</p>
-
-                    <div class="license-status" id="licenseStatusContainer">
-                        <div class="status-row">
-                            <span class="status-label">상태:</span>
-                            <span class="status-value" id="licenseType">확인 중...</span>
-                        </div>
-                        <div class="status-row">
-                            <span class="status-label">만료일:</span>
-                            <span class="status-value" id="licenseExpiry">-</span>
-                        </div>
-                        <div class="status-row" id="licenseDaysRow" style="display: none;">
-                            <span class="status-label">남은 기간:</span>
-                            <span class="status-value" id="licenseDays">-</span>
-                        </div>
-                    </div>
-
-                    <!-- Trial/만료 시 활성화 UI -->
-                    <div id="licenseActivationUI" style="display: none; margin-top: 16px;">
-                        <div class="license-tabs">
-                            <button class="license-tab active" data-tab="online">온라인 활성화</button>
-                            <button class="license-tab" data-tab="offline">오프라인 활성화</button>
-                        </div>
-
-                        <!-- 온라인 활성화 -->
-                        <div class="license-tab-content" id="onlineActivation">
-                            <div class="form-group">
-                                <label>라이선스 키</label>
-                                <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX">
-                            </div>
-                            <button class="btn btn-primary" id="activateOnlineBtn">활성화</button>
-                        </div>
-
-                        <!-- 오프라인 활성화 -->
-                        <div class="license-tab-content" id="offlineActivation" style="display: none;">
-                            <div class="form-group">
-                                <label>기기 ID (복사하여 관리자에게 전달)</label>
-                                <div class="machine-id-box">
-                                    <code id="machineIdDisplay">로딩 중...</code>
-                                    <button class="btn btn-sm btn-secondary" id="copyMachineIdBtn">복사</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>오프라인 라이선스 키</label>
-                                <textarea id="offlineKeyInput" rows="3" placeholder="관리자로부터 받은 오프라인 키를 입력하세요"></textarea>
-                            </div>
-                            <button class="btn btn-primary" id="activateOfflineBtn">오프라인 활성화</button>
-                        </div>
-                    </div>
-
-                    <!-- Pro 상태일 때 -->
-                    <div id="licenseProStatus" style="display: none; margin-top: 16px;">
-                        <div class="pro-badge">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
+                    <div class="header-actions">
+                        <div class="settings-search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="M21 21l-4.35-4.35"/>
                             </svg>
-                            Pro 라이선스 활성화됨
+                            <input type="text" id="settingsSearchInput" placeholder="설정 검색..." onkeyup="filterSettings(this.value)">
                         </div>
-                    </div>
-
-                    <!-- 개발 모드 전용: Pro 토글 버튼 -->
-                    <div id="devModeControls" style="display: none; margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                            <span style="background: #ff6b6b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">DEV</span>
-                            <span style="color: var(--text-muted); font-size: 13px;">개발 모드 전용 기능</span>
-                        </div>
-                        <button class="btn btn-secondary" id="toggleProBtn" style="width: 100%;">
-                            🔄 Pro/Trial 전환
-                        </button>
                     </div>
                 </div>
 
-                <div class="settings-card">
-                    <h3>정보</h3>
-                    <div class="info-list">
-                        <div class="info-item">
-                            <span class="info-label">버전</span>
-                            <span class="info-value">1.0.0</span>
+                <div class="settings-layout">
+                    <!-- 설정 카테고리 네비게이션 -->
+                    <nav class="settings-nav">
+                        <div class="settings-nav-item active" data-category="monitoring" onclick="showSettingsCategory('monitoring')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                            </svg>
+                            <span>모니터링</span>
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">서버 포트</span>
-                            <span class="info-value">4400</span>
+                        <div class="settings-nav-item" data-category="messenger" onclick="showSettingsCategory('messenger')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                            </svg>
+                            <span>P2P 메신저</span>
+                        </div>
+                        <div class="settings-nav-item" data-category="notifications" onclick="showSettingsCategory('notifications')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+                            </svg>
+                            <span>알림</span>
+                        </div>
+                        <div class="settings-nav-item" data-category="speech" onclick="showSettingsCategory('speech')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                                <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                                <line x1="12" y1="19" x2="12" y2="23"/>
+                                <line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                            <span>음성 인식</span>
+                        </div>
+                        <div class="settings-nav-item" data-category="ai" onclick="showSettingsCategory('ai')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                            </svg>
+                            <span>내장 AI</span>
+                        </div>
+                        <div class="settings-nav-item" data-category="license" onclick="showSettingsCategory('license')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                            <span>라이선스</span>
+                        </div>
+                        <div class="settings-nav-item" data-category="about" onclick="showSettingsCategory('about')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
+                            </svg>
+                            <span>정보</span>
+                        </div>
+                    </nav>
+
+                    <!-- 설정 내용 영역 -->
+                    <div class="settings-content">
+                        <!-- 모니터링 설정 -->
+                        <div class="settings-category active" id="settings-monitoring">
+                            <h2 class="settings-category-title">모니터링 설정</h2>
+
+                            <div class="settings-card">
+                                <h3>파일 필터</h3>
+                                <p class="help-text">특정 확장자만 감시합니다. 비어있으면 모든 파일을 감시합니다.</p>
+                                <div class="input-group">
+                                    <input type="text" id="filterInput" placeholder="확장자 입력 (예: .txt)">
+                                    <button id="addFilterBtn" class="btn btn-primary">추가</button>
+                                </div>
+                                <div id="filterList" class="tag-list"></div>
+                            </div>
+
+                            <div class="settings-card">
+                                <h3>제외 패턴</h3>
+                                <p class="help-text">특정 폴더나 파일을 제외합니다.</p>
+                                <div class="input-group">
+                                    <input type="text" id="excludeInput" placeholder="제외 패턴 (예: node_modules)">
+                                    <button id="addExcludeBtn" class="btn btn-primary">추가</button>
+                                </div>
+                                <div id="excludeList" class="tag-list"></div>
+                            </div>
+                        </div>
+
+                        <!-- P2P 메신저 설정 -->
+                        <div class="settings-category" id="settings-messenger">
+                            <h2 class="settings-category-title">P2P 메신저 설정</h2>
+
+                            <div class="settings-card">
+                                <h3>연결 설정</h3>
+                                <p class="help-text">P2P 메신저 연결에 사용되는 기본 설정입니다.</p>
+
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>기본 닉네임</label>
+                                            <p class="settings-item-desc">채팅에서 사용할 기본 닉네임입니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <input type="text" id="messengerNickname" class="settings-input" placeholder="닉네임 입력" onchange="saveMessengerSettings()">
+                                        </div>
+                                    </div>
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>기본 포트</label>
+                                            <p class="settings-item-desc">호스트 모드에서 사용할 기본 포트 번호입니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <input type="number" id="messengerPort" class="settings-input" value="9900" min="1024" max="65535" onchange="saveMessengerSettings()">
+                                        </div>
+                                    </div>
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>다운로드 폴더</label>
+                                            <p class="settings-item-desc">수신한 파일이 저장되는 폴더입니다.</p>
+                                        </div>
+                                        <div class="settings-item-control" style="display: flex; gap: 8px;">
+                                            <input type="text" id="messengerDownloadPath" class="settings-input" readonly placeholder="폴더 선택...">
+                                            <button class="btn btn-secondary btn-sm" onclick="selectMessengerDownloadFolder()">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                                                </svg>
+                                                선택
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-card">
+                                <h3>알림 설정</h3>
+                                <p class="help-text">메시지 및 파일 수신 시 알림 설정입니다.</p>
+
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>메시지 알림</label>
+                                            <p class="settings-item-desc">새 메시지 수신 시 알림을 표시합니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <label class="settings-toggle">
+                                                <input type="checkbox" id="messengerNotifyMessage" checked onchange="saveMessengerSettings()">
+                                                <span class="settings-toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>파일 수신 알림</label>
+                                            <p class="settings-item-desc">파일 수신 완료 시 알림을 표시합니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <label class="settings-toggle">
+                                                <input type="checkbox" id="messengerNotifyFile" checked onchange="saveMessengerSettings()">
+                                                <span class="settings-toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 알림 설정 -->
+                        <div class="settings-category" id="settings-notifications">
+                            <h2 class="settings-category-title">알림 설정</h2>
+
+                            <div class="settings-card">
+                                <h3>일반 알림</h3>
+                                <p class="help-text">DocWatch 알림 설정입니다.</p>
+
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>데스크톱 알림</label>
+                                            <p class="settings-item-desc">시스템 알림을 표시합니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <label class="settings-toggle">
+                                                <input type="checkbox" id="notifyDesktop" onchange="saveNotificationSettings()">
+                                                <span class="settings-toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>알림음</label>
+                                            <p class="settings-item-desc">알림 발생 시 소리를 재생합니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <label class="settings-toggle">
+                                                <input type="checkbox" id="notifySound" onchange="saveNotificationSettings()">
+                                                <span class="settings-toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-card">
+                                <h3>텔레그램 알림</h3>
+                                <p class="help-text">파일 변경 시 텔레그램으로 알림을 받습니다.</p>
+
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>텔레그램 알림 활성화</label>
+                                            <p class="settings-item-desc">텔레그램으로 변경 알림을 전송합니다.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <label class="settings-toggle">
+                                                <input type="checkbox" id="telegramEnabled" onchange="saveTelegramSettings()">
+                                                <span class="settings-toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>Bot Token</label>
+                                            <p class="settings-item-desc">텔레그램 봇 토큰을 입력하세요.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <input type="password" id="telegramBotToken" class="settings-input" placeholder="Bot Token" onchange="saveTelegramSettings()">
+                                        </div>
+                                    </div>
+                                    <div class="settings-item">
+                                        <div class="settings-item-info">
+                                            <label>Chat ID</label>
+                                            <p class="settings-item-desc">알림을 받을 채팅 ID를 입력하세요.</p>
+                                        </div>
+                                        <div class="settings-item-control">
+                                            <input type="text" id="telegramChatId" class="settings-input" placeholder="Chat ID" onchange="saveTelegramSettings()">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 음성 인식 설정 -->
+                        <div class="settings-category" id="settings-speech">
+                            <h2 class="settings-category-title">음성 인식 설정</h2>
+
+                            <div class="settings-card">
+                                <h3>🎙️ 음성 인식</h3>
+                                <p class="help-text">회의 녹음을 텍스트로 변환합니다. 인터넷 연결 없이 로컬에서 처리됩니다.</p>
+
+                                <div class="whisper-status" id="whisperStatusSettings">
+                                    <div class="status-row">
+                                        <span class="status-label">상태:</span>
+                                        <span class="status-value" id="whisperStateSettings">확인 중...</span>
+                                    </div>
+                                    <div class="status-row" id="whisperModelRow">
+                                        <span class="status-label">모델:</span>
+                                        <span class="status-value" id="whisperModelStatus">-</span>
+                                    </div>
+                                    <div class="status-row" id="whisperCliRow">
+                                        <span class="status-label">CLI:</span>
+                                        <span class="status-value" id="whisperCliStatus">-</span>
+                                    </div>
+                                </div>
+
+                                <!-- 다운로드 진행 상황 (인라인 로딩 박스) -->
+                                <div id="whisperDownloadProgress" class="inline-download-box" style="display: none;">
+                                    <div class="inline-download-header">
+                                        <div class="inline-spinner"></div>
+                                        <span class="inline-download-title" id="whisperDownloadTitle">음성 인식 설치 중</span>
+                                    </div>
+                                    <div class="inline-download-body">
+                                        <div class="inline-progress-row">
+                                            <div class="inline-progress-bar">
+                                                <div class="inline-progress-fill" id="whisperProgressBar"></div>
+                                            </div>
+                                            <span class="inline-progress-percent" id="whisperProgressPercent">0%</span>
+                                        </div>
+                                        <p class="inline-download-status" id="whisperProgressText">준비 중...</p>
+                                    </div>
+                                </div>
+
+                                <!-- 설치 버튼 -->
+                                <div id="whisperInstallSection" style="margin-top: 15px;">
+                                    <button id="whisperInstallBtn" class="btn btn-primary" style="display: none;">
+                                        🔽 음성 인식 설치 (~500MB)
+                                    </button>
+                                    <p class="help-text" id="whisperInstallHelp" style="display: none; margin-top: 10px;"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 내장 AI 설정 -->
+                        <div class="settings-category" id="settings-ai">
+                            <h2 class="settings-category-title">내장 AI 설정</h2>
+
+                            <div class="settings-card">
+                                <h3>🤖 내장 AI</h3>
+                                <p class="help-text">문서 요약 및 분석에 사용되는 AI입니다. 모든 처리는 로컬에서 진행되며 외부로 데이터가 전송되지 않습니다.</p>
+
+                                <div class="ai-model-status" id="aiModelStatusSettings">
+                                    <div class="status-row">
+                                        <span class="status-label">상태:</span>
+                                        <span class="status-value" id="ollamaStatus">확인 중...</span>
+                                    </div>
+                                </div>
+
+                                <!-- 모델 다운로드 진행 상황 (인라인 로딩 박스) -->
+                                <div id="ollamaDownloadProgress" class="inline-download-box" style="display: none;">
+                                    <div class="inline-download-header">
+                                        <div class="inline-spinner"></div>
+                                        <span class="inline-download-title" id="ollamaDownloadTitle">AI 모델 설치 중</span>
+                                    </div>
+                                    <div class="inline-download-body">
+                                        <div class="inline-progress-row">
+                                            <div class="inline-progress-bar">
+                                                <div class="inline-progress-fill" id="ollamaProgressBar"></div>
+                                            </div>
+                                            <span class="inline-progress-percent" id="ollamaProgressPercent">0%</span>
+                                        </div>
+                                        <p class="inline-download-status" id="ollamaProgressText">준비 중...</p>
+                                    </div>
+                                </div>
+
+                                <!-- 모델 설치 버튼 -->
+                                <div id="ollamaInstallSection" style="margin-top: 15px;">
+                                    <button id="ollamaInstallBtn" class="btn btn-primary" style="display: none;">
+                                        🔽 AI 모델 설치 (~2GB)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 라이선스 설정 -->
+                        <div class="settings-category" id="settings-license">
+                            <h2 class="settings-category-title">라이선스 설정</h2>
+
+                            <div class="settings-card" id="licenseCard">
+                                <h3>🔐 라이선스</h3>
+                                <p class="help-text">DocWatch Pro 라이선스를 관리합니다.</p>
+
+                                <div class="license-status" id="licenseStatusContainer">
+                                    <div class="status-row">
+                                        <span class="status-label">상태:</span>
+                                        <span class="status-value" id="licenseType">확인 중...</span>
+                                    </div>
+                                    <div class="status-row">
+                                        <span class="status-label">만료일:</span>
+                                        <span class="status-value" id="licenseExpiry">-</span>
+                                    </div>
+                                    <div class="status-row" id="licenseDaysRow" style="display: none;">
+                                        <span class="status-label">남은 기간:</span>
+                                        <span class="status-value" id="licenseDays">-</span>
+                                    </div>
+                                </div>
+
+                                <!-- Trial/만료 시 활성화 UI -->
+                                <div id="licenseActivationUI" style="display: none; margin-top: 16px;">
+                                    <div class="license-tabs">
+                                        <button class="license-tab active" data-tab="online">온라인 활성화</button>
+                                        <button class="license-tab" data-tab="offline">오프라인 활성화</button>
+                                    </div>
+
+                                    <!-- 온라인 활성화 -->
+                                    <div class="license-tab-content" id="onlineActivation">
+                                        <div class="form-group">
+                                            <label>라이선스 키</label>
+                                            <input type="text" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX">
+                                        </div>
+                                        <button class="btn btn-primary" id="activateOnlineBtn">활성화</button>
+                                    </div>
+
+                                    <!-- 오프라인 활성화 -->
+                                    <div class="license-tab-content" id="offlineActivation" style="display: none;">
+                                        <div class="form-group">
+                                            <label>기기 ID (복사하여 관리자에게 전달)</label>
+                                            <div class="machine-id-box">
+                                                <code id="machineIdDisplay">로딩 중...</code>
+                                                <button class="btn btn-sm btn-secondary" id="copyMachineIdBtn">복사</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>오프라인 라이선스 키</label>
+                                            <textarea id="offlineKeyInput" rows="3" placeholder="관리자로부터 받은 오프라인 키를 입력하세요"></textarea>
+                                        </div>
+                                        <button class="btn btn-primary" id="activateOfflineBtn">오프라인 활성화</button>
+                                    </div>
+                                </div>
+
+                                <!-- Pro 상태일 때 -->
+                                <div id="licenseProStatus" style="display: none; margin-top: 16px;">
+                                    <div class="pro-badge">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                            <polyline points="22 4 12 14.01 9 11.01"/>
+                                        </svg>
+                                        Pro 라이선스 활성화됨
+                                    </div>
+                                </div>
+
+                                <!-- 개발 모드 전용: Pro 토글 버튼 -->
+                                <div id="devModeControls" style="display: none; margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                        <span style="background: #ff6b6b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">DEV</span>
+                                        <span style="color: var(--text-muted); font-size: 13px;">개발 모드 전용 기능</span>
+                                    </div>
+                                    <button class="btn btn-secondary" id="toggleProBtn" style="width: 100%;">
+                                        🔄 Pro/Trial 전환
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 정보 -->
+                        <div class="settings-category" id="settings-about">
+                            <h2 class="settings-category-title">정보</h2>
+
+                            <div class="settings-card">
+                                <h3>DocWatch</h3>
+                                <div class="info-list">
+                                    <div class="info-item">
+                                        <span class="info-label">버전</span>
+                                        <span class="info-value">1.0.0</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">서버 포트</span>
+                                        <span class="info-value">4400</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">개발자</span>
+                                        <span class="info-value">DocWatch Team</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-card">
+                                <h3>오픈소스 라이선스</h3>
+                                <p class="help-text">DocWatch는 다음 오픈소스 라이브러리를 사용합니다.</p>
+                                <div class="license-list">
+                                    <div class="license-item">
+                                        <span class="license-name">Electron</span>
+                                        <span class="license-type">MIT</span>
+                                    </div>
+                                    <div class="license-item">
+                                        <span class="license-name">chokidar</span>
+                                        <span class="license-type">MIT</span>
+                                    </div>
+                                    <div class="license-item">
+                                        <span class="license-name">Whisper.cpp</span>
+                                        <span class="license-type">MIT</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

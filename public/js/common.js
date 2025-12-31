@@ -117,6 +117,11 @@ function initSidebarResize() {
         startX = e.clientX;
         startWidth = sidebar.offsetWidth;
         handle.classList.add('dragging');
+
+        // 리사이즈 중 transition 비활성화로 성능 향상
+        sidebar.style.transition = 'none';
+        mainContent.style.transition = 'none';
+
         document.body.style.cursor = 'ew-resize';
         document.body.style.userSelect = 'none';
         e.preventDefault();
@@ -125,17 +130,25 @@ function initSidebarResize() {
     document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
 
-        const diff = e.clientX - startX;
-        const newWidth = Math.max(startWidth + diff, 120); // 최소 120px, 최대 제한 없음
+        // requestAnimationFrame으로 렌더링 최적화
+        requestAnimationFrame(() => {
+            const diff = e.clientX - startX;
+            const newWidth = Math.max(startWidth + diff, 120);
 
-        sidebar.style.width = `${newWidth}px`;
-        document.documentElement.style.setProperty('--sidebar-current-width', `${newWidth}px`);
+            sidebar.style.width = `${newWidth}px`;
+            document.documentElement.style.setProperty('--sidebar-current-width', `${newWidth}px`);
+        });
     });
 
     document.addEventListener('mouseup', () => {
         if (isResizing) {
             isResizing = false;
             handle.classList.remove('dragging');
+
+            // transition 복원
+            sidebar.style.transition = '';
+            mainContent.style.transition = '';
+
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
         }
@@ -286,7 +299,7 @@ function renderMonitorSidebar(container) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span>감시 폴더</span>
+                <span>감시 폴더/파일</span>
             </div>
             <div class="sidebar-section-items" id="sidebarFolderList">
                 <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
@@ -295,15 +308,101 @@ function renderMonitorSidebar(container) {
             </div>
         </div>
         <div class="sidebar-section">
-            <div class="sidebar-section-header">
+            <div class="sidebar-section-header" style="cursor: pointer;" onclick="openFolderDialog()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 5v14M5 12h14"/>
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
                 </svg>
-                <span style="cursor: pointer;" onclick="document.getElementById('folderInput').click()">폴더 추가</span>
+                <span>폴더 추가</span>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" style="cursor: pointer;" onclick="openFileDialog()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                </svg>
+                <span>파일 추가</span>
             </div>
         </div>
     `;
     loadSidebarFolders();
+}
+
+// 폴더 선택 다이얼로그 열기
+async function openFolderDialog() {
+    try {
+        // Electron 환경에서 폴더 선택 다이얼로그 호출
+        if (window.electronAPI && window.electronAPI.selectFolder) {
+            const folderPath = await window.electronAPI.selectFolder();
+            if (folderPath) {
+                await addFolderByPath(folderPath);
+            }
+        } else {
+            // 웹 환경에서는 직접 입력 모달 표시
+            showFolderInputModal();
+        }
+    } catch (err) {
+        console.error('폴더 선택 실패:', err);
+        alert('폴더 선택에 실패했습니다.');
+    }
+}
+
+// 경로로 폴더 추가
+async function addFolderByPath(folderPath) {
+    if (!folderPath) return;
+
+    try {
+        const res = await fetch('/api/folders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: folderPath })
+        });
+        const data = await res.json();
+        if (data.success) {
+            loadSidebarFolders();
+            loadFolders();
+        } else {
+            alert(data.error || '폴더 추가 실패');
+        }
+    } catch (e) {
+        console.error('폴더 추가 오류:', e);
+        alert('서버 오류');
+    }
+}
+
+// 폴더 입력 모달 표시 (웹 환경용)
+function showFolderInputModal() {
+    const folderPath = prompt('감시할 폴더 경로를 입력하세요:\n예: C:\\Users\\Documents 또는 /home/user/docs');
+    if (folderPath && folderPath.trim()) {
+        addFolderByPath(folderPath.trim());
+    }
+}
+
+// 파일 선택 다이얼로그 열기
+async function openFileDialog() {
+    try {
+        // Electron 환경에서 파일 선택 다이얼로그 호출
+        if (window.electronAPI && window.electronAPI.selectFile) {
+            const filePath = await window.electronAPI.selectFile();
+            if (filePath) {
+                await addFolderByPath(filePath);
+            }
+        } else {
+            // 웹 환경에서는 직접 입력 모달 표시
+            showFileInputModal();
+        }
+    } catch (err) {
+        console.error('파일 선택 실패:', err);
+        alert('파일 선택에 실패했습니다.');
+    }
+}
+
+// 파일 입력 모달 표시 (웹 환경용)
+function showFileInputModal() {
+    const filePath = prompt('감시할 파일 경로를 입력하세요:\n예: C:\\Users\\Documents\\file.txt 또는 /home/user/docs/file.txt');
+    if (filePath && filePath.trim()) {
+        addFolderByPath(filePath.trim());
+    }
 }
 
 // 사이드바 폴더 목록 로드
@@ -5738,6 +5837,102 @@ function initBottomPanel() {
 
 initBottomPanel();
 
+// 하단 패널 탭 전환
+function initBottomPanelTabs() {
+    const tabs = document.querySelectorAll('[data-bottom-tab]');
+    const contents = document.querySelectorAll('[data-bottom-content]');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.dataset.bottomTab;
+
+            // 탭 활성화
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // 콘텐츠 표시
+            contents.forEach(c => {
+                c.classList.toggle('active', c.dataset.bottomContent === targetTab);
+            });
+        });
+    });
+}
+initBottomPanelTabs();
+
+// 녹음 패널 표시 함수
+function showRecordingPanel() {
+    const bottomPanel = document.getElementById('bottomPanel');
+    const mainContent = document.querySelector('.main-content');
+    const toggleBtn = document.getElementById('toggleBottomPanelBtn');
+    const recordingTab = document.querySelector('[data-bottom-tab="recording"]');
+
+    // 하단 패널 열기
+    if (bottomPanel) {
+        bottomPanel.classList.add('open');
+        if (toggleBtn) toggleBtn.classList.add('active');
+        if (mainContent) mainContent.classList.add('with-bottom-panel');
+    }
+
+    // 녹음 탭 활성화
+    if (recordingTab) {
+        recordingTab.click();
+    }
+}
+
+// 업로드 드롭존 이벤트
+function initUploadDropZone() {
+    const dropZone = document.getElementById('uploadDropZone');
+    const audioInput = document.getElementById('audioFileInput');
+
+    if (!dropZone) return;
+
+    // 클릭 시 파일 선택
+    dropZone.addEventListener('click', () => {
+        if (audioInput) audioInput.click();
+    });
+
+    // 드래그 앤 드롭
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleAudioFileUpload(files[0]);
+        }
+    });
+}
+initUploadDropZone();
+
+// 오디오 파일 업로드 처리
+function handleAudioFileUpload(file) {
+    const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/x-m4a'];
+    const validExtensions = ['.wav', '.mp3', '.m4a'];
+
+    const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+    if (!validExtensions.includes(ext)) {
+        alert('WAV, MP3, M4A 파일만 업로드 가능합니다.');
+        return;
+    }
+
+    // 기존 uploadAudioFile 함수 호출
+    if (typeof uploadAudioFile === 'function') {
+        uploadAudioFile(file);
+    } else {
+        console.log('파일 업로드:', file.name);
+    }
+}
+
 // ========================================
 // 하단 패널 리사이즈 기능
 // ========================================
@@ -5915,6 +6110,8 @@ async function loadConversationsList() {
         if (data.success) {
             conversationsList = data.conversations;
             renderConversationsList();
+            // 좌측 사이드바 대화 목록도 업데이트
+            loadSidebarConversations();
         }
     } catch (err) {
         console.error('대화 목록 로드 실패:', err);

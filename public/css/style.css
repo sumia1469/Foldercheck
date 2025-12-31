@@ -5481,7 +5481,7 @@ body.resizing-right-panel .main-content {
     flex-direction: column;
     height: 100%;
     background: var(--bg-tertiary);
-    border-radius: 0 12px 12px 0;
+    border-radius: 12px;
     overflow: hidden;
 }
 
@@ -5962,6 +5962,162 @@ body.resizing-right-panel .main-content {
     flex: 1;
     overflow: auto;
     padding: 12px;
+    display: none;
+}
+
+.bottom-panel-content.active {
+    display: block;
+}
+
+/* 녹음 패널 스타일 */
+.recording-panel-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 100%;
+    padding: 8px 0;
+}
+
+.recording-panel-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 80px;
+}
+
+.recording-panel-status .recording-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.recording-panel-status .recording-timer {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: 'Menlo', 'Monaco', monospace;
+    color: var(--text-primary);
+}
+
+.recording-panel-visualizer {
+    flex: 1;
+    max-width: 400px;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    padding: 4px;
+}
+
+.recording-panel-visualizer canvas {
+    width: 100%;
+    height: 50px;
+}
+
+.recording-panel-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.recording-panel-controls .btn-record {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.recording-panel-controls .btn-record svg {
+    width: 16px;
+    height: 16px;
+}
+
+.recording-panel-settings {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.setting-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-inline label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.setting-inline input,
+.setting-inline select {
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+.setting-inline input {
+    width: 150px;
+}
+
+.setting-inline select {
+    width: 80px;
+}
+
+.recording-panel-complete {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.complete-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--success);
+}
+
+.recording-panel-upload {
+    margin-left: auto;
+}
+
+.upload-drop-zone {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.upload-drop-zone:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+}
+
+.upload-drop-zone span {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.upload-drop-zone small {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.upload-drop-zone.drag-over {
+    border-color: var(--accent-primary);
+    background: rgba(16, 185, 129, 0.1);
 }
 
 /* 터미널 스타일 */

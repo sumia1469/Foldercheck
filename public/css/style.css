@@ -205,23 +205,435 @@ body {
     border-radius: 0 2px 2px 0;
 }
 
-/* 기존 Sidebar는 숨김 (하위 호환) */
+/* VSCode 스타일 사이드바 */
 .sidebar {
-    display: none;
-    width: var(--sidebar-width);
+    display: none; /* 기본적으로 숨김, 특정 섹션에서만 표시 */
+    width: 240px;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
     flex-direction: column;
     position: fixed;
+    left: 48px; /* activity-bar 오른쪽 */
     top: var(--titlebar-height);
     height: calc(100vh - var(--titlebar-height));
-    z-index: 100;
-    border-radius: 0 0 0 10px;
+    z-index: 99;
+}
+
+.sidebar.visible {
+    display: flex;
 }
 
 .sidebar-header {
-    padding: 20px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 35px;
+}
+
+.sidebar-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+}
+
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+/* 사이드바 섹션 */
+.sidebar-section {
+    margin-bottom: 4px;
+}
+
+.sidebar-section-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.sidebar-section-header:hover {
+    color: var(--text-primary);
+}
+
+.sidebar-section-header svg {
+    width: 12px;
+    height: 12px;
+    margin-right: 4px;
+    transition: transform 0.15s ease;
+}
+
+.sidebar-section.collapsed .sidebar-section-header svg {
+    transform: rotate(-90deg);
+}
+
+.sidebar-section.collapsed .sidebar-section-items {
+    display: none;
+}
+
+/* 사이드바 아이템 */
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 12px 4px 24px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.sidebar-item:hover {
+    background: var(--bg-hover);
+}
+
+.sidebar-item.active {
+    background: var(--bg-tertiary);
+}
+
+.sidebar-item svg {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    color: var(--text-muted);
+}
+
+.sidebar-item-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-item-badge {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--accent-primary);
+    color: white;
+}
+
+/* 사이드바 삭제 버튼 */
+.sidebar-remove-btn {
+    opacity: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 14px;
+    transition: all 0.15s ease;
+}
+
+.sidebar-item:hover .sidebar-remove-btn {
+    opacity: 1;
+}
+
+.sidebar-remove-btn:hover {
+    color: var(--danger);
+}
+
+/* 확장 상세 페이지 */
+.extension-detail {
+    padding: 24px;
+    max-width: 800px;
+}
+
+.extension-detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.extension-detail-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    flex-shrink: 0;
+}
+
+.extension-detail-info {
+    flex: 1;
+}
+
+.extension-detail-name {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.extension-detail-author {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.extension-detail-desc {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.extension-detail-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.extension-detail-actions .btn {
+    padding: 8px 20px;
+}
+
+.extension-detail-section {
+    margin-bottom: 24px;
+}
+
+.extension-detail-section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.extension-detail-section p,
+.extension-detail-section ul {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.extension-detail-section ul {
+    list-style: disc;
+    padding-left: 20px;
+}
+
+.extension-detail-section li {
+    margin-bottom: 4px;
+}
+
+/* 사이드바 폴더 추가 버튼 */
+.sidebar-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    margin-top: 8px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sidebar-add-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.sidebar-add-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 대화 리스트 스타일 */
+.sidebar-chat-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px 8px 24px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    border-left: 2px solid transparent;
+}
+
+.sidebar-chat-item:hover {
+    background: var(--bg-hover);
+}
+
+.sidebar-chat-item.active {
+    background: var(--bg-tertiary);
+    border-left-color: var(--accent-primary);
+}
+
+.sidebar-chat-item svg {
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.sidebar-chat-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-chat-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 8px;
+}
+
+.sidebar-new-chat-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: calc(100% - 24px);
+    margin: 12px;
+    padding: 10px 14px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sidebar-new-chat-btn:hover {
+    background: var(--accent-secondary);
+}
+
+.sidebar-new-chat-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* 사이드바가 보일 때 메인 콘텐츠 조정 */
+.sidebar.visible ~ .main-content {
+    margin-left: calc(48px + var(--sidebar-current-width, 240px));
+}
+
+/* 사이드바 리사이즈 핸들 */
+.sidebar-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 100;
+    transition: background 0.15s ease;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.dragging {
+    background: var(--accent-primary);
+}
+
+/* 사이드바 인풋 스타일 */
+.sidebar-input {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.sidebar-input:focus {
+    border-color: var(--accent-primary);
+}
+
+.sidebar-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* 사이드바 셀렉트 스타일 */
+.sidebar-select {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+
+.sidebar-select:focus {
+    border-color: var(--accent-primary);
+}
+
+/* 사이드바 토글 스위치 */
+.sidebar-toggle {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.sidebar-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.sidebar-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-tertiary);
+    border-radius: 20px;
+    transition: 0.3s;
+}
+
+.sidebar-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-muted);
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.sidebar-toggle input:checked + .sidebar-toggle-slider {
+    background-color: var(--accent-primary);
+}
+
+.sidebar-toggle input:checked + .sidebar-toggle-slider:before {
+    transform: translateX(16px);
+    background-color: white;
 }
 
 .logo {

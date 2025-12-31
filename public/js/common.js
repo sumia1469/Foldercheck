@@ -97,6 +97,53 @@ const clearStatsBtn = document.getElementById('clearStatsBtn');
 
 let settings = {};
 let allLogs = [];
+
+// ========================================
+// 사이드바 리사이즈 기능
+// ========================================
+function initSidebarResize() {
+    const sidebar = document.getElementById('sidebar');
+    const handle = document.getElementById('sidebarResizeHandle');
+    const mainContent = document.querySelector('.main-content');
+
+    if (!sidebar || !handle) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const diff = e.clientX - startX;
+        const newWidth = Math.max(startWidth + diff, 120); // 최소 120px, 최대 제한 없음
+
+        sidebar.style.width = `${newWidth}px`;
+        document.documentElement.style.setProperty('--sidebar-current-width', `${newWidth}px`);
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            handle.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// 초기화 시 사이드바 리사이즈 활성화
+document.addEventListener('DOMContentLoaded', initSidebarResize);
 let hourlyChart = null;
 let extensionChart = null;
 let lastLogCount = 0;
@@ -145,7 +192,20 @@ document.querySelectorAll('.action-card').forEach(card => {
     });
 });
 
+let currentSection = 'dashboard';
+
 function navigateTo(section) {
+    const sidebar = document.getElementById('sidebar');
+    const sidebarSections = ['monitor', 'extensions', 'smart-assist', 'meeting', 'messenger', 'notifications'];
+
+    // 같은 섹션 클릭 시 사이드바 토글 (사이드바가 있는 섹션만)
+    if (section === currentSection && sidebarSections.includes(section)) {
+        sidebar.classList.toggle('visible');
+        return;
+    }
+
+    currentSection = section;
+
     // 메뉴 활성화 (기존 nav-item)
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
@@ -171,9 +231,665 @@ function navigateTo(section) {
         targetSection.classList.add('active');
     }
 
+    // 사이드바 업데이트
+    updateSidebar(section);
+
     // 통계 탭이면 차트 로드
     if (section === 'stats') {
         loadStats();
+    }
+}
+
+// 섹션별 사이드바 업데이트
+function updateSidebar(section) {
+    const sidebar = document.getElementById('sidebar');
+    const sidebarTitle = document.getElementById('sidebarTitle');
+    const sidebarContent = document.getElementById('sidebarContent');
+
+    if (!sidebar || !sidebarContent) return;
+
+    // 사이드바가 필요한 섹션
+    const sidebarSections = ['monitor', 'extensions', 'smart-assist', 'meeting', 'messenger', 'notifications'];
+
+    if (sidebarSections.includes(section)) {
+        sidebar.classList.add('visible');
+
+        if (section === 'monitor') {
+            sidebarTitle.textContent = '폴더 탐색기';
+            renderMonitorSidebar(sidebarContent);
+        } else if (section === 'extensions') {
+            sidebarTitle.textContent = '확장';
+            renderExtensionsSidebar(sidebarContent);
+        } else if (section === 'smart-assist') {
+            sidebarTitle.textContent = '대화 기록';
+            renderSmartAssistSidebar(sidebarContent);
+        } else if (section === 'meeting') {
+            sidebarTitle.textContent = '회의록';
+            renderMeetingSidebar(sidebarContent);
+        } else if (section === 'messenger') {
+            sidebarTitle.textContent = 'P2P 메신저';
+            renderMessengerSidebar(sidebarContent);
+        } else if (section === 'notifications') {
+            sidebarTitle.textContent = '알림';
+            renderNotificationsSidebar(sidebarContent);
+        }
+    } else {
+        sidebar.classList.remove('visible');
+    }
+}
+
+// 모니터링 사이드바 (폴더 관리)
+function renderMonitorSidebar(container) {
+    container.innerHTML = `
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>감시 폴더</span>
+            </div>
+            <div class="sidebar-section-items" id="sidebarFolderList">
+                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
+                    로딩 중...
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                <span style="cursor: pointer;" onclick="document.getElementById('folderInput').click()">폴더 추가</span>
+            </div>
+        </div>
+    `;
+    loadSidebarFolders();
+}
+
+// 사이드바 폴더 목록 로드
+async function loadSidebarFolders() {
+    try {
+        const res = await fetch('/api/folders');
+        const data = await res.json();
+        const container = document.getElementById('sidebarFolderList');
+        if (!container) return;
+
+        if (data.folders.length === 0) {
+            container.innerHTML = `
+                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
+                    감시 중인 폴더가 없습니다
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = data.folders.map((folder, idx) => {
+            const name = folder.split(/[/\\]/).pop();
+            const isFile = folder.includes('.');
+            return `
+                <div class="sidebar-item" data-folder-idx="${idx}" title="${escapeHtml(folder)}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        ${isFile ?
+                            '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>' :
+                            '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+                        }
+                    </svg>
+                    <span class="sidebar-item-text">${escapeHtml(name)}</span>
+                    <span class="sidebar-remove-btn" onclick="event.stopPropagation(); removeFolderByIndex(${idx})" title="삭제">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </span>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('사이드바 폴더 로드 실패:', err);
+    }
+}
+
+// 인덱스로 폴더 삭제
+async function removeFolderByIndex(idx) {
+    try {
+        const res = await fetch('/api/folders');
+        const data = await res.json();
+        if (data.folders[idx]) {
+            await removeFolder(data.folders[idx]);
+            loadSidebarFolders();
+        }
+    } catch (err) {
+        console.error('폴더 삭제 실패:', err);
+    }
+}
+
+// 확장 사이드바
+function renderExtensionsSidebar(container) {
+    container.innerHTML = `
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>설치됨</span>
+            </div>
+            <div class="sidebar-section-items" id="sidebarExtensionList">
+                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
+                    로딩 중...
+                </div>
+            </div>
+        </div>
+    `;
+    loadSidebarExtensions();
+}
+
+// 사이드바 확장 목록 로드
+async function loadSidebarExtensions() {
+    try {
+        const res = await fetch('/api/extensions');
+        const data = await res.json();
+        const container = document.getElementById('sidebarExtensionList');
+        if (!container) return;
+
+        const extensions = data.extensions || [];
+        if (extensions.length === 0) {
+            container.innerHTML = `
+                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
+                    설치된 확장이 없습니다
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = extensions.map(ext => `
+            <div class="sidebar-item" onclick="showExtensionDetail('${ext.id}')" data-ext-id="${ext.id}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+                <span class="sidebar-item-text">${escapeHtml(ext.name)}</span>
+                ${ext.enabled ? '' : '<span class="sidebar-item-badge" style="background: var(--text-muted);">비활성</span>'}
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('사이드바 확장 로드 실패:', err);
+    }
+}
+
+// 확장 상세 정보 표시
+function showExtensionDetail(extId) {
+    // 사이드바 아이템 활성화
+    document.querySelectorAll('#sidebarExtensionList .sidebar-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.extId === extId) {
+            item.classList.add('active');
+        }
+    });
+
+    // 메인 영역에 상세 정보 표시
+    fetch('/api/extensions')
+        .then(res => res.json())
+        .then(data => {
+            const ext = (data.extensions || []).find(e => e.id === extId);
+            if (ext) {
+                renderExtensionDetailInMain(ext);
+            }
+        });
+}
+
+// 메인 영역에 확장 상세 표시
+function renderExtensionDetailInMain(ext) {
+    const mainSection = document.getElementById('extensions');
+    if (!mainSection) return;
+
+    mainSection.innerHTML = `
+        <div class="extension-detail">
+            <div class="extension-detail-header">
+                <div class="extension-icon-large">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                </div>
+                <div class="extension-info">
+                    <h1>${escapeHtml(ext.name)}</h1>
+                    <p class="extension-meta">
+                        <span>v${ext.version || '1.0.0'}</span>
+                        <span>•</span>
+                        <span>${ext.author || 'Unknown'}</span>
+                    </p>
+                </div>
+                <div class="extension-actions">
+                    <button class="btn ${ext.enabled ? 'btn-secondary' : 'btn-primary'}" onclick="toggleExtension('${ext.id}')">
+                        ${ext.enabled ? '비활성화' : '활성화'}
+                    </button>
+                </div>
+            </div>
+            <div class="extension-detail-body">
+                <h3>설명</h3>
+                <p>${escapeHtml(ext.description || '설명 없음')}</p>
+                ${ext.readme ? `<div class="extension-readme">${ext.readme}</div>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// 스마트 어시스트 사이드바 (대화 기록)
+function renderSmartAssistSidebar(container) {
+    container.innerHTML = `
+        <button class="sidebar-new-chat-btn" onclick="startNewConversation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+            </svg>
+            새 대화
+        </button>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>최근 대화</span>
+            </div>
+            <div class="sidebar-section-items" id="sidebarConversationList">
+                <div class="sidebar-chat-item" style="color: var(--text-muted); font-size: 12px;">
+                    로딩 중...
+                </div>
+            </div>
+        </div>
+    `;
+    loadSidebarConversations();
+}
+
+// 사이드바 대화 목록 로드
+async function loadSidebarConversations() {
+    try {
+        const res = await fetch('/api/conversations');
+        const data = await res.json();
+        const container = document.getElementById('sidebarConversationList');
+        if (!container) return;
+
+        const conversations = data.conversations || [];
+        if (conversations.length === 0) {
+            container.innerHTML = `
+                <div class="sidebar-chat-item" style="color: var(--text-muted); font-size: 12px; cursor: default;">
+                    대화 기록이 없습니다
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = conversations.map(conv => {
+            const date = new Date(conv.updatedAt || conv.createdAt);
+            const dateStr = formatRelativeDate(date);
+            const isActive = currentConversationId === conv.id;
+            return `
+                <div class="sidebar-chat-item ${isActive ? 'active' : ''}"
+                     onclick="loadConversationFromSidebar('${conv.id}')"
+                     data-conv-id="${conv.id}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
+                    <span class="sidebar-chat-title">${escapeHtml(conv.title || '새 대화')}</span>
+                    <span class="sidebar-chat-date">${dateStr}</span>
+                    <span class="sidebar-remove-btn" onclick="event.stopPropagation(); deleteConversationFromSidebar('${conv.id}')" title="삭제">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </span>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('사이드바 대화 목록 로드 실패:', err);
+    }
+}
+
+// 상대적 날짜 포맷팅
+function formatRelativeDate(date) {
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (days === 0) return '오늘';
+    if (days === 1) return '어제';
+    if (days < 7) return `${days}일 전`;
+    if (days < 30) return `${Math.floor(days / 7)}주 전`;
+    return `${Math.floor(days / 30)}개월 전`;
+}
+
+// 사이드바에서 대화 로드
+async function loadConversationFromSidebar(convId) {
+    // 사이드바 아이템 활성화
+    document.querySelectorAll('#sidebarConversationList .sidebar-chat-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.convId === convId) {
+            item.classList.add('active');
+        }
+    });
+
+    // 대화 로드
+    currentConversationId = convId;
+    try {
+        const res = await fetch(`/api/conversations/${convId}`);
+        const data = await res.json();
+        if (data.conversation && data.conversation.messages) {
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.innerHTML = '';
+                data.conversation.messages.forEach(msg => {
+                    appendMessage(msg.role, msg.content, false);
+                });
+            }
+        }
+    } catch (err) {
+        console.error('대화 로드 실패:', err);
+    }
+}
+
+// 사이드바에서 대화 삭제
+async function deleteConversationFromSidebar(convId) {
+    if (!confirm('이 대화를 삭제하시겠습니까?')) return;
+
+    try {
+        await fetch(`/api/conversations/${convId}`, { method: 'DELETE' });
+
+        // 현재 대화가 삭제된 경우 새 대화 시작
+        if (currentConversationId === convId) {
+            currentConversationId = null;
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.innerHTML = '';
+            }
+        }
+
+        // 사이드바 새로고침
+        loadSidebarConversations();
+    } catch (err) {
+        console.error('대화 삭제 실패:', err);
+    }
+}
+
+// 새 대화 시작
+function startNewConversation() {
+    currentConversationId = null;
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        chatMessages.innerHTML = '';
+    }
+
+    // 사이드바에서 활성 상태 제거
+    document.querySelectorAll('#sidebarConversationList .sidebar-chat-item').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    // 입력창 포커스
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.focus();
+    }
+}
+
+// 회의록 사이드바
+function renderMeetingSidebar(container) {
+    container.innerHTML = `
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>녹음</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" onclick="startRecording()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                    </svg>
+                    <span class="sidebar-item-text">회의 녹음 시작</span>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>파일 업로드</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" onclick="document.getElementById('audioFileInput')?.click()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17,8 12,3 7,8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <span class="sidebar-item-text">녹음 파일 업로드</span>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>음성인식 설정</span>
+            </div>
+            <div class="sidebar-section-items" id="sidebarSttSettings">
+                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 8px 12px 8px 24px;">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">언어</label>
+                    <select id="sidebarSttLang" class="sidebar-select" onchange="updateSttLanguage(this.value)">
+                        <option value="ko">한국어</option>
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// P2P 메신저 사이드바
+function renderMessengerSidebar(container) {
+    container.innerHTML = `
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>연결 설정</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 8px 12px 8px 24px;">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">서버 주소</label>
+                    <input type="text" id="sidebarP2pServer" class="sidebar-input" placeholder="IP:포트" value="localhost:3000">
+                </div>
+                <div class="sidebar-item" onclick="connectP2P()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8.56 3.69a9 9 0 0 0-2.92 1.95"/>
+                        <path d="M3.69 8.56A9 9 0 0 0 3 12"/>
+                        <path d="M3.69 15.44a9 9 0 0 0 1.95 2.92"/>
+                        <path d="M8.56 20.31A9 9 0 0 0 12 21"/>
+                        <path d="M15.44 20.31a9 9 0 0 0 2.92-1.95"/>
+                        <path d="M20.31 15.44A9 9 0 0 0 21 12"/>
+                        <path d="M20.31 8.56a9 9 0 0 0-1.95-2.92"/>
+                        <path d="M15.44 3.69A9 9 0 0 0 12 3"/>
+                        <circle cx="12" cy="12" r="2"/>
+                    </svg>
+                    <span class="sidebar-item-text">연결하기</span>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>다운로드 폴더</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" onclick="selectDownloadFolder()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                    </svg>
+                    <span class="sidebar-item-text">폴더 선택</span>
+                </div>
+                <div class="sidebar-item" id="sidebarDownloadPath" style="font-size: 11px; color: var(--text-muted);">
+                    <span class="sidebar-item-text">미설정</span>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>사용 안내</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 12px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                    <p style="margin-bottom: 8px;">1. 동일 네트워크의 PC와 연결</p>
+                    <p style="margin-bottom: 8px;">2. 파일 드래그&드롭으로 전송</p>
+                    <p>3. 실시간 메시지 교환 가능</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 알림 사이드바
+function renderNotificationsSidebar(container) {
+    container.innerHTML = `
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>알림 설정</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" style="justify-content: space-between;">
+                    <span class="sidebar-item-text">데스크톱 알림</span>
+                    <label class="sidebar-toggle">
+                        <input type="checkbox" id="sidebarDesktopNotif" onchange="updateNotificationSetting('desktop', this.checked)">
+                        <span class="sidebar-toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="sidebar-item" style="justify-content: space-between;">
+                    <span class="sidebar-item-text">알림음</span>
+                    <label class="sidebar-toggle">
+                        <input type="checkbox" id="sidebarSoundNotif" onchange="updateNotificationSetting('sound', this.checked)">
+                        <span class="sidebar-toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>텔레그램</span>
+            </div>
+            <div class="sidebar-section-items">
+                <div class="sidebar-item" style="justify-content: space-between;">
+                    <span class="sidebar-item-text">텔레그램 알림</span>
+                    <label class="sidebar-toggle">
+                        <input type="checkbox" id="sidebarTelegramEnabled" onchange="updateTelegramSetting('enabled', this.checked)">
+                        <span class="sidebar-toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 8px 12px 8px 24px;">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Bot Token</label>
+                    <input type="text" id="sidebarBotToken" class="sidebar-input" placeholder="봇 토큰 입력" onchange="updateTelegramSetting('botToken', this.value)">
+                </div>
+                <div class="sidebar-item" style="flex-direction: column; align-items: flex-start; padding: 8px 12px 8px 24px;">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Chat ID</label>
+                    <input type="text" id="sidebarChatId" class="sidebar-input" placeholder="채팅 ID 입력" onchange="updateTelegramSetting('chatId', this.value)">
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-section-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18M6 6v14a2 2 0 002 2h8a2 2 0 002-2V6"/>
+                </svg>
+                <span style="cursor: pointer;" onclick="clearAllNotifications()">모든 알림 지우기</span>
+            </div>
+        </div>
+    `;
+    loadNotificationSettings();
+}
+
+// 알림 설정 로드
+async function loadNotificationSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        const settings = await res.json();
+
+        const desktopCheckbox = document.getElementById('sidebarDesktopNotif');
+        const soundCheckbox = document.getElementById('sidebarSoundNotif');
+        const telegramCheckbox = document.getElementById('sidebarTelegramEnabled');
+        const botTokenInput = document.getElementById('sidebarBotToken');
+        const chatIdInput = document.getElementById('sidebarChatId');
+
+        if (desktopCheckbox) desktopCheckbox.checked = settings.notifications?.desktop ?? true;
+        if (soundCheckbox) soundCheckbox.checked = settings.notifications?.sound ?? true;
+        if (telegramCheckbox) telegramCheckbox.checked = settings.telegram?.enabled ?? false;
+        if (botTokenInput) botTokenInput.value = settings.telegram?.botToken ?? '';
+        if (chatIdInput) chatIdInput.value = settings.telegram?.chatId ?? '';
+    } catch (err) {
+        console.error('알림 설정 로드 실패:', err);
+    }
+}
+
+// 알림 설정 업데이트
+async function updateNotificationSetting(key, value) {
+    try {
+        const res = await fetch('/api/settings');
+        const settings = await res.json();
+
+        if (!settings.notifications) settings.notifications = {};
+        settings.notifications[key] = value;
+
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+    } catch (err) {
+        console.error('알림 설정 업데이트 실패:', err);
+    }
+}
+
+// 텔레그램 설정 업데이트
+async function updateTelegramSetting(key, value) {
+    try {
+        const res = await fetch('/api/settings');
+        const settings = await res.json();
+
+        if (!settings.telegram) settings.telegram = {};
+        settings.telegram[key] = value;
+
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+    } catch (err) {
+        console.error('텔레그램 설정 업데이트 실패:', err);
+    }
+}
+
+// 모든 알림 지우기
+function clearAllNotifications() {
+    if (!confirm('모든 알림을 지우시겠습니까?')) return;
+    const notifList = document.getElementById('notificationList');
+    if (notifList) {
+        notifList.innerHTML = '<div class="empty-state">알림이 없습니다</div>';
     }
 }
 

@@ -125,11 +125,6 @@
                         <circle cx="12" cy="12" r="3"/>
                     </svg>
                 </button>
-                <button class="activity-icon" data-section="folders" title="폴더 관리">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                    </svg>
-                </button>
                 <button class="activity-icon" data-section="meeting" title="회의록">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
@@ -179,6 +174,16 @@
             </div>
         </aside>
 
+        <!-- VSCode 스타일 사이드바 (섹션별 내용) -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title" id="sidebarTitle">탐색기</span>
+            </div>
+            <div class="sidebar-content" id="sidebarContent">
+                <!-- 동적으로 변경됨 -->
+            </div>
+            <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
+        </aside>
 
         <!-- 메인 콘텐츠 -->
         <main class="main-content">

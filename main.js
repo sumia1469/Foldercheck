@@ -28,6 +28,15 @@ let ollamaProcess = null; // 내장 Ollama 프로세스
 const PORT = 4400;
 const OLLAMA_PORT = 11434;
 
+// Extension System
+const ExtensionManager = require('./extensions/ExtensionManager');
+const ExtensionHost = require('./extensions/ExtensionHost');
+const ExtensionAPI = require('./extensions/ExtensionAPI');
+
+let extensionManager = null;
+let extensionHost = null;
+let extensionAPI = null;
+
 // 패키징 여부 확인 (asar 내부인지 체크 - app.isPackaged보다 먼저 사용 가능)
 const isPackaged = __dirname.includes('app.asar');
 
@@ -735,13 +744,31 @@ if (!gotTheLock) {
         console.log('Server ready, creating window...');
         createWindow();
         createTray();
+
+        // Extension 시스템 초기화
+        console.log('Initializing extension system...');
+        try {
+            await initializeExtensions();
+            console.log('Extension system initialized');
+        } catch (err) {
+            console.error('Extension system initialization failed:', err.message);
+        }
     });
 }
 
 // 앱 종료 전 처리
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
     app.isQuitting = true;
     stopEmbeddedOllama(); // 내장 Ollama 종료
+
+    // Extension 시스템 종료
+    if (extensionHost) {
+        try {
+            await extensionHost.shutdown();
+        } catch (err) {
+            console.error('Extension shutdown error:', err.message);
+        }
+    }
 });
 
 app.on('window-all-closed', () => {
@@ -840,4 +867,194 @@ ipcMain.handle('window-maximize', () => {
 
 ipcMain.handle('window-close', () => {
     if (mainWindow) mainWindow.close();
+});
+
+// ========================================
+// Extension System IPC Handlers
+// ========================================
+
+/**
+ * 확장 시스템 초기화
+ */
+async function initializeExtensions() {
+    try {
+        console.log('[Extensions] 확장 시스템 초기화 시작...');
+
+        // Extension API 생성
+        extensionAPI = new ExtensionAPI({
+            mainWindow,
+            extensionsDir: path.join(getUserDataDir(), 'extensions')
+        });
+
+        // Extension Host 생성
+        extensionHost = new ExtensionHost(extensionAPI);
+
+        // Extension Manager 생성
+        extensionManager = new ExtensionManager({
+            extensionsDir: path.join(getUserDataDir(), 'extensions'),
+            builtinDir: path.join(__dirname, 'builtin-extensions')
+        });
+        extensionManager.extensionHost = extensionHost;
+
+        // 이벤트 리스너 설정
+        extensionManager.on('extension:activated', (ext) => {
+            if (mainWindow) {
+                mainWindow.webContents.send('extension-state-change', {
+                    type: 'activated',
+                    extension: { id: ext.id, state: ext.state }
+                });
+            }
+        });
+
+        extensionManager.on('extension:deactivated', (ext) => {
+            if (mainWindow) {
+                mainWindow.webContents.send('extension-state-change', {
+                    type: 'deactivated',
+                    extension: { id: ext.id, state: ext.state }
+                });
+            }
+        });
+
+        extensionManager.on('extension:error', ({ extension, error }) => {
+            console.error(`[Extensions] 확장 에러 (${extension.id}):`, error);
+            if (mainWindow) {
+                mainWindow.webContents.send('extension-state-change', {
+                    type: 'error',
+                    extension: { id: extension.id, state: extension.state, error: error.message }
+                });
+            }
+        });
+
+        // 확장 비활성화 시 정리
+        extensionManager.on('extension:deactivated', (ext) => {
+            extensionAPI.cleanupExtension(ext.id);
+        });
+
+        // Extension Host 이벤트 처리
+        extensionHost.on('trigger-activation', async (event) => {
+            await extensionManager.activateByEvent(event);
+        });
+
+        // 초기화
+        await extensionManager.initialize();
+
+        // 시작 시 모든 '*' 활성화 이벤트 확장 활성화
+        await extensionManager.activateByEvent('*');
+
+        console.log('[Extensions] 확장 시스템 초기화 완료');
+        console.log(`[Extensions] 활성 확장 수: ${extensionHost.getActiveCount()}`);
+
+    } catch (err) {
+        console.error('[Extensions] 확장 시스템 초기화 실패:', err);
+    }
+}
+
+// 확장 목록 조회
+ipcMain.handle('extensions:getAll', () => {
+    if (!extensionManager) return [];
+    return extensionManager.getExtensions();
+});
+
+// 확장 정보 조회
+ipcMain.handle('extensions:get', (event, id) => {
+    if (!extensionManager) return null;
+    return extensionManager.getExtension(id);
+});
+
+// 확장 활성화
+ipcMain.handle('extensions:activate', async (event, id) => {
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    await extensionManager.activateExtension(id);
+    return { success: true };
+});
+
+// 확장 비활성화
+ipcMain.handle('extensions:deactivate', async (event, id) => {
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    await extensionManager.deactivateExtension(id);
+    return { success: true };
+});
+
+// 확장 토글
+ipcMain.handle('extensions:toggle', async (event, id, enabled) => {
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    await extensionManager.toggleExtension(id, enabled);
+    return { success: true };
+});
+
+// 확장 설치
+ipcMain.handle('extensions:install', async (event, source) => {
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    const id = await extensionManager.installExtension(source);
+    return { success: true, id };
+});
+
+// 확장 제거
+ipcMain.handle('extensions:uninstall', async (event, id) => {
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    await extensionManager.uninstallExtension(id);
+    return { success: true };
+});
+
+// 확장 설정 조회
+ipcMain.handle('extensions:getSettings', (event, id) => {
+    if (!extensionManager) return {};
+    return extensionManager.getExtensionSettings(id);
+});
+
+// 확장 설정 저장
+ipcMain.handle('extensions:setSettings', (event, id, settings) => {
+    if (!extensionManager) return { success: false };
+    extensionManager.setExtensionSettings(id, settings);
+    return { success: true };
+});
+
+// 명령어 목록 조회
+ipcMain.handle('extensions:getCommands', () => {
+    if (!extensionAPI) return [];
+    return extensionAPI.commandsGetAll('__main__');
+});
+
+// 명령어 실행
+ipcMain.handle('extensions:executeCommand', async (event, commandId, ...args) => {
+    if (!extensionAPI) throw new Error('확장 시스템이 초기화되지 않았습니다');
+
+    // 명령어 정보 조회
+    const cmd = extensionAPI.commands.get(commandId);
+    if (!cmd) {
+        throw new Error(`명령어를 찾을 수 없습니다: ${commandId}`);
+    }
+
+    // 확장에 명령어 실행 이벤트 전송
+    extensionHost.postToExtension(cmd.extensionId, {
+        type: 'event',
+        event: `command:${cmd.id}`,
+        data: { args }
+    });
+
+    return { success: true };
+});
+
+// QuickPick 결과 수신
+ipcMain.on('quickpick:result', (event, { id, selected }) => {
+    if (extensionAPI) {
+        extensionAPI.emit('quickpick:result', { id, selected });
+    }
+});
+
+// InputBox 결과 수신
+ipcMain.on('inputbox:result', (event, { id, value }) => {
+    if (extensionAPI) {
+        extensionAPI.emit('inputbox:result', { id, value });
+    }
+});
+
+// 앱 종료 시 확장 시스템 정리
+app.on('before-quit', async () => {
+    if (extensionManager) {
+        await extensionManager.shutdown();
+    }
+    if (extensionHost) {
+        await extensionHost.shutdown();
+    }
 });

@@ -1,0 +1,30 @@
+{
+    "name": "file-notifier",
+    "displayName": "파일 변경 알림",
+    "version": "1.0.0",
+    "description": "파일 변경 시 알림을 표시하고 변경 내역을 추적합니다",
+    "author": "DocWatch Team",
+    "license": "MIT",
+    "main": "src/extension.js",
+    "categories": ["Productivity", "Files"],
+    "activationEvents": ["*"],
+    "contributes": {
+        "commands": [
+            {
+                "command": "showHistory",
+                "title": "변경 내역 보기",
+                "category": "파일"
+            },
+            {
+                "command": "clearHistory",
+                "title": "변경 내역 지우기",
+                "category": "파일"
+            }
+        ]
+    },
+    "permissions": [
+        "files:read",
+        "ui:notifications",
+        "storage"
+    ]
+}

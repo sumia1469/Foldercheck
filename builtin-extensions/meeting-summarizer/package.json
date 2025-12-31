@@ -1,0 +1,32 @@
+{
+    "name": "meeting-summarizer",
+    "displayName": "회의록 자동 요약",
+    "version": "1.0.0",
+    "description": "회의록을 자동으로 요약하고 액션 아이템을 추출합니다",
+    "author": "DocWatch Team",
+    "license": "MIT",
+    "main": "src/extension.js",
+    "categories": ["Productivity", "Meetings"],
+    "activationEvents": ["*"],
+    "contributes": {
+        "commands": [
+            {
+                "command": "summarize",
+                "title": "회의록 요약",
+                "category": "회의록"
+            },
+            {
+                "command": "extractActions",
+                "title": "액션 아이템 추출",
+                "category": "회의록"
+            }
+        ]
+    },
+    "permissions": [
+        "meetings:read",
+        "meetings:write",
+        "llm:chat",
+        "ui:notifications",
+        "storage"
+    ]
+}

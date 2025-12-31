@@ -183,6 +183,14 @@
                     </span>
                     <span class="nav-text">알림</span>
                 </a>
+                <a href="#" class="nav-item" data-section="extensions">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">확장</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -1005,6 +1013,67 @@
                             <span class="info-value">4400</span>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <!-- 확장 관리 섹션 -->
+            <section id="extensions" class="content-section">
+                <div class="section-header">
+                    <h1>확장</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" id="refreshExtensionsBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            새로고침
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 확장 검색 -->
+                <div class="extension-search-bar">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                        <input type="text" id="extensionSearch" placeholder="확장 검색...">
+                    </div>
+                </div>
+
+                <!-- 확장 목록 -->
+                <div class="extensions-grid" id="extensionsGrid">
+                    <!-- 확장 카드가 여기에 동적으로 추가됨 -->
+                    <div class="extension-loading" id="extensionLoading">
+                        <div class="spinner"></div>
+                        <p>확장 목록을 불러오는 중...</p>
+                    </div>
+                    <div class="extension-empty" id="extensionEmpty" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        <p>설치된 확장이 없습니다</p>
+                    </div>
+                </div>
+
+                <!-- 확장 정보 -->
+                <div class="settings-card">
+                    <h3>확장 안내</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">확장 위치</span>
+                            <span class="info-value" id="extensionsPath">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">활성 확장</span>
+                            <span class="info-value" id="activeExtensionsCount">0개</span>
+                        </div>
+                    </div>
+                    <p class="help-text" style="margin-top: 15px;">
+                        확장을 통해 DocWatch의 기능을 확장할 수 있습니다.<br>
+                        확장은 샌드박스 환경에서 안전하게 실행됩니다.
+                    </p>
                 </div>
             </section>
 

@@ -2058,6 +2058,22 @@ function generateDocumentOverview(content, ext) {
 // AI 호출 함수 (로컬 Ollama 전용 - 폐쇄망 환경)
 // ========================================
 
+// 중국어/한자 제거 필터 함수
+function filterChineseCharacters(text) {
+    if (!text) return text;
+    // 중국어 문자 범위: CJK Unified Ideographs, CJK Extension 등
+    // 한글은 유지하면서 중국어만 제거
+    // 일반적인 중국어 문장 패턴도 제거
+    return text
+        // 중국어 문장 패턴 제거 (如有问题, 请随时, 有任何 등)
+        .replace(/[如有请随时任何问题需要帮助告诉我！。，]+/g, '')
+        // 남은 중국어 간체/번체 문자 제거 (한글 범위 제외)
+        .replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, '')
+        // 연속 공백 정리
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
 // AI 호출 함수 (로컬 Ollama만 사용)
 async function callAI(prompt, systemPrompt, numPredict = 2000) {
     return new Promise((resolve, reject) => {
@@ -2093,7 +2109,9 @@ async function callAI(prompt, systemPrompt, numPredict = 2000) {
             res.on('end', () => {
                 try {
                     const result = JSON.parse(data);
-                    resolve(result.response || '응답 생성 실패');
+                    // 중국어/한자 필터링 적용
+                    const filteredResponse = filterChineseCharacters(result.response);
+                    resolve(filteredResponse || '응답 생성 실패');
                 } catch (e) {
                     reject(new Error('응답 파싱 오류'));
                 }

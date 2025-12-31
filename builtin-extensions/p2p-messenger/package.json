@@ -1,0 +1,56 @@
+{
+  "name": "p2p-messenger",
+  "displayName": "P2P 메신저",
+  "description": "폐쇄망 환경에서 사용할 수 있는 P2P 메신저. 호스트/게스트 방식으로 채팅과 파일 공유를 지원합니다.",
+  "version": "1.0.0",
+  "publisher": "DocWatch",
+  "main": "src/extension.js",
+  "engines": {
+    "docwatch": "^1.0.0"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "p2pMessenger.startHost",
+        "title": "P2P 메신저: 호스트 시작"
+      },
+      {
+        "command": "p2pMessenger.stopHost",
+        "title": "P2P 메신저: 호스트 중지"
+      },
+      {
+        "command": "p2pMessenger.connect",
+        "title": "P2P 메신저: 서버 연결"
+      },
+      {
+        "command": "p2pMessenger.disconnect",
+        "title": "P2P 메신저: 연결 해제"
+      },
+      {
+        "command": "p2pMessenger.sendFile",
+        "title": "P2P 메신저: 파일 전송"
+      }
+    ],
+    "statusBar": [
+      {
+        "id": "p2pMessenger.status",
+        "text": "P2P: 오프라인",
+        "tooltip": "P2P 메신저 상태"
+      }
+    ]
+  },
+  "permissions": [
+    "network",
+    "fs:read",
+    "fs:write",
+    "ui:notifications",
+    "ui:quickPick",
+    "ui:inputBox",
+    "commands",
+    "storage"
+  ],
+  "categories": ["Communication", "Collaboration"]
+}

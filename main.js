@@ -37,6 +37,10 @@ let extensionManager = null;
 let extensionHost = null;
 let extensionAPI = null;
 
+// P2P Messenger System
+const P2PMessenger = require('./p2p-messenger');
+let p2pMessenger = null;
+
 // 패키징 여부 확인 (asar 내부인지 체크 - app.isPackaged보다 먼저 사용 가능)
 const isPackaged = __dirname.includes('app.asar');
 

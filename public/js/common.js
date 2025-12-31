@@ -5308,6 +5308,12 @@ async function selectConversation(id) {
             }));
             renderConversationMessages(data.conversation.messages);
             renderConversationsList();
+
+            // 입력란 포커스
+            setTimeout(() => {
+                const llmInput = document.getElementById('llmInput');
+                if (llmInput) llmInput.focus();
+            }, 100);
         }
     } catch (err) {
         console.error('대화 로드 실패:', err);

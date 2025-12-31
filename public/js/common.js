@@ -313,6 +313,14 @@ function renderMonitorSidebar(container) {
                         <line x1="9" y1="14" x2="15" y2="14"/>
                     </svg>
                 </button>
+                <button class="explorer-action-btn" onclick="createFolderGroup()" title="폴더 그룹 생성">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        <path d="M12 11v6"/>
+                        <path d="M9 14h6"/>
+                        <circle cx="18" cy="5" r="3" fill="var(--accent-color)" stroke="var(--accent-color)"/>
+                    </svg>
+                </button>
                 <button class="explorer-action-btn" onclick="loadSidebarFolders()" title="새로고침">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 2v6h-6"/>
@@ -327,30 +335,28 @@ function renderMonitorSidebar(container) {
                         <path d="M7 6l5 5 5-5"/>
                     </svg>
                 </button>
+                <button class="explorer-action-btn" onclick="openSettingsCategory('monitoring')" title="설정">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
-        <!-- 트리 뷰 영역 -->
+        <!-- 폴더 그룹 목록 -->
+        <div class="folder-groups-container" id="folderGroupsContainer">
+            <!-- 동적으로 폴더 그룹이 추가됨 -->
+        </div>
+
+        <!-- 트리 뷰 영역 (기본 감시 폴더) -->
         <div class="tree-view" id="sidebarFolderList">
             <div style="padding: 12px; color: var(--text-muted); font-size: 12px; text-align: center;">
                 로딩 중...
             </div>
         </div>
-
-        <!-- 빠른 액션 -->
-        <div style="border-top: 1px solid var(--border-color); margin-top: auto;">
-            <button class="quick-action-btn" onclick="openSettingsCategory('monitoring')">
-                <span class="btn-label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-                    </svg>
-                    모니터링 설정
-                </span>
-                <span class="btn-shortcut">Ctrl+,</span>
-            </button>
-        </div>
     `;
+    loadFolderGroups();
     loadSidebarFolders();
 }
 
@@ -430,6 +436,240 @@ function showFileInputModal() {
         addFolderByPath(filePath.trim());
     }
 }
+
+// ============================================
+// 폴더 그룹 관련 함수들
+// ============================================
+
+// 폴더 그룹 데이터 저장소 키
+const FOLDER_GROUPS_KEY = 'docwatch_folder_groups';
+
+// 폴더 그룹 목록 로드
+function loadFolderGroups() {
+    const container = document.getElementById('folderGroupsContainer');
+    if (!container) return;
+
+    const groups = getFolderGroups();
+
+    if (groups.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = groups.map((group, index) => `
+        <div class="folder-group" data-group-id="${group.id}">
+            <div class="folder-group-header" onclick="toggleFolderGroup('${group.id}')">
+                <svg class="folder-group-chevron ${group.expanded ? 'expanded' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+                <svg class="folder-group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                </svg>
+                <span class="folder-group-name" ondblclick="renameFolderGroup(event, '${group.id}')">${escapeHtml(group.name)}</span>
+                <span class="folder-group-count">${group.paths.length}</span>
+                <div class="folder-group-actions">
+                    <button class="folder-group-action-btn" onclick="event.stopPropagation(); addToFolderGroup('${group.id}')" title="폴더/파일 추가">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </button>
+                    <button class="folder-group-action-btn" onclick="event.stopPropagation(); deleteFolderGroup('${group.id}')" title="그룹 삭제">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="folder-group-content ${group.expanded ? 'expanded' : ''}">
+                ${group.paths.length === 0 ?
+                    '<div class="folder-group-empty">폴더 또는 파일을 추가하세요</div>' :
+                    group.paths.map(path => `
+                        <div class="folder-group-item" onclick="selectGroupItem('${escapeHtml(path)}')" title="${escapeHtml(path)}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                ${path.includes('.') && !path.endsWith('/') ?
+                                    '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>' :
+                                    '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+                                }
+                            </svg>
+                            <span class="folder-group-item-name">${getFileName(path)}</span>
+                            <button class="folder-group-item-remove" onclick="event.stopPropagation(); removeFromFolderGroup('${group.id}', '${escapeHtml(path)}')" title="제거">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                    `).join('')
+                }
+            </div>
+        </div>
+    `).join('');
+}
+
+// 폴더 그룹 데이터 가져오기
+function getFolderGroups() {
+    try {
+        const data = localStorage.getItem(FOLDER_GROUPS_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        console.error('폴더 그룹 로드 오류:', e);
+        return [];
+    }
+}
+
+// 폴더 그룹 데이터 저장
+function saveFolderGroups(groups) {
+    try {
+        localStorage.setItem(FOLDER_GROUPS_KEY, JSON.stringify(groups));
+    } catch (e) {
+        console.error('폴더 그룹 저장 오류:', e);
+    }
+}
+
+// 새 폴더 그룹 생성
+function createFolderGroup() {
+    const name = prompt('새 폴더 그룹 이름을 입력하세요:', '새 그룹');
+    if (!name || !name.trim()) return;
+
+    const groups = getFolderGroups();
+    const newGroup = {
+        id: 'group_' + Date.now(),
+        name: name.trim(),
+        paths: [],
+        expanded: true,
+        createdAt: new Date().toISOString()
+    };
+
+    groups.push(newGroup);
+    saveFolderGroups(groups);
+    loadFolderGroups();
+}
+
+// 폴더 그룹 펼침/접힘 토글
+function toggleFolderGroup(groupId) {
+    const groups = getFolderGroups();
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+        group.expanded = !group.expanded;
+        saveFolderGroups(groups);
+        loadFolderGroups();
+    }
+}
+
+// 폴더 그룹 이름 변경
+function renameFolderGroup(event, groupId) {
+    event.stopPropagation();
+    const groups = getFolderGroups();
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    const newName = prompt('그룹 이름 변경:', group.name);
+    if (newName && newName.trim() && newName.trim() !== group.name) {
+        group.name = newName.trim();
+        saveFolderGroups(groups);
+        loadFolderGroups();
+    }
+}
+
+// 폴더 그룹 삭제
+function deleteFolderGroup(groupId) {
+    if (!confirm('이 폴더 그룹을 삭제하시겠습니까?\n(포함된 폴더/파일은 감시 목록에서 제거되지 않습니다)')) return;
+
+    const groups = getFolderGroups();
+    const newGroups = groups.filter(g => g.id !== groupId);
+    saveFolderGroups(newGroups);
+    loadFolderGroups();
+}
+
+// 폴더 그룹에 폴더/파일 추가
+async function addToFolderGroup(groupId) {
+    try {
+        let path = null;
+
+        // Electron 환경에서 파일/폴더 선택
+        if (window.electronAPI) {
+            const choice = confirm('폴더를 추가하시겠습니까?\n(취소를 누르면 파일 선택)');
+            if (choice && window.electronAPI.selectFolder) {
+                path = await window.electronAPI.selectFolder();
+            } else if (window.electronAPI.selectFile) {
+                path = await window.electronAPI.selectFile();
+            }
+        } else {
+            // 웹 환경
+            path = prompt('추가할 폴더/파일 경로를 입력하세요:');
+        }
+
+        if (!path || !path.trim()) return;
+
+        const groups = getFolderGroups();
+        const group = groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        // 중복 확인
+        if (group.paths.includes(path)) {
+            alert('이미 그룹에 포함된 경로입니다.');
+            return;
+        }
+
+        group.paths.push(path);
+        saveFolderGroups(groups);
+        loadFolderGroups();
+
+        // 감시 목록에도 추가
+        await addFolderByPath(path);
+    } catch (err) {
+        console.error('그룹에 추가 실패:', err);
+        alert('추가에 실패했습니다.');
+    }
+}
+
+// 폴더 그룹에서 폴더/파일 제거
+function removeFromFolderGroup(groupId, path) {
+    const groups = getFolderGroups();
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    group.paths = group.paths.filter(p => p !== path);
+    saveFolderGroups(groups);
+    loadFolderGroups();
+}
+
+// 그룹 아이템 선택 시 동작
+function selectGroupItem(path) {
+    // 해당 경로의 폴더/파일로 이동 또는 선택
+    console.log('선택된 경로:', path);
+    // 사이드바에서 해당 항목 찾아서 선택
+    const treeItems = document.querySelectorAll('.tree-item');
+    treeItems.forEach(item => {
+        const itemPath = item.getAttribute('data-path');
+        if (itemPath === path) {
+            item.click();
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+}
+
+// 파일명 추출
+function getFileName(path) {
+    if (!path) return '';
+    const normalized = path.replace(/\\/g, '/');
+    const parts = normalized.split('/').filter(p => p);
+    return parts[parts.length - 1] || path;
+}
+
+// HTML 이스케이프 (XSS 방지)
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============================================
+// 사이드바 폴더 목록 로드
+// ============================================
 
 // 사이드바 폴더 목록 로드 (트리 뷰 스타일)
 async function loadSidebarFolders() {

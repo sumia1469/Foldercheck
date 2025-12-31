@@ -8896,3 +8896,182 @@ body.resizing-bottom-panel * {
     padding: 2px 6px;
     border-radius: 3px;
 }
+
+/* ============================================
+   폴더 그룹 스타일
+   ============================================ */
+
+.folder-groups-container {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.folder-group {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.folder-group:last-child {
+    border-bottom: none;
+}
+
+.folder-group-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s ease;
+    gap: 6px;
+}
+
+.folder-group-header:hover {
+    background: var(--bg-hover);
+}
+
+.folder-group-chevron {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.folder-group-chevron.expanded {
+    transform: rotate(90deg);
+}
+
+.folder-group-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--accent-color, #10b981);
+    flex-shrink: 0;
+}
+
+.folder-group-name {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.folder-group-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 1px 5px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.folder-group-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.folder-group-header:hover .folder-group-actions {
+    opacity: 1;
+}
+
+.folder-group-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.folder-group-action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.folder-group-action-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.folder-group-content {
+    display: none;
+    padding-left: 8px;
+}
+
+.folder-group-content.expanded {
+    display: block;
+}
+
+.folder-group-empty {
+    padding: 8px 12px 8px 28px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.folder-group-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px 4px 20px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    gap: 6px;
+}
+
+.folder-group-item:hover {
+    background: var(--bg-hover);
+}
+
+.folder-group-item svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.folder-group-item-name {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.folder-group-item-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.1s ease;
+}
+
+.folder-group-item:hover .folder-group-item-remove {
+    opacity: 1;
+}
+
+.folder-group-item-remove:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger, #ef4444);
+}
+
+.folder-group-item-remove svg {
+    width: 10px;
+    height: 10px;
+}

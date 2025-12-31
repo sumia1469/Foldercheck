@@ -235,7 +235,7 @@ async function isOllamaRunning() {
 }
 
 // 기본 AI 모델 설정
-const DEFAULT_AI_MODEL = 'qwen2.5:3b';
+const DEFAULT_AI_MODEL = 'qwen2.5:7b-instruct-q4_K_M';
 
 // 모델 설치 여부 확인
 async function checkModelInstalled() {

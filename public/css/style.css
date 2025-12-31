@@ -8586,6 +8586,169 @@ body.resizing-bottom-panel * {
    VSCode Explorer Style Sidebar
    ======================================== */
 
+/* VSCode 스타일 Explorer 전체 컨테이너 */
+.vscode-explorer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* VSCode 스타일 섹션 */
+.vscode-section {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+}
+
+/* VSCode 스타일 섹션 헤더 (접을 수 있는) */
+.vscode-section-header {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+    min-height: 22px;
+    overflow: visible;
+    position: relative;
+}
+
+.vscode-section-header:hover {
+    background: var(--bg-hover);
+}
+
+/* 섹션 접기/펼치기 화살표 (chevron) */
+.section-chevron {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+    transform: rotate(90deg);
+}
+
+.section-chevron.collapsed {
+    transform: rotate(0deg);
+}
+
+/* 섹션 제목 */
+.section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    flex: 1;
+    margin-left: 2px;
+}
+
+/* 섹션 액션 버튼들 */
+.section-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    overflow: visible;
+}
+
+.vscode-section-header:hover .section-actions {
+    opacity: 1;
+}
+
+/* VSCode 스타일 액션 버튼 */
+.vscode-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    padding: 0;
+}
+
+.vscode-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.vscode-action-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* VSCode 액션 버튼 커스텀 툴팁 */
+.vscode-action-btn {
+    position: relative;
+}
+
+.vscode-action-btn[title] {
+    overflow: visible;
+}
+
+.vscode-action-btn[title]::after {
+    content: attr(title);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 6px;
+    background: #252526;
+    color: #cccccc;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 400;
+    white-space: nowrap;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+    border: 1px solid #454545;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.vscode-action-btn[title]::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 2px;
+    border: 4px solid transparent;
+    border-bottom-color: #454545;
+    z-index: 10001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+}
+
+.vscode-action-btn[title]:hover::after,
+.vscode-action-btn[title]:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 섹션 콘텐츠 */
+.vscode-section-content {
+    flex: 1;
+    overflow-y: auto;
+    transition: max-height 0.2s ease;
+}
+
+.vscode-section-content.collapsed {
+    display: none;
+}
+
+/* 기존 explorer 스타일 (호환성 유지) */
 .explorer-header {
     display: flex;
     align-items: center;
@@ -8601,6 +8764,12 @@ body.resizing-bottom-panel * {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-secondary);
+}
+
+.explorer-title-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .explorer-actions {
@@ -8902,7 +9071,17 @@ body.resizing-bottom-panel * {
    ============================================ */
 
 .folder-groups-container {
-    border-bottom: 1px solid var(--border-color);
+    /* 그룹이 없을 때 border 제거 */
+}
+
+.folder-groups-container:empty::after {
+    content: '그룹을 만들어 폴더를 정리하세요';
+    display: block;
+    padding: 12px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: center;
+    font-style: italic;
 }
 
 .folder-group {

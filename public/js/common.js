@@ -258,6 +258,7 @@ function updateSidebar(section) {
     const sidebar = document.getElementById('sidebar');
     const sidebarTitle = document.getElementById('sidebarTitle');
     const sidebarContent = document.getElementById('sidebarContent');
+    const sidebarSettingsBtn = document.getElementById('sidebarSettingsBtn');
 
     if (!sidebar || !sidebarContent) return;
 
@@ -266,6 +267,11 @@ function updateSidebar(section) {
 
     if (sidebarSections.includes(section)) {
         sidebar.classList.add('visible');
+
+        // 모니터링 섹션일 때만 설정 버튼 표시
+        if (sidebarSettingsBtn) {
+            sidebarSettingsBtn.style.display = section === 'monitor' ? 'flex' : 'none';
+        }
 
         if (section === 'monitor') {
             sidebarTitle.textContent = '폴더 탐색기';
@@ -291,73 +297,121 @@ function updateSidebar(section) {
     }
 }
 
-// 모니터링 사이드바 (VSCode Explorer 스타일)
+// 모니터링 사이드바 (VSCode Explorer 스타일 - 기능별 섹션 분리)
 function renderMonitorSidebar(container) {
     container.innerHTML = `
-        <!-- Explorer 헤더 with 액션 버튼들 -->
-        <div class="explorer-header">
-            <span class="explorer-title">감시 폴더</span>
-            <div class="explorer-actions">
-                <button class="explorer-action-btn" onclick="openFileDialog()" title="파일 추가">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                        <path d="M14 2v6h6"/>
-                        <line x1="12" y1="18" x2="12" y2="12"/>
-                        <line x1="9" y1="15" x2="15" y2="15"/>
+        <!-- VSCode 스타일 Explorer 섹션 -->
+        <div class="vscode-explorer">
+            <!-- 섹션 1: 폴더 그룹 -->
+            <div class="vscode-section">
+                <div class="vscode-section-header" onclick="toggleExplorerSection('folderGroups')">
+                    <svg class="section-chevron" id="folderGroupsChevron" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M5.7 13.7L5 13l4.6-4.6L5 3.7l.7-.7 5.3 5.4-5.3 5.3z"/>
                     </svg>
-                </button>
-                <button class="explorer-action-btn" onclick="openFolderDialog()" title="폴더 추가">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                        <line x1="12" y1="11" x2="12" y2="17"/>
-                        <line x1="9" y1="14" x2="15" y2="14"/>
-                    </svg>
-                </button>
-                <button class="explorer-action-btn" onclick="createFolderGroup()" title="폴더 그룹 생성">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                        <path d="M12 11v6"/>
-                        <path d="M9 14h6"/>
-                        <circle cx="18" cy="5" r="3" fill="var(--accent-color)" stroke="var(--accent-color)"/>
-                    </svg>
-                </button>
-                <button class="explorer-action-btn" onclick="loadSidebarFolders()" title="새로고침">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 2v6h-6"/>
-                        <path d="M3 12a9 9 0 0115-6.7L21 8"/>
-                        <path d="M3 22v-6h6"/>
-                        <path d="M21 12a9 9 0 01-15 6.7L3 16"/>
-                    </svg>
-                </button>
-                <button class="explorer-action-btn" onclick="collapseAllFolders()" title="모두 접기">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M7 10l5 5 5-5"/>
-                        <path d="M7 6l5 5 5-5"/>
-                    </svg>
-                </button>
-                <button class="explorer-action-btn" onclick="openSettingsCategory('monitoring')" title="설정">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-                    </svg>
-                </button>
+                    <span class="section-title">폴더 그룹</span>
+                    <div class="section-actions">
+                        <!-- 새 그룹 생성 (폴더 + 플러스 배지) -->
+                        <button class="vscode-action-btn" onclick="event.stopPropagation(); createFolderGroup()" title="새 그룹 만들기">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1">
+                                <path d="M1.5 3.5h4l1 1.5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1z"/>
+                                <circle cx="12" cy="12" r="3.5" fill="var(--bg-primary, #1e1e1e)" stroke="currentColor"/>
+                                <path d="M12 10v4M10 12h4" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="vscode-section-content" id="folderGroupsContent">
+                    <!-- 폴더 그룹 목록 -->
+                    <div class="folder-groups-container" id="folderGroupsContainer">
+                        <!-- 동적으로 폴더 그룹이 추가됨 -->
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!-- 폴더 그룹 목록 -->
-        <div class="folder-groups-container" id="folderGroupsContainer">
-            <!-- 동적으로 폴더 그룹이 추가됨 -->
-        </div>
-
-        <!-- 트리 뷰 영역 (기본 감시 폴더) -->
-        <div class="tree-view" id="sidebarFolderList">
-            <div style="padding: 12px; color: var(--text-muted); font-size: 12px; text-align: center;">
-                로딩 중...
+            <!-- 섹션 2: 감시 항목 -->
+            <div class="vscode-section">
+                <div class="vscode-section-header" onclick="toggleExplorerSection('watchedItems')">
+                    <svg class="section-chevron" id="watchedItemsChevron" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M5.7 13.7L5 13l4.6-4.6L5 3.7l.7-.7 5.3 5.4-5.3 5.3z"/>
+                    </svg>
+                    <span class="section-title">감시 항목</span>
+                    <div class="section-actions">
+                        <!-- 파일 추가 (문서 + 플러스 배지) -->
+                        <button class="vscode-action-btn" onclick="event.stopPropagation(); openFileDialog()" title="파일 추가">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1">
+                                <path d="M3 1.5h6l3.5 3.5v10a1 1 0 0 1-1 1h-8.5a1 1 0 0 1-1-1v-12.5a1 1 0 0 1 1-1z"/>
+                                <path d="M9 1.5v3.5h3.5"/>
+                                <circle cx="12" cy="12" r="3.5" fill="var(--bg-primary, #1e1e1e)" stroke="currentColor"/>
+                                <path d="M12 10v4M10 12h4" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                        <!-- 폴더 추가 (폴더 + 플러스 배지) -->
+                        <button class="vscode-action-btn" onclick="event.stopPropagation(); openFolderDialog()" title="폴더 추가">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1">
+                                <path d="M1.5 3.5h4l1 1.5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1z"/>
+                                <circle cx="12" cy="12" r="3.5" fill="var(--bg-primary, #1e1e1e)" stroke="currentColor"/>
+                                <path d="M12 10v4M10 12h4" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                        <!-- 새로고침 (회전 화살표) -->
+                        <button class="vscode-action-btn" onclick="event.stopPropagation(); loadSidebarFolders()" title="새로고침">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+                                <path d="M13.5 8a5.5 5.5 0 1 1-1.5-3.8" stroke-linecap="round"/>
+                                <path d="M13.5 2v4h-4" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <!-- 모두 축소 (사각형 겹침) -->
+                        <button class="vscode-action-btn" onclick="event.stopPropagation(); collapseAllFolders()" title="모두 축소">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1">
+                                <rect x="1.5" y="4.5" width="9" height="7" rx="0.5"/>
+                                <path d="M5.5 4.5v-2a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="vscode-section-content" id="watchedItemsContent">
+                    <!-- 트리 뷰 영역 (감시 폴더/파일) -->
+                    <div class="tree-view" id="sidebarFolderList">
+                        <div style="padding: 12px; color: var(--text-muted); font-size: 12px; text-align: center;">
+                            로딩 중...
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
     loadFolderGroups();
     loadSidebarFolders();
+}
+
+// Explorer 섹션 토글
+function toggleExplorerSection(sectionId) {
+    const content = document.getElementById(sectionId + 'Content');
+    const chevron = document.getElementById(sectionId + 'Chevron');
+
+    if (content && chevron) {
+        content.classList.toggle('collapsed');
+        chevron.classList.toggle('collapsed');
+    }
+}
+
+// 모든 폴더 축소
+function collapseAllFolders() {
+    // 트리 뷰의 모든 확장된 폴더 축소
+    const expandedItems = document.querySelectorAll('.tree-item.expanded');
+    expandedItems.forEach(item => {
+        item.classList.remove('expanded');
+    });
+
+    // 폴더 그룹의 모든 확장된 그룹 축소
+    const expandedGroups = document.querySelectorAll('.folder-group-content.expanded');
+    expandedGroups.forEach(group => {
+        group.classList.remove('expanded');
+        const chevron = group.previousElementSibling?.querySelector('.folder-group-chevron');
+        if (chevron) {
+            chevron.classList.remove('expanded');
+        }
+    });
 }
 
 // 폴더 선택 다이얼로그 열기

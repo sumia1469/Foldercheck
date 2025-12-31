@@ -146,11 +146,19 @@ document.querySelectorAll('.action-card').forEach(card => {
 });
 
 function navigateTo(section) {
-    // 메뉴 활성화
+    // 메뉴 활성화 (기존 nav-item)
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.dataset.section === section) {
             item.classList.add('active');
+        }
+    });
+
+    // 액티비티 바 아이콘 활성화
+    document.querySelectorAll('.activity-icon').forEach(icon => {
+        icon.classList.remove('active');
+        if (icon.dataset.section === section) {
+            icon.classList.add('active');
         }
     });
 
@@ -6231,9 +6239,106 @@ async function showExtensionDetails(extId) {
             </div>
         </div>
         ` : ''}
+        ${renderExtensionSettings(ext)}
     `;
 
     modal.classList.add('active');
+}
+
+// 확장 설정 UI 렌더링
+function renderExtensionSettings(ext) {
+    const config = ext.manifest.contributes?.configuration;
+    if (!config || !config.properties) return '';
+
+    const properties = config.properties;
+    const propertyKeys = Object.keys(properties);
+    if (propertyKeys.length === 0) return '';
+
+    let settingsHtml = `
+        <div class="extension-modal-section">
+            <h4>설정</h4>
+            <div class="extension-settings-form" data-extension-id="${ext.id}">
+    `;
+
+    propertyKeys.forEach(key => {
+        const prop = properties[key];
+        const shortKey = key.split('.').pop();
+        const inputId = `ext-setting-${ext.id}-${shortKey}`;
+
+        settingsHtml += `<div class="extension-setting-item">`;
+        settingsHtml += `<label for="${inputId}">${prop.description || shortKey}</label>`;
+
+        if (prop.type === 'boolean') {
+            settingsHtml += `
+                <div class="extension-toggle-setting">
+                    <input type="checkbox" id="${inputId}" data-key="${key}" ${prop.default ? 'checked' : ''}>
+                    <span class="toggle-label">${prop.default ? '켜짐' : '꺼짐'}</span>
+                </div>
+            `;
+        } else if (prop.type === 'number') {
+            settingsHtml += `
+                <input type="number" id="${inputId}" data-key="${key}"
+                    value="${prop.default || ''}"
+                    ${prop.minimum !== undefined ? `min="${prop.minimum}"` : ''}
+                    ${prop.maximum !== undefined ? `max="${prop.maximum}"` : ''}
+                    class="extension-setting-input">
+            `;
+        } else {
+            settingsHtml += `
+                <input type="text" id="${inputId}" data-key="${key}"
+                    value="${prop.default || ''}"
+                    placeholder="${prop.description || ''}"
+                    class="extension-setting-input">
+            `;
+        }
+
+        settingsHtml += `</div>`;
+    });
+
+    settingsHtml += `
+                <div class="extension-settings-actions">
+                    <button class="btn btn-primary btn-sm" onclick="saveExtensionSettings('${ext.id}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        설정 저장
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    return settingsHtml;
+}
+
+// 확장 설정 저장
+async function saveExtensionSettings(extId) {
+    const form = document.querySelector(`.extension-settings-form[data-extension-id="${extId}"]`);
+    if (!form) return;
+
+    const settings = {};
+    const inputs = form.querySelectorAll('input[data-key]');
+
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        if (input.type === 'checkbox') {
+            settings[key] = input.checked;
+        } else if (input.type === 'number') {
+            settings[key] = parseFloat(input.value) || 0;
+        } else {
+            settings[key] = input.value;
+        }
+    });
+
+    try {
+        await window.extensionAPI.setSettings(extId, settings);
+        alert('설정이 저장되었습니다.');
+    } catch (err) {
+        console.error('설정 저장 실패:', err);
+        alert('설정 저장 실패: ' + err.message);
+    }
 }
 
 // 확장 모달 닫기

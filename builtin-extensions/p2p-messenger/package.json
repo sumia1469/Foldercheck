@@ -4,7 +4,10 @@
   "description": "폐쇄망 환경에서 사용할 수 있는 P2P 메신저. 호스트/게스트 방식으로 채팅과 파일 공유를 지원합니다.",
   "version": "1.0.0",
   "publisher": "DocWatch",
+  "author": "DocWatch Team",
+  "license": "MIT",
   "main": "src/extension.js",
+  "icon": "💬",
   "engines": {
     "docwatch": "^1.0.0"
   },
@@ -15,32 +18,70 @@
     "commands": [
       {
         "command": "p2pMessenger.startHost",
-        "title": "P2P 메신저: 호스트 시작"
+        "title": "호스트 시작",
+        "category": "P2P 메신저"
       },
       {
         "command": "p2pMessenger.stopHost",
-        "title": "P2P 메신저: 호스트 중지"
+        "title": "호스트 중지",
+        "category": "P2P 메신저"
       },
       {
         "command": "p2pMessenger.connect",
-        "title": "P2P 메신저: 서버 연결"
+        "title": "서버 연결",
+        "category": "P2P 메신저"
       },
       {
         "command": "p2pMessenger.disconnect",
-        "title": "P2P 메신저: 연결 해제"
+        "title": "연결 해제",
+        "category": "P2P 메신저"
       },
       {
         "command": "p2pMessenger.sendFile",
-        "title": "P2P 메신저: 파일 전송"
+        "title": "파일 전송",
+        "category": "P2P 메신저"
+      },
+      {
+        "command": "p2pMessenger.openSettings",
+        "title": "설정 열기",
+        "category": "P2P 메신저"
       }
     ],
     "statusBar": [
       {
         "id": "p2pMessenger.status",
-        "text": "P2P: 오프라인",
-        "tooltip": "P2P 메신저 상태"
+        "text": "💬 P2P: 오프라인",
+        "tooltip": "P2P 메신저 상태",
+        "position": "right"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "P2P 메신저 설정",
+      "properties": {
+        "p2pMessenger.defaultPort": {
+          "type": "number",
+          "default": 9900,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "호스트 모드에서 사용할 기본 포트 번호"
+        },
+        "p2pMessenger.defaultNickname": {
+          "type": "string",
+          "default": "",
+          "description": "채팅에서 사용할 기본 닉네임"
+        },
+        "p2pMessenger.notifyOnMessage": {
+          "type": "boolean",
+          "default": true,
+          "description": "새 메시지 수신 시 알림 표시"
+        },
+        "p2pMessenger.notifyOnFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "파일 수신 시 알림 표시"
+        }
+      }
+    }
   },
   "permissions": [
     "network",
@@ -52,5 +93,13 @@
     "commands",
     "storage"
   ],
-  "categories": ["Communication", "Collaboration"]
+  "categories": ["Communication", "Collaboration"],
+  "keywords": ["messenger", "p2p", "chat", "file-sharing", "offline", "폐쇄망"],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  }
 }

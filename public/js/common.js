@@ -8060,29 +8060,39 @@ function initLLMChat() {
         });
     }
 
-    // 퀵 명령어 버튼 이벤트 (메인)
-    const quickCmdBtns = document.querySelectorAll('#llmQuickCommands .quick-cmd-btn');
-    quickCmdBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const cmd = btn.getAttribute('data-cmd');
-            if (cmd && llmInput) {
-                llmInput.value = cmd;
-                sendLLMMessage(llmInput, llmMessages, false);
+    // 퀵 명령어 버튼 이벤트 (메인) - 이벤트 위임 방식
+    const quickCmdsContainer = document.getElementById('llmQuickCommands');
+    if (quickCmdsContainer) {
+        quickCmdsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-cmd-btn');
+            if (btn) {
+                const cmd = btn.getAttribute('data-cmd');
+                const input = document.getElementById('llmInput');
+                const messages = document.getElementById('llmMessages');
+                if (cmd && input && messages) {
+                    input.value = cmd;
+                    sendLLMMessage(input, messages, false);
+                }
             }
         });
-    });
+    }
 
-    // 퀵 명령어 버튼 이벤트 (패널)
-    const panelQuickCmdBtns = document.querySelectorAll('#panelQuickCommands .quick-cmd-btn');
-    panelQuickCmdBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const cmd = btn.getAttribute('data-cmd');
-            if (cmd && panelLlmInput) {
-                panelLlmInput.value = cmd;
-                sendLLMMessage(panelLlmInput, panelLlmMessages, true);
+    // 퀵 명령어 버튼 이벤트 (패널) - 이벤트 위임 방식
+    const panelQuickCmdsContainer = document.getElementById('panelQuickCommands');
+    if (panelQuickCmdsContainer) {
+        panelQuickCmdsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-cmd-btn');
+            if (btn) {
+                const cmd = btn.getAttribute('data-cmd');
+                const input = document.getElementById('panelLlmInput');
+                const messages = document.getElementById('panelLlmMessages');
+                if (cmd && input && messages) {
+                    input.value = cmd;
+                    sendLLMMessage(input, messages, true);
+                }
             }
         });
-    });
+    }
 }
 
 

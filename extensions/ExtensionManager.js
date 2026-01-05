@@ -44,8 +44,13 @@ class ExtensionManager extends EventEmitter {
      * 초기화 - 확장 디렉토리 생성 및 기존 확장 로드
      */
     async initialize() {
+        console.log('[ExtensionManager] 초기화 시작');
+        console.log('[ExtensionManager] 사용자 확장 디렉토리:', this.extensionsDir);
+        console.log('[ExtensionManager] 번들 확장 디렉토리:', this.bundledDir);
+
         // 확장 디렉토리 생성
         if (!fs.existsSync(this.extensionsDir)) {
+            console.log('[ExtensionManager] 사용자 확장 디렉토리 생성');
             fs.mkdirSync(this.extensionsDir, { recursive: true });
         }
 
@@ -59,6 +64,7 @@ class ExtensionManager extends EventEmitter {
         await this.scanExtensions();
 
         console.log(`[ExtensionManager] ${this.registry.size}개 확장 발견`);
+        console.log('[ExtensionManager] 등록된 확장:', Array.from(this.registry.keys()));
 
         return this;
     }
@@ -67,12 +73,16 @@ class ExtensionManager extends EventEmitter {
      * 번들 확장을 사용자 디렉토리에 설치
      */
     async installBundledExtensions() {
+        console.log('[ExtensionManager] 번들 확장 설치 확인 중...');
+        console.log('[ExtensionManager] 번들 디렉토리 존재 여부:', fs.existsSync(this.bundledDir));
+
         if (!fs.existsSync(this.bundledDir)) {
-            console.log('[ExtensionManager] 번들 확장 디렉토리 없음');
+            console.log('[ExtensionManager] 번들 확장 디렉토리 없음:', this.bundledDir);
             return;
         }
 
         const entries = fs.readdirSync(this.bundledDir, { withFileTypes: true });
+        console.log('[ExtensionManager] 번들 디렉토리 내용:', entries.map(e => e.name));
 
         for (const entry of entries) {
             if (!entry.isDirectory()) continue;
@@ -91,15 +101,21 @@ class ExtensionManager extends EventEmitter {
                 let shouldInstall = false;
 
                 if (!fs.existsSync(targetPath)) {
-                    // 확장이 없으면 설치
+                    // 확장 폴더가 없으면 설치
                     shouldInstall = true;
-                    console.log(`[ExtensionManager] 번들 확장 설치: ${entry.name}`);
-                } else if (fs.existsSync(targetManifestPath)) {
+                    console.log(`[ExtensionManager] 번들 확장 설치 (새로 설치): ${entry.name}`);
+                } else if (!fs.existsSync(targetManifestPath)) {
+                    // 폴더는 있지만 package.json이 없으면 재설치
+                    shouldInstall = true;
+                    console.log(`[ExtensionManager] 번들 확장 재설치 (manifest 없음): ${entry.name}`);
+                } else {
                     // 버전 비교
                     const targetManifest = JSON.parse(fs.readFileSync(targetManifestPath, 'utf8'));
                     if (this.compareVersions(bundledManifest.version, targetManifest.version) > 0) {
                         shouldInstall = true;
                         console.log(`[ExtensionManager] 번들 확장 업데이트: ${entry.name} (${targetManifest.version} → ${bundledManifest.version})`);
+                    } else {
+                        console.log(`[ExtensionManager] 번들 확장 최신 상태: ${entry.name} (v${targetManifest.version})`);
                     }
                 }
 
@@ -109,6 +125,7 @@ class ExtensionManager extends EventEmitter {
                         fs.rmSync(targetPath, { recursive: true });
                     }
                     this.copyDirectory(bundledPath, targetPath);
+                    console.log(`[ExtensionManager] 번들 확장 복사 완료: ${entry.name}`);
                 }
             } catch (err) {
                 console.error(`[ExtensionManager] 번들 확장 설치 실패: ${entry.name}`, err.message);

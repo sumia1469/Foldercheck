@@ -1953,8 +1953,10 @@ async function loadSidebarExtensions() {
         let extensions = [];
         if (window.extensionAPI && typeof window.extensionAPI.getExtensions === 'function') {
             extensions = await window.extensionAPI.getExtensions() || [];
+            console.log('[Extensions] 사이드바 확장 목록 로드:', extensions);
         } else {
             // 폴백: HTTP API (개발 모드)
+            console.log('[Extensions] Electron API 없음, HTTP API 사용');
             const res = await fetch('/api/extensions');
             const data = await res.json();
             extensions = data.extensions || [];

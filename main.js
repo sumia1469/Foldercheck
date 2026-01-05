@@ -978,7 +978,7 @@ async function initializeExtensions() {
         // Extension Manager 생성
         extensionManager = new ExtensionManager({
             extensionsDir: path.join(getUserDataDir(), 'extensions'),
-            builtinDir: path.join(__dirname, 'builtin-extensions')
+            bundledDir: path.join(__dirname, 'bundled-extensions')
         });
         extensionManager.extensionHost = extensionHost;
 

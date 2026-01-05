@@ -10908,8 +10908,8 @@ body.resizing-bottom-panel * {
    확장 제공 섹션 스타일
    ======================================== */
 
-/* 확장 배지 (섹션 헤더에 표시) */
-.extension-badge {
+/* 확장 아이콘 배지 (섹션 헤더에 표시되는 아이콘) */
+.extension-icon-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -10921,7 +10921,7 @@ body.resizing-bottom-panel * {
     margin-right: 8px;
 }
 
-.extension-badge svg {
+.extension-icon-badge svg {
     opacity: 0.6;
 }
 
@@ -11209,6 +11209,8 @@ body.resizing-bottom-panel * {
     border-radius: 3px;
     text-transform: uppercase;
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .extension-badge.disabled {
@@ -11715,6 +11717,8 @@ body.resizing-bottom-panel * {
     border-radius: 10px;
     background: var(--status-warning-bg);
     color: var(--status-warning);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .extension-badge.disabled {

@@ -1831,12 +1831,39 @@ async function removeFolderByIndex(idx) {
 // 확장 사이드바
 function renderExtensionsSidebar(container) {
     container.innerHTML = `
-        <div class="sidebar-section">
+        <!-- 검색 바 (VSCode 스타일) -->
+        <div class="extensions-search-container">
+            <div class="extensions-search-input-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="text" id="extensionSearchInput" placeholder="마켓플레이스에서 확장 검색" class="extensions-search-input">
+                <button class="extensions-search-clear" id="extensionSearchClear" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 검색 결과 영역 -->
+        <div class="extensions-search-results" id="extensionSearchResults" style="display: none;">
+            <div class="sidebar-section-header" style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+                <span>검색 결과</span>
+                <span class="search-result-count" id="searchResultCount"></span>
+            </div>
+            <div class="sidebar-section-items" id="extensionSearchList"></div>
+        </div>
+
+        <!-- 설치됨 섹션 -->
+        <div class="sidebar-section" id="installedSection">
             <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
                 <span>설치됨</span>
+                <span class="sidebar-section-count" id="installedCount">0</span>
             </div>
             <div class="sidebar-section-items" id="sidebarExtensionList">
                 <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
@@ -1844,43 +1871,368 @@ function renderExtensionsSidebar(container) {
                 </div>
             </div>
         </div>
+
+        <!-- 추천 섹션 -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>추천</span>
+            </div>
+            <div class="sidebar-section-items" id="recommendedExtensionList">
+                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
+                    로딩 중...
+                </div>
+            </div>
+        </div>
+
+        <!-- 인기 섹션 -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>인기</span>
+            </div>
+            <div class="sidebar-section-items" id="popularExtensionList">
+                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
+                    로딩 중...
+                </div>
+            </div>
+        </div>
     `;
+
+    // 확장 목록 로드
     loadSidebarExtensions();
+    loadRecommendedExtensions();
+    loadPopularExtensions();
+
+    // 검색 이벤트 설정
+    setupExtensionSearch();
 }
 
-// 사이드바 확장 목록 로드
+// 사이드바 확장 목록 로드 (설치됨)
 async function loadSidebarExtensions() {
     try {
         const res = await fetch('/api/extensions');
         const data = await res.json();
         const container = document.getElementById('sidebarExtensionList');
+        const countEl = document.getElementById('installedCount');
         if (!container) return;
 
         const extensions = data.extensions || [];
+
+        // 설치 개수 업데이트
+        if (countEl) {
+            countEl.textContent = extensions.length;
+        }
+
         if (extensions.length === 0) {
             container.innerHTML = `
-                <div class="sidebar-item" style="color: var(--text-muted); font-size: 12px;">
-                    설치된 확장이 없습니다
+                <div class="extension-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                    <span>설치된 확장이 없습니다</span>
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = extensions.map(ext => `
-            <div class="sidebar-item" onclick="showExtensionDetail('${ext.id}')" data-ext-id="${ext.id}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7" rx="1"/>
-                    <rect x="14" y="3" width="7" height="7" rx="1"/>
-                    <rect x="3" y="14" width="7" height="7" rx="1"/>
-                    <rect x="14" y="14" width="7" height="7" rx="1"/>
-                </svg>
-                <span class="sidebar-item-text">${escapeHtml(ext.name)}</span>
-                ${ext.enabled ? '' : '<span class="sidebar-item-badge" style="background: var(--text-muted);">비활성</span>'}
-            </div>
-        `).join('');
+        container.innerHTML = extensions.map(ext => renderExtensionItem(ext, true)).join('');
     } catch (err) {
         console.error('사이드바 확장 로드 실패:', err);
     }
+}
+
+// 추천 확장 목록 로드
+async function loadRecommendedExtensions() {
+    const container = document.getElementById('recommendedExtensionList');
+    if (!container) return;
+
+    try {
+        const res = await fetch('/api/extensions/marketplace?category=recommended');
+        const data = await res.json();
+        const extensions = data.extensions || [];
+
+        if (extensions.length === 0) {
+            container.innerHTML = `
+                <div class="extension-empty-state">
+                    <span>추천 확장이 없습니다</span>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = extensions.map(ext => renderExtensionItem(ext, false)).join('');
+    } catch (err) {
+        // API가 없을 경우 기본 추천 목록 표시
+        container.innerHTML = getDefaultRecommendedExtensions();
+    }
+}
+
+// 인기 확장 목록 로드
+async function loadPopularExtensions() {
+    const container = document.getElementById('popularExtensionList');
+    if (!container) return;
+
+    try {
+        const res = await fetch('/api/extensions/marketplace?category=popular');
+        const data = await res.json();
+        const extensions = data.extensions || [];
+
+        if (extensions.length === 0) {
+            container.innerHTML = `
+                <div class="extension-empty-state">
+                    <span>인기 확장이 없습니다</span>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = extensions.map(ext => renderExtensionItem(ext, false)).join('');
+    } catch (err) {
+        // API가 없을 경우 기본 인기 목록 표시
+        container.innerHTML = getDefaultPopularExtensions();
+    }
+}
+
+// 기본 추천 확장 목록 (API 없을 때)
+function getDefaultRecommendedExtensions() {
+    const recommended = [
+        { id: 'theme-dark-plus', name: 'Dark+ 테마', description: '어두운 테마', icon: '🎨', downloads: '10K+' },
+        { id: 'pdf-viewer', name: 'PDF 뷰어', description: 'PDF 문서 미리보기', icon: '📄', downloads: '5K+' },
+        { id: 'markdown-preview', name: 'Markdown 미리보기', description: 'MD 파일 렌더링', icon: '📝', downloads: '8K+' },
+    ];
+    return recommended.map(ext => `
+        <div class="extension-item marketplace" onclick="showMarketplaceExtension('${ext.id}')">
+            <div class="extension-item-icon">${ext.icon}</div>
+            <div class="extension-item-content">
+                <div class="extension-item-name">${ext.name}</div>
+                <div class="extension-item-desc">${ext.description}</div>
+                <div class="extension-item-meta">
+                    <span class="download-count">⬇ ${ext.downloads}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 기본 인기 확장 목록 (API 없을 때)
+function getDefaultPopularExtensions() {
+    const popular = [
+        { id: 'auto-save', name: '자동 저장', description: '문서 자동 저장', icon: '💾', downloads: '15K+' },
+        { id: 'file-icons', name: '파일 아이콘', description: '파일 타입별 아이콘', icon: '📁', downloads: '12K+' },
+        { id: 'git-lens', name: 'Git 렌즈', description: 'Git 변경 내역 추적', icon: '🔍', downloads: '20K+' },
+    ];
+    return popular.map(ext => `
+        <div class="extension-item marketplace" onclick="showMarketplaceExtension('${ext.id}')">
+            <div class="extension-item-icon">${ext.icon}</div>
+            <div class="extension-item-content">
+                <div class="extension-item-name">${ext.name}</div>
+                <div class="extension-item-desc">${ext.description}</div>
+                <div class="extension-item-meta">
+                    <span class="download-count">⬇ ${ext.downloads}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 확장 아이템 렌더링
+function renderExtensionItem(ext, isInstalled) {
+    const statusBadge = isInstalled && !ext.enabled
+        ? '<span class="extension-badge disabled">비활성</span>'
+        : '';
+
+    const icon = ext.icon || `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+    `;
+
+    return `
+        <div class="extension-item ${isInstalled ? 'installed' : 'marketplace'}"
+             onclick="${isInstalled ? `showExtensionDetail('${ext.id}')` : `showMarketplaceExtension('${ext.id}')`}"
+             data-ext-id="${ext.id}">
+            <div class="extension-item-icon">${icon}</div>
+            <div class="extension-item-content">
+                <div class="extension-item-header">
+                    <span class="extension-item-name">${escapeHtml(ext.name)}</span>
+                    ${statusBadge}
+                </div>
+                <div class="extension-item-desc">${escapeHtml(ext.description || '')}</div>
+                ${!isInstalled ? `
+                    <div class="extension-item-meta">
+                        <span class="extension-author">${ext.author || 'Unknown'}</span>
+                        ${ext.downloads ? `<span class="download-count">⬇ ${ext.downloads}</span>` : ''}
+                    </div>
+                ` : `
+                    <div class="extension-item-meta">
+                        <span class="extension-version">v${ext.version || '1.0.0'}</span>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+}
+
+// 확장 검색 설정
+function setupExtensionSearch() {
+    const searchInput = document.getElementById('extensionSearchInput');
+    const clearBtn = document.getElementById('extensionSearchClear');
+    const searchResults = document.getElementById('extensionSearchResults');
+    const installedSection = document.getElementById('installedSection');
+
+    if (!searchInput) return;
+
+    let searchTimeout;
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+
+        // 클리어 버튼 표시/숨김
+        if (clearBtn) {
+            clearBtn.style.display = query ? 'flex' : 'none';
+        }
+
+        // 디바운스 적용
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            if (query.length >= 2) {
+                searchExtensions(query);
+            } else {
+                // 검색어 없으면 기본 섹션 표시
+                if (searchResults) searchResults.style.display = 'none';
+                document.querySelectorAll('.sidebar-section').forEach(s => s.style.display = '');
+            }
+        }, 300);
+    });
+
+    // 클리어 버튼 클릭
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            if (searchResults) searchResults.style.display = 'none';
+            document.querySelectorAll('.sidebar-section').forEach(s => s.style.display = '');
+            searchInput.focus();
+        });
+    }
+
+    // Enter 키로 검색
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const query = searchInput.value.trim();
+            if (query.length >= 2) {
+                searchExtensions(query);
+            }
+        }
+    });
+}
+
+// 확장 검색 실행
+async function searchExtensions(query) {
+    const searchResults = document.getElementById('extensionSearchResults');
+    const searchList = document.getElementById('extensionSearchList');
+    const searchCount = document.getElementById('searchResultCount');
+
+    if (!searchResults || !searchList) return;
+
+    // 기존 섹션 숨기고 검색 결과 표시
+    document.querySelectorAll('.sidebar-section').forEach(s => s.style.display = 'none');
+    searchResults.style.display = 'block';
+
+    // 로딩 표시
+    searchList.innerHTML = `
+        <div class="extension-empty-state">
+            <span>검색 중...</span>
+        </div>
+    `;
+
+    try {
+        // 마켓플레이스 검색 API 호출
+        const res = await fetch(`/api/extensions/marketplace/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        const extensions = data.extensions || [];
+
+        // 설치된 확장에서도 검색
+        const installedRes = await fetch('/api/extensions');
+        const installedData = await installedRes.json();
+        const installedExtensions = (installedData.extensions || []).filter(ext =>
+            ext.name.toLowerCase().includes(query.toLowerCase()) ||
+            (ext.description && ext.description.toLowerCase().includes(query.toLowerCase()))
+        );
+
+        const allResults = [
+            ...installedExtensions.map(e => ({ ...e, isInstalled: true })),
+            ...extensions.filter(e => !installedExtensions.find(i => i.id === e.id))
+        ];
+
+        if (searchCount) {
+            searchCount.textContent = `(${allResults.length})`;
+        }
+
+        if (allResults.length === 0) {
+            searchList.innerHTML = `
+                <div class="extension-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    <span>"${escapeHtml(query)}" 검색 결과가 없습니다</span>
+                </div>
+            `;
+            return;
+        }
+
+        searchList.innerHTML = allResults.map(ext => renderExtensionItem(ext, ext.isInstalled)).join('');
+
+    } catch (err) {
+        // API가 없을 경우 설치된 확장에서만 검색
+        try {
+            const res = await fetch('/api/extensions');
+            const data = await res.json();
+            const extensions = (data.extensions || []).filter(ext =>
+                ext.name.toLowerCase().includes(query.toLowerCase()) ||
+                (ext.description && ext.description.toLowerCase().includes(query.toLowerCase()))
+            );
+
+            if (searchCount) {
+                searchCount.textContent = `(${extensions.length})`;
+            }
+
+            if (extensions.length === 0) {
+                searchList.innerHTML = `
+                    <div class="extension-empty-state">
+                        <span>"${escapeHtml(query)}" 검색 결과가 없습니다</span>
+                    </div>
+                `;
+                return;
+            }
+
+            searchList.innerHTML = extensions.map(ext => renderExtensionItem(ext, true)).join('');
+        } catch (e) {
+            searchList.innerHTML = `
+                <div class="extension-empty-state">
+                    <span>검색 중 오류가 발생했습니다</span>
+                </div>
+            `;
+        }
+    }
+}
+
+// 마켓플레이스 확장 상세 표시
+function showMarketplaceExtension(extId) {
+    // TODO: 마켓플레이스 확장 상세 페이지 표시
+    showToast(`확장 "${extId}" 상세 정보 (준비 중)`, 'info');
 }
 
 // 확장 상세 정보 표시
@@ -9312,18 +9664,19 @@ function initGlobalSearch() {
 initGlobalSearch();
 
 // ========================================
-// 확장(Extensions) 관리
+// 확장(Extensions) 관리 - VSCode 스타일
 // ========================================
 
 let extensionsData = [];
+let selectedExtensionId = null;
 
-// 확장 목록 로드
+// 확장 목록 로드 (새로운 리스트 스타일)
 async function loadExtensions() {
-    const grid = document.getElementById('extensionsGrid');
+    const list = document.getElementById('extensionsList');
     const loading = document.getElementById('extensionLoading');
     const empty = document.getElementById('extensionEmpty');
 
-    if (!grid || !window.extensionAPI) return;
+    if (!list || !window.extensionAPI) return;
 
     try {
         if (loading) loading.style.display = 'flex';
@@ -9334,24 +9687,31 @@ async function loadExtensions() {
         // 로딩 숨기기
         if (loading) loading.style.display = 'none';
 
-        // 기존 카드 제거
-        grid.querySelectorAll('.extension-card').forEach(el => el.remove());
+        // 기존 아이템 제거
+        list.querySelectorAll('.extension-list-item').forEach(el => el.remove());
 
         if (!extensionsData || extensionsData.length === 0) {
             if (empty) empty.style.display = 'flex';
             return;
         }
 
-        // 확장 카드 생성
+        // 확장 리스트 아이템 생성
         extensionsData.forEach(ext => {
-            const card = createExtensionCard(ext);
-            grid.appendChild(card);
+            const item = createExtensionListItem(ext);
+            list.appendChild(item);
         });
 
         // 활성 확장 수 업데이트
         const activeCount = extensionsData.filter(e => e.state === 'active').length;
-        const countEl = document.getElementById('activeExtensionsCount');
-        if (countEl) countEl.textContent = `${activeCount}개`;
+        document.getElementById('installedCount').textContent = extensionsData.length;
+
+        // 첫 번째 확장 선택 (있으면)
+        if (extensionsData.length > 0 && !selectedExtensionId) {
+            selectExtension(extensionsData[0].id);
+        } else if (selectedExtensionId) {
+            // 기존 선택 유지
+            selectExtension(selectedExtensionId);
+        }
 
     } catch (err) {
         console.error('확장 목록 로드 실패:', err);
@@ -9363,53 +9723,318 @@ async function loadExtensions() {
     }
 }
 
-// 확장 카드 생성
-function createExtensionCard(ext) {
-    const card = document.createElement('div');
-    card.className = `extension-card ${ext.enabled ? '' : 'disabled'}`;
-    card.dataset.extensionId = ext.id;
+// 확장 리스트 아이템 생성 (VSCode 스타일)
+function createExtensionListItem(ext) {
+    const item = document.createElement('div');
+    item.className = `extension-list-item ${ext.enabled ? '' : 'disabled'} ${selectedExtensionId === ext.id ? 'selected' : ''}`;
+    item.dataset.extensionId = ext.id;
 
     const isActive = ext.state === 'active';
-    const isBuiltin = ext.id.startsWith('docwatch.');
 
-    card.innerHTML = `
-        <div class="extension-card-header">
-            <div class="extension-icon">
-                ${ext.manifest.icon || getDefaultExtensionIcon()}
-            </div>
-            <div class="extension-info">
-                <div class="extension-name">
-                    ${ext.manifest.displayName || ext.manifest.name}
-                    <span class="version">v${ext.manifest.version}</span>
-                </div>
-                <div class="extension-publisher">${ext.manifest.publisher || '알 수 없음'}</div>
-            </div>
+    item.innerHTML = `
+        <div class="ext-icon">
+            ${ext.manifest.icon || getDefaultExtensionIcon()}
         </div>
-        <div class="extension-description">${ext.manifest.description || '설명 없음'}</div>
-        <div class="extension-tags">
-            ${isBuiltin ? '<span class="extension-tag builtin">내장</span>' : ''}
-            ${isActive ? '<span class="extension-tag active">활성</span>' : ''}
-            ${(ext.manifest.categories || []).map(c => `<span class="extension-tag">${c}</span>`).join('')}
+        <div class="ext-info">
+            <div class="ext-name">${ext.manifest.displayName || ext.manifest.name}</div>
+            <div class="ext-publisher">${ext.manifest.publisher || '알 수 없음'}</div>
+            <div class="ext-description">${ext.manifest.description || '설명 없음'}</div>
         </div>
-        <div class="extension-card-footer">
-            <div class="extension-status">
-                <span class="status-dot ${isActive ? 'active' : ''}"></span>
-                <span>${getExtensionStateText(ext.state)}</span>
-            </div>
-            <div class="extension-actions">
-                <button class="extension-settings-btn" onclick="showExtensionDetails('${ext.id}')" title="상세 정보">
+        <div class="ext-actions">
+            <div class="ext-status-dot ${isActive ? 'active' : ''}" title="${isActive ? '실행 중' : '비활성'}"></div>
+            <div class="ext-btn-group">
+                <button class="ext-btn settings-btn" onclick="event.stopPropagation(); openExtensionSettings('${ext.id}')" title="설정">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="1"/>
-                        <circle cx="19" cy="12" r="1"/>
-                        <circle cx="5" cy="12" r="1"/>
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
                     </svg>
                 </button>
-                <div class="extension-toggle ${ext.enabled ? 'active' : ''}" onclick="toggleExtension('${ext.id}', ${!ext.enabled})"></div>
             </div>
         </div>
     `;
 
-    return card;
+    // 클릭 시 상세 정보 표시
+    item.addEventListener('click', () => selectExtension(ext.id));
+
+    return item;
+}
+
+// 확장 선택 및 상세 정보 표시
+async function selectExtension(extId) {
+    selectedExtensionId = extId;
+    const ext = extensionsData.find(e => e.id === extId);
+    if (!ext) return;
+
+    // 리스트 아이템 선택 상태 업데이트
+    document.querySelectorAll('.extension-list-item').forEach(item => {
+        item.classList.toggle('selected', item.dataset.extensionId === extId);
+    });
+
+    // 상세 패널 표시
+    const emptyPanel = document.getElementById('extensionDetailEmpty');
+    const contentPanel = document.getElementById('extensionDetailContent');
+
+    if (emptyPanel) emptyPanel.style.display = 'none';
+    if (contentPanel) contentPanel.style.display = 'flex';
+
+    // 상세 정보 업데이트
+    await updateExtensionDetailPanel(ext);
+}
+
+// 확장 상세 패널 업데이트
+async function updateExtensionDetailPanel(ext) {
+    const isActive = ext.state === 'active';
+    const isBuiltin = ext.id.startsWith('docwatch.');
+
+    // 아이콘
+    document.getElementById('extDetailIcon').innerHTML = ext.manifest.icon || getDefaultExtensionIcon();
+
+    // 제목 및 메타 정보
+    document.getElementById('extDetailName').textContent = ext.manifest.displayName || ext.manifest.name;
+    document.getElementById('extDetailPublisher').textContent = ext.manifest.publisher || '알 수 없음';
+    document.getElementById('extDetailVersion').textContent = `v${ext.manifest.version}`;
+    document.getElementById('extDetailCategory').textContent = (ext.manifest.categories || ['기타']).join(', ');
+
+    // 액션 버튼
+    const actionsEl = document.getElementById('extDetailActions');
+    actionsEl.innerHTML = `
+        ${ext.enabled ? `
+            <button class="btn btn-disable" onclick="toggleExtensionFromDetail('${ext.id}', false)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                </svg>
+                비활성화
+            </button>
+        ` : `
+            <button class="btn btn-enable" onclick="toggleExtensionFromDetail('${ext.id}', true)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                활성화
+            </button>
+        `}
+        ${!isBuiltin ? `
+            <button class="btn btn-uninstall" onclick="uninstallExtensionFromDetail('${ext.id}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+                제거
+            </button>
+        ` : ''}
+    `;
+
+    // 설명
+    document.getElementById('extDetailDescription').textContent = ext.manifest.description || '설명이 없습니다.';
+
+    // 정보 그리드
+    document.getElementById('extDetailInfo').innerHTML = `
+        <span class="info-label">ID</span>
+        <span class="info-value mono">${ext.id}</span>
+        <span class="info-label">버전</span>
+        <span class="info-value">${ext.manifest.version}</span>
+        <span class="info-label">게시자</span>
+        <span class="info-value">${ext.manifest.publisher || '알 수 없음'}</span>
+        <span class="info-label">상태</span>
+        <span class="info-value">${getExtensionStateText(ext.state)}</span>
+        <span class="info-label">유형</span>
+        <span class="info-value">${isBuiltin ? '내장 확장' : '사용자 확장'}</span>
+    `;
+
+    // 권한
+    const permissionsSection = document.getElementById('extPermissionsSection');
+    const permissionsEl = document.getElementById('extDetailPermissions');
+    if (ext.manifest.permissions && ext.manifest.permissions.length > 0) {
+        permissionsSection.style.display = 'block';
+        permissionsEl.innerHTML = ext.manifest.permissions.map(p => `
+            <span class="permission-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                ${p}
+            </span>
+        `).join('');
+    } else {
+        permissionsSection.style.display = 'none';
+    }
+
+    // 명령어
+    const commandsSection = document.getElementById('extCommandsSection');
+    const commandsEl = document.getElementById('extDetailCommands');
+    try {
+        const allCommands = await window.extensionAPI.getCommands();
+        const commands = allCommands.filter(c => c.extensionId === ext.id);
+        if (commands.length > 0) {
+            commandsSection.style.display = 'block';
+            commandsEl.innerHTML = commands.map(cmd => `
+                <div class="command-item">
+                    <div class="command-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4,17 10,11 4,5"/>
+                            <line x1="12" y1="19" x2="20" y2="19"/>
+                        </svg>
+                    </div>
+                    <div class="command-info">
+                        <div class="command-title">${cmd.title}</div>
+                        <div class="command-id">${cmd.id}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            commandsSection.style.display = 'none';
+        }
+    } catch (e) {
+        commandsSection.style.display = 'none';
+    }
+
+    // 설정
+    const settingsSection = document.getElementById('extSettingsSection');
+    const settingsEl = document.getElementById('extDetailSettings');
+    const config = ext.manifest.contributes?.configuration;
+    if (config && config.properties) {
+        const props = Object.entries(config.properties);
+        if (props.length > 0) {
+            settingsSection.style.display = 'block';
+            settingsEl.innerHTML = props.map(([key, prop]) => `
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-key">${key.split('.').pop()}</span>
+                        <span class="setting-type">${prop.type}</span>
+                    </div>
+                    <div class="setting-description">${prop.description || '설명 없음'}</div>
+                </div>
+            `).join('');
+        } else {
+            settingsSection.style.display = 'none';
+        }
+    } else {
+        settingsSection.style.display = 'none';
+    }
+
+    // 기여 항목
+    const contributesSection = document.getElementById('extContributesSection');
+    const contributesEl = document.getElementById('extDetailContributes');
+    const contributes = ext.manifest.contributes;
+    if (contributes) {
+        const items = [];
+        if (contributes.commands?.length) items.push({ type: '명령어', count: contributes.commands.length, icon: 'terminal' });
+        if (contributes.activityBar) items.push({ type: '액티비티 바', count: 1, icon: 'sidebar' });
+        if (contributes.sections) items.push({ type: '섹션', count: Object.keys(contributes.sections).length, icon: 'layout' });
+        if (contributes.statusBar) items.push({ type: '상태 바', count: 1, icon: 'status' });
+        if (contributes.configuration) items.push({ type: '설정', count: Object.keys(contributes.configuration.properties || {}).length, icon: 'settings' });
+
+        if (items.length > 0) {
+            contributesSection.style.display = 'block';
+            contributesEl.innerHTML = items.map(item => `
+                <div class="contribute-item">
+                    <div class="contribute-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            ${getContributeIcon(item.icon)}
+                        </svg>
+                    </div>
+                    <span class="contribute-label">${item.type}</span>
+                    <span class="contribute-count">${item.count}</span>
+                </div>
+            `).join('');
+        } else {
+            contributesSection.style.display = 'none';
+        }
+    } else {
+        contributesSection.style.display = 'none';
+    }
+
+    // 변경 로그
+    const changelogEl = document.getElementById('extDetailChangelog');
+    if (ext.manifest.changelog) {
+        changelogEl.innerHTML = ext.manifest.changelog;
+    } else {
+        changelogEl.innerHTML = '<p class="empty-message">변경 로그가 없습니다.</p>';
+    }
+}
+
+// 기여 항목 아이콘 가져오기
+function getContributeIcon(type) {
+    const icons = {
+        terminal: '<polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+        sidebar: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>',
+        layout: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+        status: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/>',
+        settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4"/>'
+    };
+    return icons[type] || '<circle cx="12" cy="12" r="10"/>';
+}
+
+// 상세 탭 전환
+function switchDetailTab(tabName) {
+    // 탭 버튼 업데이트
+    document.querySelectorAll('.detail-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.detailTab === tabName);
+    });
+
+    // 탭 콘텐츠 업데이트
+    document.querySelectorAll('.detail-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `${tabName}TabContent`);
+    });
+}
+
+// 상세 패널에서 토글
+async function toggleExtensionFromDetail(extId, enabled) {
+    try {
+        await window.extensionAPI.toggle(extId, enabled);
+        await loadExtensions();
+        showToast(enabled ? '확장이 활성화되었습니다.' : '확장이 비활성화되었습니다.', 'success');
+    } catch (err) {
+        console.error('확장 토글 실패:', err);
+        showToast(`확장 ${enabled ? '활성화' : '비활성화'} 실패: ${err.message}`, 'error');
+    }
+}
+
+// 상세 패널에서 제거
+async function uninstallExtensionFromDetail(extId) {
+    const ext = extensionsData.find(e => e.id === extId);
+    if (!ext) return;
+
+    if (!confirm(`"${ext.manifest.displayName || ext.manifest.name}" 확장을 제거하시겠습니까?`)) return;
+
+    try {
+        await window.extensionAPI.uninstall(extId);
+        selectedExtensionId = null;
+        await loadExtensions();
+
+        // 상세 패널 초기화
+        document.getElementById('extensionDetailEmpty').style.display = 'flex';
+        document.getElementById('extensionDetailContent').style.display = 'none';
+
+        showToast(`"${ext.manifest.displayName || ext.manifest.name}" 확장이 제거되었습니다.`, 'success');
+    } catch (err) {
+        console.error('확장 제거 실패:', err);
+        showToast(`확장 제거 실패: ${err.message}`, 'error');
+    }
+}
+
+// 확장 설정 열기
+function openExtensionSettings(extId) {
+    const ext = extensionsData.find(e => e.id === extId);
+    if (!ext) return;
+
+    // 설정 섹션으로 이동하고 해당 확장의 설정 표시
+    showSection('settings');
+
+    // 확장 설정 카테고리가 있으면 해당 카테고리 선택
+    setTimeout(() => {
+        const settingNav = document.querySelector(`[data-extension-settings="${extId}"]`);
+        if (settingNav) {
+            settingNav.click();
+        }
+    }, 100);
+}
+
+// 기존 호환성을 위한 함수들 (레거시)
+function createExtensionCard(ext) {
+    // 새로운 리스트 아이템으로 대체
+    return createExtensionListItem(ext);
 }
 
 // 기본 확장 아이콘
@@ -9827,13 +10452,14 @@ const marketplaceExtensions = [
 
 let marketplaceData = [];
 let currentMarketplaceCategory = 'all';
+let selectedMarketplaceExtId = null;
 
-// 마켓플레이스 로드
+// 마켓플레이스 로드 (VSCode 스타일)
 async function loadMarketplace() {
-    const grid = document.getElementById('marketplaceGrid');
+    const list = document.getElementById('marketplaceList');
     const loading = document.getElementById('marketplaceLoading');
 
-    if (!grid) return;
+    if (!list) return;
 
     if (loading) loading.style.display = 'flex';
 
@@ -9858,13 +10484,13 @@ async function loadMarketplace() {
     }
 }
 
-// 마켓플레이스 렌더링
+// 마켓플레이스 렌더링 (VSCode 스타일 리스트)
 function renderMarketplace() {
-    const grid = document.getElementById('marketplaceGrid');
-    if (!grid) return;
+    const list = document.getElementById('marketplaceList');
+    if (!list) return;
 
-    // 로딩 제외한 기존 카드 제거
-    grid.querySelectorAll('.marketplace-card').forEach(el => el.remove());
+    // 로딩 제외한 기존 아이템 제거
+    list.querySelectorAll('.extension-list-item').forEach(el => el.remove());
 
     // 카테고리 필터링
     const filtered = currentMarketplaceCategory === 'all'
@@ -9872,62 +10498,163 @@ function renderMarketplace() {
         : marketplaceData.filter(ext => ext.categories.includes(currentMarketplaceCategory));
 
     filtered.forEach(ext => {
-        const card = createMarketplaceCard(ext);
-        grid.appendChild(card);
+        const item = createMarketplaceListItem(ext);
+        list.appendChild(item);
     });
+
+    // 첫 번째 항목 선택
+    if (filtered.length > 0 && !selectedMarketplaceExtId) {
+        selectMarketplaceExtension(filtered[0].id);
+    }
 }
 
-// 마켓플레이스 카드 생성
-function createMarketplaceCard(ext) {
-    const card = document.createElement('div');
-    card.className = `marketplace-card ${ext.installed ? 'installed' : ''}`;
-    card.dataset.extensionId = ext.id;
+// 마켓플레이스 리스트 아이템 생성 (VSCode 스타일)
+function createMarketplaceListItem(ext) {
+    const item = document.createElement('div');
+    item.className = `extension-list-item ${selectedMarketplaceExtId === ext.id ? 'selected' : ''}`;
+    item.dataset.extensionId = ext.id;
 
-    card.innerHTML = `
-        <div class="marketplace-card-header">
-            <div class="marketplace-card-icon">${ext.icon}</div>
-            <div class="marketplace-card-info">
-                <div class="marketplace-card-name">${ext.name}</div>
-                <div class="marketplace-card-meta">
-                    <span>${ext.publisher}</span>
+    item.innerHTML = `
+        <div class="ext-icon">${ext.icon}</div>
+        <div class="ext-info">
+            <div class="ext-name">${ext.name}</div>
+            <div class="ext-publisher">${ext.publisher}</div>
+            <div class="ext-description">${ext.description}</div>
+        </div>
+        <div class="ext-actions">
+            ${ext.installed ? `
+                <span class="btn-installed">설치됨</span>
+            ` : `
+                <button class="btn-install-small" onclick="event.stopPropagation(); installMarketplaceExtension('${ext.id}')">설치</button>
+            `}
+        </div>
+    `;
+
+    // 클릭 시 상세 정보 표시
+    item.addEventListener('click', () => selectMarketplaceExtension(ext.id));
+
+    return item;
+}
+
+// 마켓플레이스 확장 선택
+function selectMarketplaceExtension(extId) {
+    selectedMarketplaceExtId = extId;
+    const ext = marketplaceData.find(e => e.id === extId);
+    if (!ext) return;
+
+    // 리스트 아이템 선택 상태 업데이트
+    document.querySelectorAll('#marketplaceList .extension-list-item').forEach(item => {
+        item.classList.toggle('selected', item.dataset.extensionId === extId);
+    });
+
+    // 상세 패널 표시
+    const emptyPanel = document.getElementById('marketplaceDetailEmpty');
+    const contentPanel = document.getElementById('marketplaceDetailContent');
+
+    if (emptyPanel) emptyPanel.style.display = 'none';
+    if (contentPanel) {
+        contentPanel.style.display = 'flex';
+        updateMarketplaceDetailPanel(ext);
+    }
+}
+
+// 마켓플레이스 상세 패널 업데이트
+function updateMarketplaceDetailPanel(ext) {
+    const contentPanel = document.getElementById('marketplaceDetailContent');
+    if (!contentPanel) return;
+
+    contentPanel.innerHTML = `
+        <!-- 확장 헤더 -->
+        <div class="extension-detail-header">
+            <div class="extension-detail-icon">${ext.icon}</div>
+            <div class="extension-detail-title-area">
+                <h2>${ext.name}</h2>
+                <div class="extension-detail-meta">
+                    <span class="publisher">${ext.publisher}</span>
+                    <span class="separator">|</span>
+                    <span class="version">v${ext.version || '1.0.0'}</span>
+                    <span class="separator">|</span>
+                    <span class="category">${ext.categories.map(c => getCategoryName(c)).join(', ')}</span>
+                    <span class="separator">|</span>
                     <span class="downloads">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
                             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                         </svg>
                         ${formatDownloads(ext.downloads)}
                     </span>
                 </div>
             </div>
-        </div>
-        <div class="marketplace-card-description">${ext.description}</div>
-        <div class="marketplace-card-tags">
-            ${ext.isBuiltin ? '<span class="marketplace-tag">내장</span>' : ''}
-            ${ext.categories.map(c => `<span class="marketplace-tag">${getCategoryName(c)}</span>`).join('')}
-        </div>
-        <div class="marketplace-card-footer">
-            <div class="marketplace-card-rating">
-                <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                ${ext.rating}
-            </div>
-            <button class="marketplace-install-btn ${ext.installed ? 'installed' : ''}"
-                    onclick="installMarketplaceExtension('${ext.id}')"
-                    ${ext.installed ? 'disabled' : ''}>
+            <div class="extension-detail-actions">
                 ${ext.installed ? `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    설치됨
+                    <button class="btn btn-installed" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        설치됨
+                    </button>
                 ` : `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                    </svg>
-                    설치
+                    <button class="btn btn-install" onclick="installMarketplaceExtension('${ext.id}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        설치
+                    </button>
                 `}
-            </button>
+            </div>
+        </div>
+        <!-- 확장 탭 네비게이션 -->
+        <div class="extension-detail-tabs">
+            <button class="detail-tab active" onclick="this.parentElement.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active')); this.classList.add('active'); document.getElementById('mpDetailsTab').style.display='block'; document.getElementById('mpFeaturesTab').style.display='none';">상세 정보</button>
+            <button class="detail-tab" onclick="this.parentElement.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active')); this.classList.add('active'); document.getElementById('mpDetailsTab').style.display='none'; document.getElementById('mpFeaturesTab').style.display='block';">기능</button>
+        </div>
+        <!-- 탭 컨텐츠 -->
+        <div class="extension-detail-body">
+            <div id="mpDetailsTab">
+                <div class="extension-description">${ext.description}</div>
+                <div class="extension-info-section">
+                    <h4>정보</h4>
+                    <div class="info-grid">
+                        <span class="info-label">ID</span>
+                        <span class="info-value mono">${ext.id}</span>
+                        <span class="info-label">버전</span>
+                        <span class="info-value">${ext.version || '1.0.0'}</span>
+                        <span class="info-label">게시자</span>
+                        <span class="info-value">${ext.publisher}</span>
+                        <span class="info-label">평점</span>
+                        <span class="info-value">
+                            <svg viewBox="0 0 24 24" fill="var(--warning)" style="width: 14px; height: 14px; vertical-align: -2px;">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            ${ext.rating}
+                        </span>
+                        <span class="info-label">다운로드</span>
+                        <span class="info-value">${formatDownloads(ext.downloads)}</span>
+                        <span class="info-label">유형</span>
+                        <span class="info-value">${ext.isBuiltin ? '내장 확장' : '외부 확장'}</span>
+                    </div>
+                </div>
+            </div>
+            <div id="mpFeaturesTab" style="display: none;">
+                <div class="extension-info-section">
+                    <h4>카테고리</h4>
+                    <div class="permission-tags">
+                        ${ext.categories.map(c => `<span class="permission-tag">${getCategoryName(c)}</span>`).join('')}
+                    </div>
+                </div>
+                ${ext.isBuiltin ? `
+                <div class="extension-info-section">
+                    <h4>참고</h4>
+                    <p style="color: var(--text-secondary); font-size: 13px;">이 확장은 DocWatch에 내장되어 있으며, 설치 시 활성화됩니다.</p>
+                </div>
+                ` : ''}
+            </div>
         </div>
     `;
+}
 
-    return card;
+// 기존 마켓플레이스 카드 생성 (레거시 호환성)
+function createMarketplaceCard(ext) {
+    return createMarketplaceListItem(ext);
 }
 
 // 다운로드 수 포맷
@@ -9951,14 +10678,22 @@ function getCategoryName(category) {
 
 // 마켓플레이스 확장 설치
 async function installMarketplaceExtension(extId) {
-    const btn = document.querySelector(`.marketplace-card[data-extension-id="${extId}"] .marketplace-install-btn`);
-    if (!btn || btn.classList.contains('installed')) return;
+    // 새로운 UI 구조에서 버튼 찾기 (리스트 아이템 또는 상세 패널)
+    const listBtn = document.querySelector(`#marketplaceTab .extension-list-item[data-extension-id="${extId}"] .btn-install-small`);
+    const detailBtn = document.querySelector('#marketplaceTab .extension-detail-panel .btn-install');
 
+    // 리스트의 버튼 또는 상세 패널의 버튼 중 하나 사용
+    const btn = listBtn || detailBtn;
+    if (!btn || btn.classList.contains('btn-installed')) return;
+
+    // 설치 중 상태 표시
     btn.classList.add('installing');
+    const originalContent = btn.innerHTML;
     btn.innerHTML = `
         <div class="spinner" style="width: 14px; height: 14px; border-width: 2px;"></div>
         설치 중...
     `;
+    btn.disabled = true;
 
     try {
         const ext = marketplaceData.find(e => e.id === extId);
@@ -9973,16 +10708,31 @@ async function installMarketplaceExtension(extId) {
             // await window.extensionAPI.install(downloadUrl);
         }
 
-        // UI 업데이트
-        btn.classList.remove('installing');
-        btn.classList.add('installed');
-        btn.disabled = true;
-        btn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            설치됨
-        `;
+        // 리스트 버튼 UI 업데이트
+        if (listBtn) {
+            listBtn.classList.remove('installing', 'btn-install-small');
+            listBtn.classList.add('btn-installed');
+            listBtn.disabled = true;
+            listBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                설치됨
+            `;
+        }
+
+        // 상세 패널 버튼 UI 업데이트
+        if (detailBtn) {
+            detailBtn.classList.remove('installing', 'btn-install');
+            detailBtn.classList.add('btn-installed');
+            detailBtn.disabled = true;
+            detailBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                설치됨
+            `;
+        }
 
         // 설치된 목록 새로고침
         await loadExtensions();
@@ -9996,12 +10746,8 @@ async function installMarketplaceExtension(extId) {
     } catch (err) {
         console.error('확장 설치 실패:', err);
         btn.classList.remove('installing');
-        btn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            설치
-        `;
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
         showToast('확장 설치에 실패했습니다: ' + err.message, 'error');
     }
 }

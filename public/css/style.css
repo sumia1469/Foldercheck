@@ -9925,3 +9925,309 @@ body.resizing-bottom-panel * {
 .restart-btn-icon {
     font-size: 14px;
 }
+
+/* ===== 확장 마켓플레이스 ===== */
+
+/* 확장 탭 */
+.extension-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: var(--bg-secondary);
+    padding: 4px;
+    border-radius: 8px;
+    width: fit-content;
+}
+
+.extension-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.extension-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.extension-tab.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.extension-tab svg {
+    flex-shrink: 0;
+}
+
+.tab-badge {
+    background: var(--bg-tertiary);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.extension-tab.active .tab-badge {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 탭 콘텐츠 */
+.extension-tab-content {
+    display: none;
+}
+
+.extension-tab-content.active {
+    display: block;
+}
+
+/* 마켓플레이스 카테고리 */
+.marketplace-categories {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.category-chip {
+    padding: 6px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.category-chip:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.category-chip.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+/* 마켓플레이스 그리드 */
+.marketplace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+/* 마켓플레이스 카드 */
+.marketplace-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s ease;
+}
+
+.marketplace-card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+}
+
+.marketplace-card.installed {
+    border-color: var(--success);
+    background: rgba(78, 201, 176, 0.05);
+}
+
+.marketplace-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.marketplace-card-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-hover));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.marketplace-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.marketplace-card-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.marketplace-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.marketplace-card-meta .downloads {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.marketplace-card-meta .downloads svg {
+    width: 12px;
+    height: 12px;
+}
+
+.marketplace-card-description {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.marketplace-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.marketplace-tag {
+    font-size: 10px;
+    padding: 3px 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    color: var(--text-muted);
+}
+
+.marketplace-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.marketplace-card-rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--warning);
+}
+
+.marketplace-card-rating svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.marketplace-install-btn {
+    padding: 6px 16px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.marketplace-install-btn:hover {
+    background: var(--accent-secondary);
+    transform: translateY(-1px);
+}
+
+.marketplace-install-btn.installed {
+    background: var(--bg-tertiary);
+    color: var(--success);
+    cursor: default;
+}
+
+.marketplace-install-btn.installed:hover {
+    transform: none;
+}
+
+.marketplace-install-btn.installing {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: wait;
+}
+
+.marketplace-install-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 마켓플레이스 정보 카드 */
+.marketplace-info {
+    margin-top: 20px;
+}
+
+/* 확장 empty 상태 버튼 */
+.extension-empty .btn {
+    margin-top: 16px;
+}
+
+/* 확장 관리 버튼 섹션 */
+.extension-actions-section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.extension-manage-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.extension-manage-buttons .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+}
+
+.extension-manage-buttons .btn-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: white;
+}
+
+.extension-manage-buttons .btn-danger:hover {
+    background: #e03e3e;
+    border-color: #e03e3e;
+}
+
+.extension-manage-buttons .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

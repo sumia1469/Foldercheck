@@ -1364,6 +1364,25 @@
                     </div>
                 </div>
 
+                <!-- 확장 탭 메뉴 -->
+                <div class="extension-tabs">
+                    <button class="extension-tab active" data-tab="installed" onclick="switchExtensionTab('installed')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        설치됨
+                        <span class="tab-badge" id="installedCount">0</span>
+                    </button>
+                    <button class="extension-tab" data-tab="marketplace" onclick="switchExtensionTab('marketplace')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                            <circle cx="9" cy="21" r="1"/>
+                            <circle cx="20" cy="21" r="1"/>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+                        </svg>
+                        마켓플레이스
+                    </button>
+                </div>
+
                 <!-- 확장 검색 -->
                 <div class="extension-search-bar">
                     <div class="search-box">
@@ -1375,38 +1394,66 @@
                     </div>
                 </div>
 
-                <!-- 확장 목록 -->
-                <div class="extensions-grid" id="extensionsGrid">
-                    <!-- 확장 카드가 여기에 동적으로 추가됨 -->
-                    <div class="extension-loading" id="extensionLoading">
-                        <div class="spinner"></div>
-                        <p>확장 목록을 불러오는 중...</p>
+                <!-- 설치된 확장 탭 -->
+                <div class="extension-tab-content active" id="installedTab">
+                    <div class="extensions-grid" id="extensionsGrid">
+                        <div class="extension-loading" id="extensionLoading">
+                            <div class="spinner"></div>
+                            <p>확장 목록을 불러오는 중...</p>
+                        </div>
+                        <div class="extension-empty" id="extensionEmpty" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                            </svg>
+                            <p>설치된 확장이 없습니다</p>
+                            <button class="btn btn-primary" onclick="switchExtensionTab('marketplace')">마켓플레이스 둘러보기</button>
+                        </div>
                     </div>
-                    <div class="extension-empty" id="extensionEmpty" style="display: none;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                        </svg>
-                        <p>설치된 확장이 없습니다</p>
+
+                    <!-- 확장 정보 -->
+                    <div class="settings-card">
+                        <h3>확장 안내</h3>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="info-label">확장 위치</span>
+                                <span class="info-value" id="extensionsPath">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">활성 확장</span>
+                                <span class="info-value" id="activeExtensionsCount">0개</span>
+                            </div>
+                        </div>
+                        <p class="help-text" style="margin-top: 15px;">
+                            확장을 통해 DocWatch의 기능을 확장할 수 있습니다.<br>
+                            확장은 샌드박스 환경에서 안전하게 실행됩니다.
+                        </p>
                     </div>
                 </div>
 
-                <!-- 확장 정보 -->
-                <div class="settings-card">
-                    <h3>확장 안내</h3>
-                    <div class="info-list">
-                        <div class="info-item">
-                            <span class="info-label">확장 위치</span>
-                            <span class="info-value" id="extensionsPath">-</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">활성 확장</span>
-                            <span class="info-value" id="activeExtensionsCount">0개</span>
-                        </div>
+                <!-- 마켓플레이스 탭 -->
+                <div class="extension-tab-content" id="marketplaceTab">
+                    <div class="marketplace-categories">
+                        <button class="category-chip active" data-category="all" onclick="filterMarketplace('all')">전체</button>
+                        <button class="category-chip" data-category="communication" onclick="filterMarketplace('communication')">커뮤니케이션</button>
+                        <button class="category-chip" data-category="productivity" onclick="filterMarketplace('productivity')">생산성</button>
+                        <button class="category-chip" data-category="integration" onclick="filterMarketplace('integration')">통합</button>
                     </div>
-                    <p class="help-text" style="margin-top: 15px;">
-                        확장을 통해 DocWatch의 기능을 확장할 수 있습니다.<br>
-                        확장은 샌드박스 환경에서 안전하게 실행됩니다.
-                    </p>
+
+                    <div class="marketplace-grid" id="marketplaceGrid">
+                        <div class="extension-loading" id="marketplaceLoading" style="display: none;">
+                            <div class="spinner"></div>
+                            <p>마켓플레이스를 불러오는 중...</p>
+                        </div>
+                        <!-- 마켓플레이스 확장 카드가 여기에 동적으로 추가됨 -->
+                    </div>
+
+                    <div class="marketplace-info settings-card">
+                        <h3>확장 설치 안내</h3>
+                        <p class="help-text">
+                            마켓플레이스에서 확장을 설치하면 자동으로 메뉴와 설정이 추가됩니다.<br>
+                            확장은 활성화 후 앱 재시작 없이 바로 사용할 수 있습니다.
+                        </p>
+                    </div>
                 </div>
             </section>
 

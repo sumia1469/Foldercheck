@@ -1945,13 +1945,20 @@ async function refreshAllExtensions() {
 // 사이드바 확장 목록 로드 (설치됨)
 async function loadSidebarExtensions() {
     try {
-        const res = await fetch('/api/extensions');
-        const data = await res.json();
         const container = document.getElementById('sidebarExtensionList');
         const countEl = document.getElementById('installedCount');
         if (!container) return;
 
-        const extensions = data.extensions || [];
+        // Electron API 사용 (window.extensionAPI)
+        let extensions = [];
+        if (window.extensionAPI && typeof window.extensionAPI.getExtensions === 'function') {
+            extensions = await window.extensionAPI.getExtensions() || [];
+        } else {
+            // 폴백: HTTP API (개발 모드)
+            const res = await fetch('/api/extensions');
+            const data = await res.json();
+            extensions = data.extensions || [];
+        }
 
         // 설치 개수 업데이트
         if (countEl) {
@@ -2037,7 +2044,9 @@ function renderExtensionItem(ext, isInstalled) {
         ? '<span class="extension-badge disabled">비활성</span>'
         : '';
 
-    const icon = ext.icon || `
+    // 아이콘: manifest.icon 또는 ext.icon 확인
+    const iconValue = (ext.manifest && ext.manifest.icon) || ext.icon;
+    const icon = iconValue || `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="3" y="3" width="7" height="7" rx="1"/>
             <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -2199,23 +2208,18 @@ async function searchExtensions(query) {
     `;
 
     try {
-        // 마켓플레이스 검색 API 호출
-        const res = await fetch(`/api/extensions/marketplace/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        const extensions = data.extensions || [];
+        // 설치된 확장에서 검색 (Electron API 사용)
+        let installedExtensions = [];
+        if (window.extensionAPI && typeof window.extensionAPI.getExtensions === 'function') {
+            const allExtensions = await window.extensionAPI.getExtensions() || [];
+            installedExtensions = allExtensions.filter(ext =>
+                (ext.name && ext.name.toLowerCase().includes(query.toLowerCase())) ||
+                (ext.displayName && ext.displayName.toLowerCase().includes(query.toLowerCase())) ||
+                (ext.description && ext.description.toLowerCase().includes(query.toLowerCase()))
+            );
+        }
 
-        // 설치된 확장에서도 검색
-        const installedRes = await fetch('/api/extensions');
-        const installedData = await installedRes.json();
-        const installedExtensions = (installedData.extensions || []).filter(ext =>
-            ext.name.toLowerCase().includes(query.toLowerCase()) ||
-            (ext.description && ext.description.toLowerCase().includes(query.toLowerCase()))
-        );
-
-        const allResults = [
-            ...installedExtensions.map(e => ({ ...e, isInstalled: true })),
-            ...extensions.filter(e => !installedExtensions.find(i => i.id === e.id))
-        ];
+        const allResults = installedExtensions.map(e => ({ ...e, isInstalled: true }));
 
         if (searchCount) {
             searchCount.textContent = `(${allResults.length})`;
@@ -2237,41 +2241,17 @@ async function searchExtensions(query) {
         searchList.innerHTML = allResults.map(ext => renderExtensionItem(ext, ext.isInstalled)).join('');
 
     } catch (err) {
-        // API가 없을 경우 설치된 확장에서만 검색
-        try {
-            const res = await fetch('/api/extensions');
-            const data = await res.json();
-            const extensions = (data.extensions || []).filter(ext =>
-                ext.name.toLowerCase().includes(query.toLowerCase()) ||
-                (ext.description && ext.description.toLowerCase().includes(query.toLowerCase()))
-            );
-
-            if (searchCount) {
-                searchCount.textContent = `(${extensions.length})`;
-            }
-
-            if (extensions.length === 0) {
-                searchList.innerHTML = `
-                    <div class="extension-empty-state">
-                        <span>"${escapeHtml(query)}" 검색 결과가 없습니다</span>
-                    </div>
-                `;
-                return;
-            }
-
-            searchList.innerHTML = extensions.map(ext => renderExtensionItem(ext, true)).join('');
-        } catch (e) {
-            searchList.innerHTML = `
-                <div class="extension-empty-state">
-                    <span>검색 중 오류가 발생했습니다</span>
-                </div>
-            `;
-        }
+        console.error('확장 검색 오류:', err);
+        searchList.innerHTML = `
+            <div class="extension-empty-state">
+                <span>검색 중 오류가 발생했습니다</span>
+            </div>
+        `;
     }
 }
 
 // 확장 상세 정보 표시 (설치된 확장)
-function showExtensionDetail(extId) {
+async function showExtensionDetail(extId) {
     // 사이드바 모든 확장 아이템 비활성화
     document.querySelectorAll('.extension-item').forEach(item => {
         item.classList.remove('active');
@@ -2283,15 +2263,24 @@ function showExtensionDetail(extId) {
         selectedItem.classList.add('active');
     }
 
-    // 메인 영역에 상세 정보 표시
-    fetch('/api/extensions')
-        .then(res => res.json())
-        .then(data => {
-            const ext = (data.extensions || []).find(e => e.id === extId);
-            if (ext) {
-                renderExtensionDetailInMain(ext, true);
-            }
-        });
+    // Electron API로 확장 정보 조회
+    try {
+        let ext = null;
+        if (window.extensionAPI && typeof window.extensionAPI.getExtension === 'function') {
+            ext = await window.extensionAPI.getExtension(extId);
+        } else {
+            // 폴백
+            const res = await fetch('/api/extensions');
+            const data = await res.json();
+            ext = (data.extensions || []).find(e => e.id === extId);
+        }
+
+        if (ext) {
+            renderExtensionDetailInMain(ext, true);
+        }
+    } catch (err) {
+        console.error('확장 정보 조회 실패:', err);
+    }
 }
 
 // 마켓플레이스 확장 상세 정보 표시
@@ -2340,13 +2329,14 @@ function renderExtensionDetailInMain(ext, isInstalled) {
     welcomeEl.style.display = 'none';
     mainEl.style.display = 'flex';
 
-    // 아이콘
+    // 아이콘 (manifest.icon 우선)
     const iconEl = document.getElementById('extDetailIcon');
     if (iconEl) {
-        if (ext.icon && !ext.icon.includes('<svg')) {
-            iconEl.innerHTML = ext.icon;
+        const iconValue = (ext.manifest && ext.manifest.icon) || ext.icon;
+        if (iconValue && !iconValue.includes('<svg')) {
+            iconEl.innerHTML = iconValue;
         } else {
-            iconEl.innerHTML = ext.icon || `
+            iconEl.innerHTML = iconValue || `
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <rect x="3" y="3" width="7" height="7" rx="1"/>
                     <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -2361,9 +2351,12 @@ function renderExtensionDetailInMain(ext, isInstalled) {
     const nameEl = document.getElementById('extDetailName');
     if (nameEl) nameEl.textContent = ext.name;
 
-    // 게시자
+    // 게시자 (manifest.publisher 우선)
     const publisherEl = document.getElementById('extDetailPublisher');
-    if (publisherEl) publisherEl.textContent = ext.author || 'Unknown';
+    if (publisherEl) {
+        const publisher = (ext.manifest && ext.manifest.publisher) || ext.author || 'Unknown';
+        publisherEl.textContent = publisher;
+    }
 
     // 버전
     const versionEl = document.getElementById('extDetailVersion');

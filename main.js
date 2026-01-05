@@ -876,8 +876,42 @@ ipcMain.handle('window-close', () => {
 // 쉘 작업: Finder/탐색기에서 항목 표시
 ipcMain.handle('shell-show-item-in-folder', (event, filePath) => {
     try {
-        shell.showItemInFolder(filePath);
-        return { success: true };
+        // 경로 정규화 (Windows에서 슬래시/백슬래시 처리)
+        const normalizedPath = path.normalize(filePath);
+
+        // 파일/폴더 존재 여부 확인
+        const fs = require('fs');
+        if (!fs.existsSync(normalizedPath)) {
+            console.error('[Shell] 경로가 존재하지 않음:', normalizedPath);
+            return { success: false, error: '경로를 찾을 수 없습니다: ' + normalizedPath };
+        }
+
+        // Windows에서 shell.showItemInFolder가 실패할 경우를 대비한 대체 로직
+        if (process.platform === 'win32') {
+            const { exec } = require('child_process');
+            const stats = fs.statSync(normalizedPath);
+
+            if (stats.isDirectory()) {
+                // 폴더인 경우: 해당 폴더를 직접 열기
+                exec(`explorer "${normalizedPath}"`, (error) => {
+                    if (error) {
+                        console.error('[Shell] explorer 실행 실패:', error);
+                    }
+                });
+            } else {
+                // 파일인 경우: /select 옵션으로 파일 선택 상태로 열기
+                exec(`explorer /select,"${normalizedPath}"`, (error) => {
+                    if (error) {
+                        console.error('[Shell] explorer /select 실행 실패:', error);
+                    }
+                });
+            }
+            return { success: true };
+        } else {
+            // macOS/Linux: 기존 shell API 사용
+            shell.showItemInFolder(normalizedPath);
+            return { success: true };
+        }
     } catch (err) {
         console.error('[Shell] showItemInFolder 실패:', err);
         return { success: false, error: err.message };

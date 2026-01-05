@@ -1171,26 +1171,58 @@ function showItemContextMenu(event, groupId, path) {
     const menu = document.createElement('div');
     menu.id = 'contextMenu';
     menu.className = 'context-menu';
+
+    // data 속성으로 경로 저장 (백슬래시 이스케이프 문제 해결)
+    menu.dataset.path = path;
+    menu.dataset.groupId = groupId;
+
     menu.innerHTML = `
-        <div class="context-menu-item" onclick="hideContextMenu(); openInExplorer('${escapeHtml(path).replace(/'/g, "\\'")}')">
+        <div class="context-menu-item" data-action="openExplorer">
             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h13zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13z"/><path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zM3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8zm0 2.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5z"/></svg>
             <span>${explorerName}</span>
         </div>
-        <div class="context-menu-item" onclick="hideContextMenu(); copyPathToClipboard('${escapeHtml(path).replace(/'/g, "\\'")}')">
+        <div class="context-menu-item" data-action="copyPath">
             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z"/><path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>
             <span>경로 복사</span>
         </div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" onclick="hideContextMenu(); moveToAnotherGroup('${groupId}', '${escapeHtml(path).replace(/'/g, "\\'")}')">
+        <div class="context-menu-item" data-action="moveGroup">
             <svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
             <span>다른 그룹으로 이동</span>
         </div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item context-menu-item-danger" onclick="hideContextMenu(); removeFromFolderGroup('${groupId}', '${escapeHtml(path).replace(/'/g, "\\'")}')">
+        <div class="context-menu-item context-menu-item-danger" data-action="removeFromGroup">
             <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
             <span>그룹에서 제거</span>
         </div>
     `;
+
+    // 이벤트 위임으로 클릭 처리
+    menu.addEventListener('click', (e) => {
+        const item = e.target.closest('[data-action]');
+        if (!item) return;
+
+        const action = item.dataset.action;
+        const menuPath = menu.dataset.path;
+        const menuGroupId = menu.dataset.groupId;
+
+        hideContextMenu();
+
+        switch (action) {
+            case 'openExplorer':
+                openInExplorer(menuPath);
+                break;
+            case 'copyPath':
+                copyPathToClipboard(menuPath);
+                break;
+            case 'moveGroup':
+                moveToAnotherGroup(menuGroupId, menuPath);
+                break;
+            case 'removeFromGroup':
+                removeFromFolderGroup(menuGroupId, menuPath);
+                break;
+        }
+    });
 
     document.body.appendChild(menu);
     positionContextMenu(menu, event);
@@ -7538,24 +7570,10 @@ function initBottomPanelTabs() {
 }
 initBottomPanelTabs();
 
-// 녹음 패널 표시 함수
+// 녹음 패널 표시 함수 (모달을 통해 녹음 시작)
 function showRecordingPanel() {
-    const bottomPanel = document.getElementById('bottomPanel');
-    const mainContent = document.querySelector('.main-content');
-    const toggleBtn = document.getElementById('toggleBottomPanelBtn');
-    const recordingTab = document.querySelector('[data-bottom-tab="recording"]');
-
-    // 하단 패널 열기
-    if (bottomPanel) {
-        bottomPanel.classList.add('open');
-        if (toggleBtn) toggleBtn.classList.add('active');
-        if (mainContent) mainContent.classList.add('with-bottom-panel');
-    }
-
-    // 녹음 탭 활성화
-    if (recordingTab) {
-        recordingTab.click();
-    }
+    // 좌측 패널과 동일하게 모달을 표시하여 제목/마이크 선택 후 녹음 시작
+    showRecordingConfirmModal();
 }
 
 // 업로드 드롭존 이벤트

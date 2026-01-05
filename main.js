@@ -894,22 +894,30 @@ ipcMain.handle('shell-show-item-in-folder', (event, filePath) => {
 
         // Windows에서 shell.showItemInFolder가 실패할 경우를 대비한 대체 로직
         if (process.platform === 'win32') {
-            const { exec } = require('child_process');
+            const { spawn } = require('child_process');
             const stats = fs.statSync(normalizedPath);
 
             if (stats.isDirectory()) {
                 // 폴더인 경우: 해당 폴더를 직접 열기
-                exec(`explorer "${normalizedPath}"`, (error) => {
-                    if (error) {
-                        console.error('[Shell] explorer 실행 실패:', error);
-                    }
+                const explorer = spawn('explorer', [normalizedPath], {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsVerbatimArguments: true
+                });
+                explorer.unref();
+                explorer.on('error', (error) => {
+                    console.error('[Shell] explorer 실행 실패:', error);
                 });
             } else {
                 // 파일인 경우: /select 옵션으로 파일 선택 상태로 열기
-                exec(`explorer /select,"${normalizedPath}"`, (error) => {
-                    if (error) {
-                        console.error('[Shell] explorer /select 실행 실패:', error);
-                    }
+                const explorer = spawn('explorer', ['/select,', normalizedPath], {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsVerbatimArguments: true
+                });
+                explorer.unref();
+                explorer.on('error', (error) => {
+                    console.error('[Shell] explorer /select 실행 실패:', error);
                 });
             }
             return { success: true };

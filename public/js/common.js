@@ -2894,39 +2894,84 @@ function renderMeetingSidebar(container) {
 
 // P2P 메신저 사이드바 (Git Control 스타일)
 function renderMessengerSidebar(container) {
+    const isConnected = messengerState.mode !== 'offline';
+    const isHost = messengerState.mode === 'host';
+    const isGuest = messengerState.mode === 'guest';
+
+    // 상태에 따른 표시 텍스트
+    let statusText = '오프라인';
+    let statusClass = 'offline';
+    if (isHost) {
+        statusText = `호스트 (포트: ${localStorage.getItem('p2pPort') || '9900'})`;
+        statusClass = 'host';
+    } else if (isGuest) {
+        statusText = '연결됨';
+        statusClass = 'online';
+    }
+
     container.innerHTML = `
         <!-- 연결 상태 헤더 -->
         <div class="server-list-header">
-            <span class="server-list-title">연결</span>
+            <span class="server-list-title">P2P 메신저</span>
             <div class="server-status-indicator" id="messengerSidebarStatus">
-                <span class="server-status-dot offline"></span>
-                <span>오프라인</span>
+                <span class="server-status-dot ${statusClass}"></span>
+                <span>${statusText}</span>
             </div>
         </div>
 
-        <!-- 서버/연결 리스트 -->
-        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
-            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
-                <span>서버 리스트</span>
-            </div>
-            <div class="sidebar-section-items" id="messengerServerList">
-                <!-- 서버 없을 때 -->
-                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
-                    저장된 서버가 없습니다
+        ${isConnected ? `
+        <!-- 현재 연결 정보 -->
+        <div class="sidebar-section p2p-active-session" style="border-bottom: 1px solid var(--border-color);">
+            <div class="p2p-session-card">
+                <div class="p2p-session-icon ${isHost ? 'host' : 'guest'}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        ${isHost ?
+                            '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' :
+                            '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+                        }
+                    </svg>
                 </div>
+                <div class="p2p-session-info">
+                    <div class="p2p-session-mode">${isHost ? '호스트 모드' : '게스트 모드'}</div>
+                    <div class="p2p-session-name">${messengerState.nickname || '나'}</div>
+                </div>
+                <button class="p2p-session-stop" onclick="${isHost ? 'stopP2PHostFromSidebar()' : 'disconnectP2PFromSidebar()'}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="6" width="12" height="12"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
-        <!-- 빠른 연결 -->
+        <!-- 접속자 목록 (연결 시 표시) -->
         <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
             <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span>빠른 연결</span>
+                <span>접속자</span>
+                <span class="tree-item-badge">${messengerState.users?.length || 0}</span>
+            </div>
+            <div class="sidebar-section-items" id="messengerUserList">
+                ${(messengerState.users && messengerState.users.length > 0) ?
+                    messengerState.users.map(user => `
+                        <div class="sidebar-user-item">
+                            <span class="user-avatar">${user.nickname?.charAt(0) || '?'}</span>
+                            <span class="user-name">${user.nickname || '알 수 없음'}</span>
+                        </div>
+                    `).join('') :
+                    '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">접속자 없음</div>'
+                }
+            </div>
+        </div>
+        ` : `
+        <!-- 빠른 연결 (오프라인 시) -->
+        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>새 연결</span>
             </div>
             <div class="sidebar-section-items">
                 <div class="server-item" onclick="startP2PHost()">
@@ -2958,36 +3003,40 @@ function renderMessengerSidebar(container) {
             </div>
         </div>
 
-        <!-- 접속자 목록 (연결 시 표시) -->
-        <div class="sidebar-section" id="messengerUserSection" style="display: none; border-bottom: 1px solid var(--border-color);">
+        <!-- 서버/연결 리스트 (오프라인 시) -->
+        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
             <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 9l6 6 6-6"/>
                 </svg>
-                <span>접속자</span>
-                <span class="tree-item-badge" id="messengerUserCount">0</span>
+                <span>저장된 서버</span>
             </div>
-            <div class="sidebar-section-items" id="messengerUserList">
-                <!-- 동적으로 채워짐 -->
+            <div class="sidebar-section-items" id="messengerServerList">
+                <!-- 서버 없을 때 -->
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    저장된 서버가 없습니다
+                </div>
             </div>
         </div>
+        `}
 
         <!-- 하단 액션 -->
         <div style="border-top: 1px solid var(--border-color); margin-top: auto;">
-            <button class="quick-action-btn" onclick="openSettingsCategory('messenger')">
+            <button class="quick-action-btn" onclick="window.p2pAPI.openDownloads()">
                 <span class="btn-label">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
                     </svg>
-                    메신저 설정
+                    다운로드 폴더
                 </span>
             </button>
         </div>
     `;
 
-    // 저장된 서버 목록 로드
-    loadMessengerServers();
+    // 오프라인일 때만 저장된 서버 목록 로드
+    if (!isConnected) {
+        loadMessengerServers();
+    }
 }
 
 // 메신저 서버 목록 로드
@@ -3034,18 +3083,301 @@ async function loadMessengerServers() {
     }
 }
 
-// 호스트 모드 시작
+// 호스트 모드 시작 모달
 function startP2PHost() {
-    // 메인 패널의 호스트 모드 탭 활성화
-    const hostModeTab = document.querySelector('.mode-tab[data-mode="host"]');
-    if (hostModeTab) hostModeTab.click();
+    showP2PModal('host');
 }
 
 // 연결 다이얼로그 표시
 function showConnectDialog() {
-    // 메인 패널의 게스트 모드 탭 활성화
-    const guestModeTab = document.querySelector('.mode-tab[data-mode="guest"]');
-    if (guestModeTab) guestModeTab.click();
+    showP2PModal('guest');
+}
+
+// P2P 모달 표시
+function showP2PModal(mode) {
+    // 기존 모달 제거
+    const existingModal = document.getElementById('p2pModal');
+    if (existingModal) existingModal.remove();
+
+    const isHost = mode === 'host';
+    const savedNickname = localStorage.getItem('p2pNickname') || (isHost ? '호스트' : '게스트');
+    const savedPort = localStorage.getItem('p2pPort') || '9900';
+
+    const modal = document.createElement('div');
+    modal.id = 'p2pModal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content p2p-modal">
+            <div class="modal-header">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; margin-right: 8px;">
+                        ${isHost ?
+                            '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' :
+                            '<path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'
+                        }
+                    </svg>
+                    ${isHost ? '호스트 서버 시작' : '서버에 연결'}
+                </h3>
+                <button class="modal-close" onclick="closeP2PModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>닉네임</label>
+                    <input type="text" id="p2pModalNickname" placeholder="이름 입력" value="${savedNickname}">
+                </div>
+                ${isHost ? `
+                    <div class="form-group">
+                        <label>포트 번호</label>
+                        <input type="number" id="p2pModalPort" placeholder="9900" value="${savedPort}" min="1024" max="65535">
+                    </div>
+                    <div class="help-text" style="margin-bottom: 16px; font-size: 11px; color: var(--text-muted);">
+                        서버를 시작하면 다른 사용자가 IP와 포트로 연결할 수 있습니다.
+                    </div>
+                ` : `
+                    <div class="form-row" style="display: flex; gap: 12px;">
+                        <div class="form-group" style="flex: 2;">
+                            <label>호스트 IP</label>
+                            <input type="text" id="p2pModalHost" placeholder="예: 192.168.1.100">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>포트</label>
+                            <input type="number" id="p2pModalPort" placeholder="9900" value="${savedPort}">
+                        </div>
+                    </div>
+                    <div class="help-text" style="margin-bottom: 16px; font-size: 11px; color: var(--text-muted);">
+                        호스트의 IP 주소와 포트 번호를 입력하세요.
+                    </div>
+                `}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeP2PModal()">취소</button>
+                <button class="btn btn-primary" onclick="confirmP2PConnection('${mode}')">
+                    ${isHost ? '서버 시작' : '연결'}
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 배경 클릭 시 닫기
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeP2PModal();
+    });
+
+    // ESC 키로 닫기
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeP2PModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // 첫 번째 입력 필드에 포커스
+    setTimeout(() => {
+        const firstInput = modal.querySelector('input');
+        if (firstInput) firstInput.focus();
+    }, 100);
+}
+
+// P2P 모달 닫기
+function closeP2PModal() {
+    const modal = document.getElementById('p2pModal');
+    if (modal) {
+        modal.classList.add('closing');
+        setTimeout(() => modal.remove(), 200);
+    }
+}
+
+// P2P 연결 확인
+async function confirmP2PConnection(mode) {
+    const nickname = document.getElementById('p2pModalNickname').value.trim();
+    const port = parseInt(document.getElementById('p2pModalPort').value) || 9900;
+
+    if (!nickname) {
+        alert('닉네임을 입력해주세요.');
+        return;
+    }
+
+    // 설정 저장
+    localStorage.setItem('p2pNickname', nickname);
+    localStorage.setItem('p2pPort', port.toString());
+
+    if (mode === 'host') {
+        await startHostFromModal(port, nickname);
+    } else {
+        const host = document.getElementById('p2pModalHost').value.trim();
+        if (!host) {
+            alert('호스트 IP를 입력해주세요.');
+            return;
+        }
+        await connectFromModal(host, port, nickname);
+    }
+
+    closeP2PModal();
+}
+
+// 모달에서 호스트 시작
+async function startHostFromModal(port, nickname) {
+    try {
+        updateMessengerSidebarStatus('connecting', '서버 시작 중...');
+        const result = await window.p2pAPI.startHost(port, nickname);
+
+        if (result.success) {
+            messengerState.mode = 'host';
+            messengerState.nickname = nickname;
+
+            updateMessengerSidebarStatus('host', `호스트 (포트: ${port})`);
+            updateMainPanelForChat('host', port, nickname);
+            updateMessengerSidebar();
+
+            addSystemMessage(`서버가 시작되었습니다. 포트: ${port}`);
+        } else {
+            throw new Error(result.error || '서버 시작 실패');
+        }
+    } catch (error) {
+        console.error('호스트 시작 실패:', error);
+        updateMessengerSidebarStatus('offline', '오프라인');
+        alert('서버 시작 실패: ' + error.message);
+    }
+}
+
+// 모달에서 서버 연결
+async function connectFromModal(host, port, nickname) {
+    try {
+        updateMessengerSidebarStatus('connecting', '연결 중...');
+        const result = await window.p2pAPI.connect(host, port, nickname);
+
+        if (result.success) {
+            messengerState.mode = 'guest';
+            messengerState.nickname = nickname;
+
+            updateMessengerSidebarStatus('online', `연결됨 (${host}:${port})`);
+            updateMainPanelForChat('guest', port, nickname, host);
+            updateMessengerSidebar();
+
+            // 서버 목록에 저장
+            saveServerToList(host, port);
+
+            addSystemMessage(`${host}:${port}에 연결되었습니다.`);
+        } else {
+            throw new Error(result.error || '연결 실패');
+        }
+    } catch (error) {
+        console.error('연결 실패:', error);
+        updateMessengerSidebarStatus('offline', '오프라인');
+        alert('연결 실패: ' + error.message);
+    }
+}
+
+// 서버 목록에 저장
+function saveServerToList(host, port) {
+    const savedServers = JSON.parse(localStorage.getItem('p2pServers') || '[]');
+    const exists = savedServers.some(s => s.address === host && s.port === port);
+    if (!exists) {
+        savedServers.unshift({ address: host, port: port, name: `${host}:${port}` });
+        if (savedServers.length > 10) savedServers.pop(); // 최대 10개
+        localStorage.setItem('p2pServers', JSON.stringify(savedServers));
+    }
+}
+
+// 사이드바 상태 업데이트
+function updateMessengerSidebarStatus(status, text) {
+    const statusEl = document.getElementById('messengerSidebarStatus');
+    if (statusEl) {
+        const dotClass = status === 'host' ? 'host' :
+                        status === 'online' ? 'online' :
+                        status === 'connecting' ? 'connecting' : 'offline';
+        statusEl.innerHTML = `
+            <span class="server-status-dot ${dotClass}"></span>
+            <span>${text}</span>
+        `;
+    }
+
+    // 메인 패널 상태 배지도 업데이트
+    updateMessengerStatus(status, text);
+}
+
+// 메인 패널을 채팅 모드로 업데이트
+function updateMainPanelForChat(mode, port, nickname, host = null) {
+    const chatArea = document.getElementById('messengerChatArea');
+    const notConnected = document.getElementById('messengerNotConnected');
+    const messengerLayout = document.getElementById('messengerLayout');
+
+    // 연결됨 클래스 추가하여 채팅 레이아웃 표시
+    if (chatArea) {
+        chatArea.classList.add('connected');
+    }
+
+    // 직접 display 조절도 추가 (CSS 클래스가 적용 안될 경우 대비)
+    if (notConnected) notConnected.style.display = 'none';
+    if (messengerLayout) messengerLayout.style.display = 'flex';
+}
+
+// 사이드바 새로고침
+function updateMessengerSidebar() {
+    const container = document.getElementById('sidebarContent');
+    const currentSection = document.querySelector('.activity-icon.active')?.dataset.section;
+    if (currentSection === 'messenger' && container) {
+        renderMessengerSidebar(container);
+    }
+}
+
+// 호스트 중지 (사이드바에서)
+async function stopP2PHostFromSidebar() {
+    try {
+        await window.p2pAPI.stopHost();
+
+        messengerState.mode = 'offline';
+        messengerState.users = [];
+
+        updateMessengerSidebarStatus('offline', '오프라인');
+        resetMainPanelToSetup();
+        updateMessengerSidebar();
+
+        addSystemMessage('서버가 중지되었습니다.');
+    } catch (error) {
+        console.error('호스트 중지 실패:', error);
+    }
+}
+
+// 연결 해제 (사이드바에서)
+async function disconnectP2PFromSidebar() {
+    try {
+        await window.p2pAPI.disconnect();
+
+        messengerState.mode = 'offline';
+        messengerState.users = [];
+
+        updateMessengerSidebarStatus('offline', '오프라인');
+        resetMainPanelToSetup();
+        updateMessengerSidebar();
+
+        addSystemMessage('연결이 해제되었습니다.');
+    } catch (error) {
+        console.error('연결 해제 실패:', error);
+    }
+}
+
+// 메인 패널을 초기 상태(연결되지 않음)로 리셋
+function resetMainPanelToSetup() {
+    const chatArea = document.getElementById('messengerChatArea');
+    const notConnected = document.getElementById('messengerNotConnected');
+    const messengerLayout = document.getElementById('messengerLayout');
+
+    // 연결됨 클래스 제거하여 플레이스홀더 표시
+    if (chatArea) {
+        chatArea.classList.remove('connected');
+    }
+
+    // 직접 display 조절도 추가
+    if (notConnected) notConnected.style.display = 'flex';
+    if (messengerLayout) messengerLayout.style.display = 'none';
 }
 
 // 서버 삭제
@@ -11528,33 +11860,10 @@ function switchMessengerMode(mode) {
     document.getElementById('guestModeContent').style.display = mode === 'guest' ? 'block' : 'none';
 }
 
-// 호스트 시작
+// 호스트 시작 (레거시 - 사이드바 모달에서 처리하므로 사용 안함)
 async function startHost() {
-    const nickname = document.getElementById('hostNickname').value.trim() || '호스트';
-    const port = parseInt(document.getElementById('hostPort').value) || 9900;
-
-    try {
-        updateMessengerStatus('connecting', '서버 시작 중...');
-        const result = await window.p2pAPI.startHost(port, nickname);
-
-        if (result.success) {
-            messengerState.mode = 'host';
-            messengerState.nickname = nickname;
-
-            updateMessengerStatus('host', `호스트 (포트: ${port})`);
-            document.getElementById('startHostBtn').style.display = 'none';
-            document.getElementById('stopHostBtn').style.display = 'inline-flex';
-            document.getElementById('messengerChatArea').style.display = 'block';
-
-            addSystemMessage(`서버가 시작되었습니다. 포트: ${port}`);
-        } else {
-            throw new Error(result.error);
-        }
-    } catch (error) {
-        console.error('호스트 시작 실패:', error);
-        updateMessengerStatus('offline', '오프라인');
-        alert('서버 시작 실패: ' + error.message);
-    }
+    // 이제 사이드바 모달에서 처리
+    console.log('startHost is deprecated. Use sidebar modal instead.');
 }
 
 // 호스트 중지
@@ -11566,54 +11875,21 @@ async function stopHost() {
         messengerState.users = [];
 
         updateMessengerStatus('offline', '오프라인');
-        document.getElementById('startHostBtn').style.display = 'inline-flex';
-        document.getElementById('stopHostBtn').style.display = 'none';
-        document.getElementById('messengerChatArea').style.display = 'none';
+        resetMainPanelToSetup();
+        updateMessengerSidebar();
 
         clearChatMessages();
         updateUsersList([]);
+        addSystemMessage('서버가 중지되었습니다.');
     } catch (error) {
         console.error('호스트 중지 실패:', error);
     }
 }
 
-// 호스트에 연결
+// 호스트에 연결 (레거시 - 사이드바 모달에서 처리하므로 사용 안함)
 async function connectToHost() {
-    const nickname = document.getElementById('guestNickname').value.trim();
-    const host = document.getElementById('hostAddress').value.trim();
-    const port = parseInt(document.getElementById('guestPort').value) || 9900;
-
-    if (!nickname) {
-        alert('닉네임을 입력해주세요.');
-        return;
-    }
-    if (!host) {
-        alert('호스트 IP를 입력해주세요.');
-        return;
-    }
-
-    try {
-        updateMessengerStatus('connecting', '연결 중...');
-        const result = await window.p2pAPI.connect(host, port, nickname);
-
-        if (result.success) {
-            messengerState.mode = 'guest';
-            messengerState.nickname = nickname;
-
-            updateMessengerStatus('online', `연결됨 (${host}:${port})`);
-            document.getElementById('connectBtn').style.display = 'none';
-            document.getElementById('disconnectBtn').style.display = 'inline-flex';
-            document.getElementById('messengerChatArea').style.display = 'block';
-
-            addSystemMessage(`${host}:${port}에 연결되었습니다.`);
-        } else {
-            throw new Error(result.error);
-        }
-    } catch (error) {
-        console.error('연결 실패:', error);
-        updateMessengerStatus('offline', '오프라인');
-        alert('연결 실패: ' + error.message);
-    }
+    // 이제 사이드바 모달에서 처리
+    console.log('connectToHost is deprecated. Use sidebar modal instead.');
 }
 
 // 연결 해제
@@ -11625,12 +11901,12 @@ async function disconnectFromHost() {
         messengerState.users = [];
 
         updateMessengerStatus('offline', '오프라인');
-        document.getElementById('connectBtn').style.display = 'inline-flex';
-        document.getElementById('disconnectBtn').style.display = 'none';
-        document.getElementById('messengerChatArea').style.display = 'none';
+        resetMainPanelToSetup();
+        updateMessengerSidebar();
 
         clearChatMessages();
         updateUsersList([]);
+        addSystemMessage('연결이 해제되었습니다.');
     } catch (error) {
         console.error('연결 해제 실패:', error);
     }
@@ -11869,9 +12145,10 @@ function setupP2PEventListeners() {
     window.p2pAPI.onDisconnected((data) => {
         console.log('연결 해제:', data);
         messengerState.mode = 'offline';
+        messengerState.users = [];
         updateMessengerStatus('offline', '연결 끊김');
-        document.getElementById('connectBtn').style.display = 'inline-flex';
-        document.getElementById('disconnectBtn').style.display = 'none';
+        resetMainPanelToSetup();
+        updateMessengerSidebar();
         addSystemMessage('연결이 끊어졌습니다: ' + (data.reason || ''));
     });
 

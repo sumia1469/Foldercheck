@@ -53,7 +53,7 @@ class P2PMessenger extends EventEmitter {
                 this.mode = 'host';
                 console.log(`[P2P] 호스트 시작: 포트 ${port}`);
                 this.emit('status', { mode: 'host', port });
-                resolve({ port });
+                resolve({ success: true, port });
             });
         });
     }
@@ -120,7 +120,7 @@ class P2PMessenger extends EventEmitter {
                 });
 
                 this.emit('status', { mode: 'guest', host, port });
-                resolve({ host, port });
+                resolve({ success: true, host, port });
             });
 
             this.clientSocket.on('data', (data) => {

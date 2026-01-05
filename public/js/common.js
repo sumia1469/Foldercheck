@@ -101,6 +101,41 @@ const InlineDownload = {
 };
 
 // DOM 요소
+
+// 재시작 버튼 표시 함수
+function showRestartButton(type) {
+    const prefix = type === 'whisper' ? 'whisper' : 'ollama';
+    const box = document.getElementById(`${prefix}DownloadProgress`);
+
+    if (box) {
+        // 기존 재시작 버튼이 있으면 제거
+        const existingBtn = box.querySelector('.restart-btn');
+        if (existingBtn) existingBtn.remove();
+
+        // 재시작 버튼 생성
+        const restartBtn = document.createElement('button');
+        restartBtn.className = 'restart-btn';
+        restartBtn.innerHTML = '🔄 앱 재시작';
+        restartBtn.style.cssText = 'margin-top: 8px; padding: 6px 12px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;';
+        restartBtn.onclick = async () => {
+            restartBtn.disabled = true;
+            restartBtn.textContent = '재시작 중...';
+            try {
+                if (window.electronAPI && window.electronAPI.relaunchApp) {
+                    await window.electronAPI.relaunchApp();
+                } else {
+                    window.location.reload();
+                }
+            } catch (e) {
+                console.error('앱 재시작 실패:', e);
+                restartBtn.disabled = false;
+                restartBtn.innerHTML = '🔄 앱 재시작';
+            }
+        };
+        box.appendChild(restartBtn);
+        box.style.display = 'block';
+    }
+}
 const folderInput = document.getElementById('folderInput');
 const addBtn = document.getElementById('addBtn');
 const folderList = document.getElementById('folderList');
@@ -3671,7 +3706,8 @@ function startOllamaProgressPolling() {
             // 설치 완료 확인
             const status = await loadAiModelStatus();
             if (status?.ready) {
-                InlineDownload.success('ollama', 'AI 모델이 설치되었습니다!');
+                InlineDownload.success('ollama', 'AI 모델이 설치되었습니다! 앱을 재시작해주세요.');
+                showRestartButton('ollama');
             } else if (progress.error) {
                 InlineDownload.error('ollama', '설치 중 오류: ' + progress.error);
                 const installBtn = document.getElementById('ollamaInstallBtn');
@@ -6790,7 +6826,8 @@ function startWhisperProgressPolling() {
 
                     // 설치 완료 확인
                     if (data.ready) {
-                        InlineDownload.success('whisper', '음성 인식이 설치되었습니다!');
+                        InlineDownload.success('whisper', '음성 인식이 설치되었습니다! 앱을 재시작해주세요.');
+                        showRestartButton('whisper');
                     } else if (data.downloadProgress?.model?.error || data.downloadProgress?.cli?.error) {
                         const modelError = data.downloadProgress?.model?.error;
                         const cliError = data.downloadProgress?.cli?.error;

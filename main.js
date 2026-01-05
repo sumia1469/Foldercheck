@@ -945,6 +945,18 @@ ipcMain.handle('clipboard-write-text', (event, text) => {
 
 // ========================================
 // Extension System IPC Handlers
+
+// 앱 재시작
+ipcMain.handle('app-relaunch', () => {
+    try {
+        app.relaunch();
+        app.exit(0);
+        return { success: true };
+    } catch (err) {
+        console.error('[App] relaunch 실패:', err);
+        return { success: false, error: err.message };
+    }
+});
 // ========================================
 
 /**

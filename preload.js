@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showItemInFolder: (path) => ipcRenderer.invoke('shell-show-item-in-folder', path),
     copyToClipboard: (text) => ipcRenderer.invoke('clipboard-write-text', text),
 
+    // 앱 재시작
+    relaunchApp: () => ipcRenderer.invoke('app-relaunch'),
+
     // Electron 환경 확인
     isElectron: true
 });

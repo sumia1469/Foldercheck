@@ -6225,8 +6225,7 @@ const ProgressBanner = {
             title = '처리 중...',
             detail = '',
             icon = '⏳',
-            type = 'ai',
-            closable = false
+            type = 'ai'
         } = options;
 
         const banner = document.createElement('div');
@@ -6252,13 +6251,11 @@ const ProgressBanner = {
                             <path d="M6 9l6 6 6-6"/>
                         </svg>
                     </button>
-                    ${closable ? `
                     <button class="progress-banner-close" onclick="ProgressBanner.hide('${id}')" title="닫기">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M18 6L6 18M6 6l12 12"/>
                         </svg>
                     </button>
-                    ` : ''}
                 </div>
             </div>
         `;
@@ -6367,21 +6364,6 @@ const ProgressBanner = {
         if (banner) {
             const iconEl = banner.querySelector('.progress-banner-icon');
             if (iconEl) iconEl.textContent = '❌';
-
-            // 닫기 버튼 추가
-            const actionsEl = banner.querySelector('.progress-banner-actions');
-            if (actionsEl && !actionsEl.querySelector('.progress-banner-close')) {
-                const closeBtn = document.createElement('button');
-                closeBtn.className = 'progress-banner-close';
-                closeBtn.title = '닫기';
-                closeBtn.onclick = () => this.hide(id);
-                closeBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                        <path d="M18 6L6 18M6 6l12 12"/>
-                    </svg>
-                `;
-                actionsEl.appendChild(closeBtn);
-            }
         }
     }
 };

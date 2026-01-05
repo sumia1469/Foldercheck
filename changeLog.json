@@ -1,1 +1,70 @@
-[]
+[
+  {
+    "timestamp": "2026-01-05T01:51:20.577Z",
+    "folder": "Z:\\2차사업\\100.타란\\02. 화면설계서\\국가공유 산출물",
+    "file": "DN25-NIA-NSDP-DP01-정보구조도(국가공유)_v1.3.xlsx",
+    "action": "수정",
+    "fullPath": "Z:\\2차사업\\100.타란\\02. 화면설계서\\국가공유 산출물\\DN25-NIA-NSDP-DP01-정보구조도(국가공유)_v1.3.xlsx",
+    "extension": ".xlsx",
+    "isFile": true,
+    "changeSummary": {
+      "type": "modified",
+      "summary": "내용 변경됨 (+1항목, -1항목)",
+      "details": {
+        "lengthDiff": -1,
+        "prevLength": 11943,
+        "currLength": 11942,
+        "added": [
+          "업데이트"
+        ],
+        "removed": [
+          "업데이트s"
+        ],
+        "addedCount": 1,
+        "removedCount": 1,
+        "fileTypeInfo": {
+          "type": "xlsx",
+          "prevSheets": 6,
+          "currSheets": 6,
+          "sheetDiff": 0,
+          "newSheets": [],
+          "removedSheets": []
+        }
+      }
+    }
+  },
+  {
+    "timestamp": "2026-01-05T01:51:13.801Z",
+    "folder": "Z:\\2차사업\\100.타란\\02. 화면설계서\\국가공유 산출물",
+    "file": "DN25-NIA-NSDP-DP01-정보구조도(국가공유)_v1.3.xlsx",
+    "action": "수정",
+    "fullPath": "Z:\\2차사업\\100.타란\\02. 화면설계서\\국가공유 산출물\\DN25-NIA-NSDP-DP01-정보구조도(국가공유)_v1.3.xlsx",
+    "extension": ".xlsx",
+    "isFile": true,
+    "changeSummary": {
+      "type": "modified",
+      "summary": "내용 변경됨 (+1항목, -1항목)",
+      "details": {
+        "lengthDiff": 1,
+        "prevLength": 11942,
+        "currLength": 11943,
+        "added": [
+          "업데이트s"
+        ],
+        "removed": [
+          "업데이트"
+        ],
+        "addedCount": 1,
+        "removedCount": 1,
+        "fileTypeInfo": {
+          "type": "xlsx",
+          "prevSheets": 6,
+          "currSheets": 6,
+          "sheetDiff": 0,
+          "newSheets": [],
+          "removedSheets": []
+        }
+      }
+    }
+  }
+]

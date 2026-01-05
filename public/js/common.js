@@ -1,5 +1,5 @@
 // ========================================
-// 인라인 다운로드 박스 유틸리티
+// 인라인 다운로드 박스 유틸리티 (ProgressBanner 연동)
 // ========================================
 const InlineDownload = {
     // type: 'whisper' 또는 'ollama'
@@ -19,6 +19,17 @@ const InlineDownload = {
         if (progressEl) progressEl.style.width = '0%';
         if (percentEl) percentEl.textContent = '0%';
         if (statusEl) statusEl.textContent = status;
+
+        // ProgressBanner 연동 (ProgressBanner가 로드된 후에만 동작)
+        if (typeof ProgressBanner !== 'undefined') {
+            const icon = type === 'whisper' ? '🎤' : '🤖';
+            ProgressBanner.show(`download_${type}`, {
+                title: title,
+                detail: status,
+                icon: icon,
+                type: 'download'
+            });
+        }
     },
 
     update(type, status, progress = 0) {
@@ -30,6 +41,11 @@ const InlineDownload = {
         if (progressEl) progressEl.style.width = `${progress}%`;
         if (percentEl) percentEl.textContent = `${Math.round(progress)}%`;
         if (statusEl) statusEl.textContent = status;
+
+        // ProgressBanner 연동
+        if (typeof ProgressBanner !== 'undefined') {
+            ProgressBanner.update(`download_${type}`, status, progress);
+        }
     },
 
     success(type, message = '완료되었습니다!') {
@@ -46,6 +62,11 @@ const InlineDownload = {
         if (percentEl) percentEl.textContent = '100%';
         if (statusEl) statusEl.textContent = message;
 
+        // ProgressBanner 연동
+        if (typeof ProgressBanner !== 'undefined') {
+            ProgressBanner.complete(`download_${type}`, message);
+        }
+
         setTimeout(() => this.hide(type), 3000);
     },
 
@@ -59,6 +80,11 @@ const InlineDownload = {
         if (titleEl) titleEl.textContent = '설치 실패';
         if (statusEl) statusEl.textContent = message;
 
+        // ProgressBanner 연동
+        if (typeof ProgressBanner !== 'undefined') {
+            ProgressBanner.error(`download_${type}`, message);
+        }
+
         setTimeout(() => this.hide(type), 5000);
     },
 
@@ -66,6 +92,11 @@ const InlineDownload = {
         const prefix = type === 'whisper' ? 'whisper' : 'ollama';
         const box = document.getElementById(`${prefix}DownloadProgress`);
         if (box) box.style.display = 'none';
+
+        // ProgressBanner 연동
+        if (typeof ProgressBanner !== 'undefined') {
+            ProgressBanner.hide(`download_${type}`);
+        }
     }
 };
 
@@ -3153,12 +3184,22 @@ async function analyzeChangeWithAI(encodedFileName, summaryData) {
 
     if (!btn) return;
 
+    const bannerId = `change_${Date.now()}`;
+
     // 버튼 비활성화 및 로딩 표시
     btn.disabled = true;
     btn.innerHTML = `
         <span class="ai-icon spinning">⏳</span>
         <span class="ai-text">분석 중...</span>
     `;
+
+    // 진행 배너 표시
+    ProgressBanner.show(bannerId, {
+        title: '✨ AI 변경 분석',
+        detail: fileName,
+        icon: '🔍',
+        type: 'ai'
+    });
 
     // 우측 패널 열기 및 로딩 표시
     const rightPanel = document.getElementById('rightPanel');
@@ -3199,6 +3240,14 @@ async function analyzeChangeWithAI(encodedFileName, summaryData) {
         `;
     }
 
+    // 진행률 시뮬레이션
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 12;
+        if (progress > 90) progress = 90;
+        ProgressBanner.update(bannerId, 'AI가 변경 내용 분석 중...', progress);
+    }, 600);
+
     try {
         const res = await fetch('/api/analyze/change', {
             method: 'POST',
@@ -3214,8 +3263,11 @@ async function analyzeChangeWithAI(encodedFileName, summaryData) {
         });
 
         const result = await res.json();
+        clearInterval(progressInterval);
 
         if (result.success && result.analysis) {
+            ProgressBanner.complete(bannerId, '분석 완료!');
+
             // 우측 패널에 분석 결과 표시
             showAIResultInPanel(encodedFileName, result.analysis);
 
@@ -3229,7 +3281,9 @@ async function analyzeChangeWithAI(encodedFileName, summaryData) {
             throw new Error(result.error || '분석에 실패했습니다.');
         }
     } catch (e) {
+        clearInterval(progressInterval);
         console.error('AI 분석 실패:', e);
+        ProgressBanner.error(bannerId, e.message);
 
         // 패널에 오류 표시
         if (panelAiInfo) {
@@ -3794,8 +3848,17 @@ async function analyzeDocument(filePath) {
 
     // 파일명 추출
     const fileName = filePath.split('/').pop().split('\\').pop();
+    const bannerId = `doc_${Date.now()}`;
 
-    // 로딩 표시
+    // 진행 배너 표시
+    ProgressBanner.show(bannerId, {
+        title: '📊 문서 분석 중',
+        detail: fileName,
+        icon: '📄',
+        type: 'document'
+    });
+
+    // 패널에도 로딩 표시
     panelAiInfo.innerHTML = `
         <div class="panel-document-analysis">
             <div class="panel-analysis-header">
@@ -3816,6 +3879,14 @@ async function analyzeDocument(filePath) {
         </div>
     `;
 
+    // 진행률 시뮬레이션
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+        ProgressBanner.update(bannerId, '문서 내용 분석 중...', progress);
+    }, 500);
+
     try {
         const res = await fetch('/api/document/analyze', {
             method: 'POST',
@@ -3824,14 +3895,19 @@ async function analyzeDocument(filePath) {
         });
 
         const result = await res.json();
+        clearInterval(progressInterval);
 
         if (result.error) {
+            ProgressBanner.error(bannerId, result.error);
             showDocumentAnalysisInPanel('error', result.error, fileName);
         } else {
+            ProgressBanner.complete(bannerId, '분석 완료!');
             showDocumentAnalysisInPanel('result', result, fileName);
         }
     } catch (e) {
+        clearInterval(progressInterval);
         console.error('문서 분석 오류:', e);
+        ProgressBanner.error(bannerId, '문서 분석 실패');
         showDocumentAnalysisInPanel('error', '문서 분석 중 오류가 발생했습니다.', fileName);
     }
 }
@@ -4976,9 +5052,15 @@ async function generateMinutesFromRecording() {
 async function handleAudioFileWithModal(file) {
     console.log('오디오 파일 처리 (모달):', file.name);
 
-    // 로딩 오버레이 표시 (화면 전체를 덮어서 다른 조작 차단)
-    showSummarizingOverlay('🎙️ 회의록 생성 중...', '녹음 파일을 분석하고 있습니다');
-    updateSummarizingOverlay('파일 업로드 중...', 5);
+    const bannerId = `audio_${Date.now()}`;
+
+    // 진행 배너 표시
+    ProgressBanner.show(bannerId, {
+        title: '🎙️ 회의록 생성',
+        detail: file.name,
+        icon: '🎤',
+        type: 'meeting'
+    });
 
     // FormData로 파일 전송
     const formData = new FormData();
@@ -4993,7 +5075,7 @@ async function handleAudioFileWithModal(file) {
                 const text = progress.detail
                     ? `${progress.stage} - ${progress.detail}`
                     : progress.stage;
-                updateSummarizingOverlay(text, progress.percent);
+                ProgressBanner.update(bannerId, text, progress.percent);
             }
         } catch (e) {
             // 폴링 실패는 무시
@@ -5001,7 +5083,7 @@ async function handleAudioFileWithModal(file) {
     }, 500);
 
     try {
-        updateSummarizingOverlay('📤 서버로 전송 중...', 10);
+        ProgressBanner.update(bannerId, '📤 서버로 전송 중...', 10);
 
         const response = await fetch('/api/meeting/transcribe', {
             method: 'POST',
@@ -5017,19 +5099,16 @@ async function handleAudioFileWithModal(file) {
         const result = await response.json();
 
         if (result.success) {
-            updateSummarizingOverlay('✅ 회의록 생성 완료!', 100);
-            setTimeout(() => {
-                hideSummarizingOverlay();
-                loadMeetings();
-                showToast('회의록이 생성되었습니다!', 'success');
-            }, 1500);
+            ProgressBanner.complete(bannerId, '회의록 생성 완료!');
+            loadMeetings();
+            showToast('회의록이 생성되었습니다!', 'success');
         } else {
             throw new Error(result.error || '알 수 없는 오류');
         }
     } catch (e) {
         clearInterval(progressInterval);
         console.error('회의록 생성 실패:', e);
-        hideSummarizingOverlay();
+        ProgressBanner.error(bannerId, e.message);
         showToast('회의록 생성에 실패했습니다: ' + e.message, 'error');
     }
 }
@@ -5660,30 +5739,222 @@ async function deleteMeeting(id) {
     }
 }
 
-// 요약 중 로딩 오버레이 표시
+// 회의록 생성 진행 배너 표시 (화면을 가리지 않는 하단 배너)
 function showSummarizingOverlay(title = '✨ AI 요약 생성 중...', detail = '회의 내용을 분석하고 있습니다') {
-    // 기존 오버레이 제거
+    // 기존 배너 제거
     hideSummarizingOverlay();
 
-    const overlay = document.createElement('div');
-    overlay.className = 'summarizing-overlay';
-    overlay.id = 'summarizingOverlay';
-    overlay.innerHTML = `
-        <div class="summarizing-spinner"></div>
-        <div class="summarizing-text">${title}</div>
-        <div class="summarizing-detail" id="summarizingDetail">${detail}</div>
-        <div class="summarizing-percent" id="summarizingPercent">0%</div>
-        <div class="summarizing-progress">
-            <div class="summarizing-progress-bar" id="summarizingProgressBar"></div>
+    const banner = document.createElement('div');
+    banner.className = 'summarizing-banner';
+    banner.id = 'summarizingOverlay';
+    banner.innerHTML = `
+        <div class="summarizing-banner-content">
+            <div class="summarizing-banner-spinner"></div>
+            <div class="summarizing-banner-info">
+                <div class="summarizing-banner-title">${title}</div>
+                <div class="summarizing-banner-detail" id="summarizingDetail">${detail}</div>
+            </div>
+            <div class="summarizing-banner-progress-container">
+                <div class="summarizing-banner-percent" id="summarizingPercent">0%</div>
+                <div class="summarizing-banner-progress">
+                    <div class="summarizing-banner-progress-bar" id="summarizingProgressBar"></div>
+                </div>
+            </div>
+            <button class="summarizing-banner-minimize" onclick="toggleSummarizingBanner()" title="최소화">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </button>
         </div>
     `;
-    document.body.appendChild(overlay);
+
+    // 스타일 추가 (한 번만)
+    if (!document.getElementById('summarizingBannerStyles')) {
+        const style = document.createElement('style');
+        style.id = 'summarizingBannerStyles';
+        style.textContent = `
+            .summarizing-banner {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: var(--bg-secondary, #1e1e1e);
+                border: 1px solid var(--border-color, #3c3c3c);
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                z-index: 9999;
+                min-width: 360px;
+                max-width: 450px;
+                overflow: hidden;
+                animation: slideInUp 0.3s ease-out;
+            }
+
+            .summarizing-banner.minimized {
+                min-width: auto;
+                max-width: 200px;
+            }
+
+            .summarizing-banner.minimized .summarizing-banner-info,
+            .summarizing-banner.minimized .summarizing-banner-progress-container {
+                display: none;
+            }
+
+            .summarizing-banner.minimized .summarizing-banner-minimize svg {
+                transform: rotate(180deg);
+            }
+
+            @keyframes slideInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .summarizing-banner-content {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px 16px;
+            }
+
+            .summarizing-banner-spinner {
+                width: 24px;
+                height: 24px;
+                border: 3px solid var(--border-color, #3c3c3c);
+                border-top-color: var(--accent-color, #0078d4);
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                flex-shrink: 0;
+            }
+
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+
+            .summarizing-banner-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .summarizing-banner-title {
+                font-weight: 600;
+                font-size: 13px;
+                color: var(--text-primary, #fff);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .summarizing-banner-detail {
+                font-size: 11px;
+                color: var(--text-secondary, #888);
+                margin-top: 2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .summarizing-banner-progress-container {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 4px;
+                min-width: 80px;
+            }
+
+            .summarizing-banner-percent {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--accent-color, #0078d4);
+            }
+
+            .summarizing-banner-progress {
+                width: 80px;
+                height: 4px;
+                background: var(--bg-tertiary, #2d2d2d);
+                border-radius: 2px;
+                overflow: hidden;
+            }
+
+            .summarizing-banner-progress-bar {
+                height: 100%;
+                background: linear-gradient(90deg, var(--accent-color, #0078d4), #00a8ff);
+                border-radius: 2px;
+                width: 0%;
+                transition: width 0.3s ease;
+            }
+
+            .summarizing-banner-minimize {
+                background: none;
+                border: none;
+                padding: 4px;
+                cursor: pointer;
+                color: var(--text-secondary, #888);
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .summarizing-banner-minimize:hover {
+                background: var(--bg-tertiary, #2d2d2d);
+                color: var(--text-primary, #fff);
+            }
+
+            .summarizing-banner-minimize svg {
+                transition: transform 0.2s ease;
+            }
+
+            /* 완료 상태 스타일 */
+            .summarizing-banner.completed {
+                border-color: #28a745;
+            }
+
+            .summarizing-banner.completed .summarizing-banner-spinner {
+                border-color: #28a745;
+                border-top-color: #28a745;
+                animation: none;
+            }
+
+            .summarizing-banner.completed .summarizing-banner-progress-bar {
+                background: linear-gradient(90deg, #28a745, #34d058);
+            }
+
+            /* 오류 상태 스타일 */
+            .summarizing-banner.error {
+                border-color: #dc3545;
+            }
+
+            .summarizing-banner.error .summarizing-banner-spinner {
+                border-color: #dc3545;
+                border-top-color: #dc3545;
+                animation: none;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(banner);
+}
+
+// 배너 최소화/확장 토글
+function toggleSummarizingBanner() {
+    const banner = document.getElementById('summarizingOverlay');
+    if (banner) {
+        banner.classList.toggle('minimized');
+    }
 }
 
 function updateSummarizingOverlay(text, percent) {
     const detail = document.getElementById('summarizingDetail');
     const progressBar = document.getElementById('summarizingProgressBar');
     const percentText = document.getElementById('summarizingPercent');
+    const banner = document.getElementById('summarizingOverlay');
+
     if (detail) detail.textContent = text;
 
     // percent가 -1이면 시간 기반 진행률 (무한 애니메이션)
@@ -5699,18 +5970,427 @@ function updateSummarizingOverlay(text, percent) {
             progressBar.style.animation = 'none';
         }
         if (percentText) percentText.textContent = `${Math.round(percent)}%`;
+
+        // 100% 완료 시 스타일 변경
+        if (percent >= 100 && banner) {
+            banner.classList.add('completed');
+        }
     }
 }
 
 function hideSummarizingOverlay() {
     const overlay = document.getElementById('summarizingOverlay');
-    if (overlay) overlay.remove();
+    if (overlay) {
+        overlay.style.animation = 'slideInUp 0.2s ease-out reverse';
+        setTimeout(() => overlay.remove(), 200);
+    }
 }
+
+// ========================================
+// 통합 진행 배너 시스템 (ProgressBanner)
+// ========================================
+// 여러 작업의 진행 상황을 동시에 표시할 수 있는 배너 시스템
+
+const ProgressBanner = {
+    banners: new Map(), // 활성 배너 저장
+
+    // 스타일 초기화 (한 번만)
+    initStyles() {
+        if (document.getElementById('progressBannerStyles')) return;
+
+        const style = document.createElement('style');
+        style.id = 'progressBannerStyles';
+        style.textContent = `
+            .progress-banner-container {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                display: flex;
+                flex-direction: column-reverse;
+                gap: 10px;
+                z-index: 9999;
+                pointer-events: none;
+            }
+
+            .progress-banner {
+                background: var(--bg-secondary, #1e1e1e);
+                border: 1px solid var(--border-color, #3c3c3c);
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                min-width: 340px;
+                max-width: 420px;
+                overflow: hidden;
+                animation: bannerSlideIn 0.3s ease-out;
+                pointer-events: auto;
+            }
+
+            .progress-banner.minimized {
+                min-width: auto;
+                max-width: 180px;
+            }
+
+            .progress-banner.minimized .progress-banner-info,
+            .progress-banner.minimized .progress-banner-progress-wrap {
+                display: none;
+            }
+
+            .progress-banner.minimized .progress-banner-minimize svg {
+                transform: rotate(180deg);
+            }
+
+            @keyframes bannerSlideIn {
+                from { opacity: 0; transform: translateX(20px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            @keyframes bannerSlideOut {
+                from { opacity: 1; transform: translateX(0); }
+                to { opacity: 0; transform: translateX(20px); }
+            }
+
+            .progress-banner-content {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 14px;
+            }
+
+            .progress-banner-icon {
+                width: 32px;
+                height: 32px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                flex-shrink: 0;
+                background: var(--bg-tertiary, #2d2d2d);
+            }
+
+            .progress-banner-icon.spinning {
+                animation: iconPulse 1.5s ease-in-out infinite;
+            }
+
+            @keyframes iconPulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
+            }
+
+            .progress-banner-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .progress-banner-title {
+                font-weight: 600;
+                font-size: 13px;
+                color: var(--text-primary, #fff);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .progress-banner-detail {
+                font-size: 11px;
+                color: var(--text-secondary, #888);
+                margin-top: 2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .progress-banner-progress-wrap {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 4px;
+                min-width: 70px;
+            }
+
+            .progress-banner-percent {
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--accent-color, #0078d4);
+            }
+
+            .progress-banner-bar {
+                width: 70px;
+                height: 4px;
+                background: var(--bg-tertiary, #2d2d2d);
+                border-radius: 2px;
+                overflow: hidden;
+            }
+
+            .progress-banner-bar-fill {
+                height: 100%;
+                background: linear-gradient(90deg, var(--accent-color, #0078d4), #00a8ff);
+                border-radius: 2px;
+                width: 0%;
+                transition: width 0.3s ease;
+            }
+
+            .progress-banner-actions {
+                display: flex;
+                gap: 4px;
+                flex-shrink: 0;
+            }
+
+            .progress-banner-minimize,
+            .progress-banner-close {
+                background: none;
+                border: none;
+                padding: 4px;
+                cursor: pointer;
+                color: var(--text-secondary, #888);
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .progress-banner-minimize:hover,
+            .progress-banner-close:hover {
+                background: var(--bg-tertiary, #2d2d2d);
+                color: var(--text-primary, #fff);
+            }
+
+            .progress-banner-minimize svg {
+                transition: transform 0.2s ease;
+            }
+
+            /* 상태별 스타일 */
+            .progress-banner.completed {
+                border-color: #28a745;
+            }
+            .progress-banner.completed .progress-banner-bar-fill {
+                background: linear-gradient(90deg, #28a745, #34d058);
+            }
+            .progress-banner.completed .progress-banner-percent {
+                color: #28a745;
+            }
+
+            .progress-banner.error {
+                border-color: #dc3545;
+            }
+            .progress-banner.error .progress-banner-bar-fill {
+                background: linear-gradient(90deg, #dc3545, #ff6b6b);
+            }
+            .progress-banner.error .progress-banner-percent {
+                color: #dc3545;
+            }
+
+            /* 타입별 아이콘 색상 */
+            .progress-banner[data-type="meeting"] .progress-banner-icon { background: rgba(0, 120, 212, 0.2); }
+            .progress-banner[data-type="document"] .progress-banner-icon { background: rgba(40, 167, 69, 0.2); }
+            .progress-banner[data-type="download"] .progress-banner-icon { background: rgba(255, 193, 7, 0.2); }
+            .progress-banner[data-type="upload"] .progress-banner-icon { background: rgba(111, 66, 193, 0.2); }
+            .progress-banner[data-type="ai"] .progress-banner-icon { background: rgba(0, 188, 212, 0.2); }
+        `;
+        document.head.appendChild(style);
+    },
+
+    // 컨테이너 생성/가져오기
+    getContainer() {
+        let container = document.getElementById('progressBannerContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'progressBannerContainer';
+            container.className = 'progress-banner-container';
+            document.body.appendChild(container);
+        }
+        return container;
+    },
+
+    /**
+     * 진행 배너 표시
+     * @param {string} id - 고유 ID
+     * @param {object} options - 옵션
+     * @param {string} options.title - 제목
+     * @param {string} options.detail - 상세 설명
+     * @param {string} options.icon - 이모지 아이콘
+     * @param {string} options.type - 타입 (meeting, document, download, upload, ai)
+     * @param {boolean} options.closable - 닫기 버튼 표시 여부
+     */
+    show(id, options = {}) {
+        this.initStyles();
+        const container = this.getContainer();
+
+        // 기존 배너가 있으면 업데이트
+        if (this.banners.has(id)) {
+            this.update(id, options.detail, options.percent || 0);
+            return;
+        }
+
+        const {
+            title = '처리 중...',
+            detail = '',
+            icon = '⏳',
+            type = 'ai',
+            closable = false
+        } = options;
+
+        const banner = document.createElement('div');
+        banner.className = 'progress-banner';
+        banner.id = `progressBanner_${id}`;
+        banner.dataset.type = type;
+        banner.innerHTML = `
+            <div class="progress-banner-content">
+                <div class="progress-banner-icon spinning">${icon}</div>
+                <div class="progress-banner-info">
+                    <div class="progress-banner-title">${title}</div>
+                    <div class="progress-banner-detail" data-detail>${detail}</div>
+                </div>
+                <div class="progress-banner-progress-wrap">
+                    <div class="progress-banner-percent" data-percent>0%</div>
+                    <div class="progress-banner-bar">
+                        <div class="progress-banner-bar-fill" data-bar></div>
+                    </div>
+                </div>
+                <div class="progress-banner-actions">
+                    <button class="progress-banner-minimize" onclick="ProgressBanner.toggle('${id}')" title="최소화">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    ${closable ? `
+                    <button class="progress-banner-close" onclick="ProgressBanner.hide('${id}')" title="닫기">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        container.appendChild(banner);
+        this.banners.set(id, banner);
+    },
+
+    /**
+     * 진행 상황 업데이트
+     */
+    update(id, detail, percent) {
+        const banner = this.banners.get(id);
+        if (!banner) return;
+
+        const detailEl = banner.querySelector('[data-detail]');
+        const percentEl = banner.querySelector('[data-percent]');
+        const barEl = banner.querySelector('[data-bar]');
+        const iconEl = banner.querySelector('.progress-banner-icon');
+
+        if (detailEl && detail !== undefined) detailEl.textContent = detail;
+
+        if (percent !== undefined && percent >= 0) {
+            if (percentEl) percentEl.textContent = `${Math.round(percent)}%`;
+            if (barEl) barEl.style.width = `${percent}%`;
+
+            if (percent >= 100) {
+                banner.classList.add('completed');
+                if (iconEl) iconEl.classList.remove('spinning');
+            }
+        }
+    },
+
+    /**
+     * 상태 변경 (completed, error)
+     */
+    setStatus(id, status) {
+        const banner = this.banners.get(id);
+        if (!banner) return;
+
+        banner.classList.remove('completed', 'error');
+        if (status) banner.classList.add(status);
+
+        const iconEl = banner.querySelector('.progress-banner-icon');
+        if (iconEl && (status === 'completed' || status === 'error')) {
+            iconEl.classList.remove('spinning');
+        }
+    },
+
+    /**
+     * 배너 최소화/확장 토글
+     */
+    toggle(id) {
+        const banner = this.banners.get(id);
+        if (banner) banner.classList.toggle('minimized');
+    },
+
+    /**
+     * 배너 숨기기
+     */
+    hide(id, delay = 0) {
+        setTimeout(() => {
+            const banner = this.banners.get(id);
+            if (banner) {
+                banner.style.animation = 'bannerSlideOut 0.2s ease-out forwards';
+                setTimeout(() => {
+                    banner.remove();
+                    this.banners.delete(id);
+
+                    // 컨테이너가 비었으면 제거
+                    const container = document.getElementById('progressBannerContainer');
+                    if (container && container.children.length === 0) {
+                        container.remove();
+                    }
+                }, 200);
+            }
+        }, delay);
+    },
+
+    /**
+     * 완료 후 자동 숨기기
+     */
+    complete(id, message = '완료!', autoHideDelay = 2000) {
+        this.update(id, message, 100);
+        this.setStatus(id, 'completed');
+
+        const banner = this.banners.get(id);
+        if (banner) {
+            const iconEl = banner.querySelector('.progress-banner-icon');
+            if (iconEl) iconEl.textContent = '✅';
+        }
+
+        if (autoHideDelay > 0) {
+            this.hide(id, autoHideDelay);
+        }
+    },
+
+    /**
+     * 오류 표시
+     */
+    error(id, message = '오류 발생') {
+        this.update(id, message, -1);
+        this.setStatus(id, 'error');
+
+        const banner = this.banners.get(id);
+        if (banner) {
+            const iconEl = banner.querySelector('.progress-banner-icon');
+            if (iconEl) iconEl.textContent = '❌';
+
+            // 닫기 버튼 추가
+            const actionsEl = banner.querySelector('.progress-banner-actions');
+            if (actionsEl && !actionsEl.querySelector('.progress-banner-close')) {
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'progress-banner-close';
+                closeBtn.title = '닫기';
+                closeBtn.onclick = () => this.hide(id);
+                closeBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                `;
+                actionsEl.appendChild(closeBtn);
+            }
+        }
+    }
+};
 
 // AI 요약 생성
 async function summarizeMeeting(meetingId) {
     const meetingEl = document.getElementById(`meeting-${meetingId}`);
     const btn = meetingEl?.querySelector('.btn-primary');
+    const bannerId = `summary_${meetingId}_${Date.now()}`;
 
     if (btn) {
         btn.disabled = true;
@@ -5719,6 +6399,14 @@ async function summarizeMeeting(meetingId) {
 
     // 우측 패널에 로딩 상태 표시
     showMeetingSummaryInPanel(meetingId, null, true);
+
+    // 진행 배너 표시
+    ProgressBanner.show(bannerId, {
+        title: '✨ AI 요약 생성',
+        detail: '회의 내용을 분석하고 있습니다',
+        icon: '🤖',
+        type: 'ai'
+    });
 
     // 진행 상황 폴링
     let progressInterval = setInterval(async () => {
@@ -5730,6 +6418,7 @@ async function summarizeMeeting(meetingId) {
                     ? `${progress.stage} - ${progress.detail}`
                     : progress.stage;
                 updatePanelProgress(text, progress.percent);
+                ProgressBanner.update(bannerId, text, progress.percent);
             }
         } catch (e) {
             // 폴링 실패는 무시
@@ -5748,6 +6437,8 @@ async function summarizeMeeting(meetingId) {
         if (!res.ok) {
             throw new Error(data.error || '요약 생성 실패');
         }
+
+        ProgressBanner.complete(bannerId, '요약 생성 완료!');
 
         // 성공 시 목록 새로고침
         await loadMeetings();
@@ -5770,6 +6461,7 @@ async function summarizeMeeting(meetingId) {
 
     } catch (e) {
         console.error('요약 오류:', e);
+        ProgressBanner.error(bannerId, e.message);
         showMeetingSummaryError(e.message);
 
         if (btn) {
@@ -6721,9 +7413,15 @@ async function deleteRecordingFile(filename) {
 async function transcribeRecording(filename) {
     if (!confirm(`이 녹음 파일로 회의록을 생성하시겠습니까?\n${filename}`)) return;
 
-    // 로딩 오버레이 표시 (화면 전체를 덮어서 다른 조작 차단)
-    showSummarizingOverlay('🎙️ 회의록 생성 중...', '녹음 파일을 분석하고 있습니다');
-    updateSummarizingOverlay('녹음 파일 로딩 중...', 5);
+    const bannerId = `transcribe_${Date.now()}`;
+
+    // 진행 배너 표시
+    ProgressBanner.show(bannerId, {
+        title: '🎙️ 회의록 생성',
+        detail: filename,
+        icon: '🎤',
+        type: 'meeting'
+    });
 
     // 진행 상황 폴링
     let progressInterval = setInterval(async () => {
@@ -6734,7 +7432,7 @@ async function transcribeRecording(filename) {
                 const text = progress.detail
                     ? `${progress.stage} - ${progress.detail}`
                     : progress.stage;
-                updateSummarizingOverlay(text, progress.percent);
+                ProgressBanner.update(bannerId, text, progress.percent);
             }
         } catch (e) {
             // 폴링 실패는 무시
@@ -6753,20 +7451,16 @@ async function transcribeRecording(filename) {
         clearInterval(progressInterval);
 
         if (result.success) {
-            updateSummarizingOverlay('완료!', 100);
-            setTimeout(() => {
-                hideSummarizingOverlay();
-                loadMeetings();
-                loadRecordings();
-            }, 1000);
+            ProgressBanner.complete(bannerId, '회의록 생성 완료!');
+            loadMeetings();
+            loadRecordings();
         } else {
             throw new Error(result.error || '회의록 생성 실패');
         }
     } catch (e) {
         clearInterval(progressInterval);
         console.error('회의록 생성 실패:', e);
-        hideSummarizingOverlay();
-        alert('회의록 생성 실패: ' + e.message);
+        ProgressBanner.error(bannerId, e.message);
     }
 }
 

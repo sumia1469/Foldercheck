@@ -1021,6 +1021,88 @@ async function initializeExtensions() {
             await extensionManager.activateByEvent(event);
         });
 
+        // ExtensionAPI에서 IPC invoke 이벤트 처리
+        extensionAPI.on('ipc:invoke', async ({ requestId, channel, args, extensionId }) => {
+            try {
+                let result;
+                // P2P 관련 채널은 직접 처리
+                switch (channel) {
+                    case 'p2p:startHost':
+                        initializeP2PMessenger();
+                        result = await p2pMessenger.startHost(args[0], args[1]);
+                        break;
+                    case 'p2p:stopHost':
+                        if (p2pMessenger) result = await p2pMessenger.stopHost();
+                        break;
+                    case 'p2p:connect':
+                        initializeP2PMessenger();
+                        result = await p2pMessenger.connect(args[0], args[1], args[2]);
+                        break;
+                    case 'p2p:disconnect':
+                        if (p2pMessenger) result = await p2pMessenger.disconnect();
+                        break;
+                    case 'p2p:sendMessage':
+                        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+                        result = p2pMessenger.sendMessage(args[0]);
+                        break;
+                    case 'p2p:sendFile':
+                        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+                        result = await p2pMessenger.sendFile(args[0]);
+                        break;
+                    case 'p2p:getStatus':
+                        result = p2pMessenger ? p2pMessenger.getStatus() :
+                            { mode: 'offline', nickname: '', port: 9900, connectedUsers: [], userCount: 0 };
+                        break;
+                    case 'p2p:getUsers':
+                        result = p2pMessenger ? p2pMessenger.getUsers() : [];
+                        break;
+                    case 'p2p:selectFile':
+                        const fileResult = await dialog.showOpenDialog(mainWindow, {
+                            properties: ['openFile'],
+                            title: '전송할 파일 선택'
+                        });
+                        result = fileResult.canceled ? null : fileResult.filePaths[0];
+                        break;
+                    case 'p2p:openDownloads':
+                        const downloadsDir = path.join(getUserDataDir(), 'p2p-downloads');
+                        if (!fs.existsSync(downloadsDir)) {
+                            fs.mkdirSync(downloadsDir, { recursive: true });
+                        }
+                        shell.openPath(downloadsDir);
+                        result = { success: true };
+                        break;
+                    case 'select-folder':
+                        const folderResult = await dialog.showOpenDialog(mainWindow, {
+                            properties: ['openDirectory'],
+                            title: '폴더 선택'
+                        });
+                        result = folderResult.canceled ? null : folderResult.filePaths[0];
+                        break;
+                    case 'select-file':
+                        const selectFileResult = await dialog.showOpenDialog(mainWindow, {
+                            properties: ['openFile'],
+                            title: '파일 선택'
+                        });
+                        result = selectFileResult.canceled ? null : selectFileResult.filePaths[0];
+                        break;
+                    case 'shell-show-item-in-folder':
+                        shell.showItemInFolder(args[0]);
+                        result = { success: true };
+                        break;
+                    case 'clipboard-write-text':
+                        clipboard.writeText(args[0]);
+                        result = { success: true };
+                        break;
+                    default:
+                        throw new Error(`알 수 없는 IPC 채널: ${channel}`);
+                }
+
+                extensionAPI.emit('ipc:response', { requestId, result });
+            } catch (err) {
+                extensionAPI.emit('ipc:response', { requestId, error: err.message });
+            }
+        });
+
         // 초기화
         await extensionManager.initialize();
 
@@ -1111,14 +1193,54 @@ ipcMain.handle('extensions:executeCommand', async (event, commandId, ...args) =>
         throw new Error(`명령어를 찾을 수 없습니다: ${commandId}`);
     }
 
-    // 확장에 명령어 실행 이벤트 전송
-    extensionHost.postToExtension(cmd.extensionId, {
-        type: 'event',
-        event: `command:${cmd.id}`,
-        data: { args }
-    });
+    // 확장에 명령어 실행 요청 전송
+    const requestId = `cmd:${Date.now()}`;
 
-    return { success: true };
+    return new Promise((resolve, reject) => {
+        // 결과 핸들러 설정
+        const resultHandler = (msg) => {
+            if (msg.type === 'command-result' && msg.requestId === requestId) {
+                extensionHost.removeListener('message', resultHandler);
+                if (msg.error) {
+                    reject(new Error(msg.error));
+                } else {
+                    resolve({ success: true, result: msg.result });
+                }
+            }
+        };
+
+        // 타임아웃
+        const timeout = setTimeout(() => {
+            extensionHost.removeListener('message', resultHandler);
+            reject(new Error('명령어 실행 타임아웃'));
+        }, 30000);
+
+        // Worker 메시지 리스너 설정
+        const workerInfo = extensionHost.workers.get(cmd.extensionId);
+        if (workerInfo && workerInfo.worker) {
+            workerInfo.worker.on('message', (msg) => {
+                if (msg.type === 'command-result' && msg.requestId === requestId) {
+                    clearTimeout(timeout);
+                    if (msg.error) {
+                        reject(new Error(msg.error));
+                    } else {
+                        resolve({ success: true, result: msg.result });
+                    }
+                }
+            });
+
+            // 명령어 실행 요청 전송
+            workerInfo.worker.postMessage({
+                type: 'command-execute',
+                requestId,
+                commandId: cmd.id,
+                args
+            });
+        } else {
+            clearTimeout(timeout);
+            reject(new Error(`확장이 활성화되지 않았습니다: ${cmd.extensionId}`));
+        }
+    });
 });
 
 // QuickPick 결과 수신
@@ -1147,59 +1269,75 @@ function initializeP2PMessenger() {
 
     p2pMessenger = new P2PMessenger();
 
+    // P2P 이벤트를 확장 시스템으로 전달하는 헬퍼 함수
+    const notifyExtensions = (channel, data) => {
+        if (extensionHost) {
+            extensionHost.broadcast({ type: 'ipc-event', channel, data });
+        }
+    };
+
     // 이벤트 리스너 설정
     p2pMessenger.on('status', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:status', data);
         }
+        notifyExtensions('p2p:status', data);
     });
 
     p2pMessenger.on('message', (msg) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:message', msg);
         }
+        notifyExtensions('p2p:message', msg);
     });
 
     p2pMessenger.on('user_joined', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:user-joined', data);
         }
+        notifyExtensions('p2p:user-joined', data);
     });
 
     p2pMessenger.on('user_left', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:user-left', data);
         }
+        notifyExtensions('p2p:user-left', data);
     });
 
     p2pMessenger.on('user_list', (users) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:user-list', users);
         }
+        notifyExtensions('p2p:user-list', users);
     });
 
     p2pMessenger.on('error', (err) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:error', err);
         }
+        notifyExtensions('p2p:error', err);
     });
 
     p2pMessenger.on('disconnected', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:disconnected', data);
         }
+        notifyExtensions('p2p:disconnected', data);
     });
 
     p2pMessenger.on('file_start', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:file-start', data);
         }
+        notifyExtensions('p2p:file-start', data);
     });
 
     p2pMessenger.on('file_progress', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:file-progress', data);
         }
+        notifyExtensions('p2p:file-progress', data);
     });
 
     p2pMessenger.on('file_received', (data) => {
@@ -1212,20 +1350,24 @@ function initializeP2PMessenger() {
         const savePath = path.join(downloadsDir, data.filename);
         fs.writeFileSync(savePath, data.data);
 
+        const eventData = {
+            filename: data.filename,
+            size: data.size,
+            from: data.from,
+            savedPath: savePath
+        };
+
         if (mainWindow) {
-            mainWindow.webContents.send('p2p:file-received', {
-                filename: data.filename,
-                size: data.size,
-                from: data.from,
-                savedPath: savePath
-            });
+            mainWindow.webContents.send('p2p:file-received', eventData);
         }
+        notifyExtensions('p2p:file-received', eventData);
     });
 
     p2pMessenger.on('file_sent', (data) => {
         if (mainWindow) {
             mainWindow.webContents.send('p2p:file-sent', data);
         }
+        notifyExtensions('p2p:file-sent', data);
     });
 
     console.log('[P2P] 메신저 시스템 초기화 완료');

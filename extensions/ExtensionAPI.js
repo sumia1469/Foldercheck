@@ -8,6 +8,7 @@
  * - docwatch.commands: 명령어 시스템
  * - docwatch.llm: AI/LLM 인터페이스
  * - docwatch.storage: 확장별 저장소
+ * - docwatch.ipc: 메인 프로세스 통신
  */
 
 const EventEmitter = require('events');
@@ -39,6 +40,12 @@ class ExtensionAPI extends EventEmitter {
 
         // 확장별 저장소 캐시
         this.storageCache = new Map();
+
+        // Activity Bar 아이템
+        this.activityBarItems = new Map();
+
+        // IPC 핸들러 (확장별)
+        this.ipcHandlers = new Map();
     }
 
     /**
@@ -99,7 +106,17 @@ class ExtensionAPI extends EventEmitter {
             'storage.get': this.storageGet,
             'storage.set': this.storageSet,
             'storage.delete': this.storageDelete,
-            'storage.getAll': this.storageGetAll
+            'storage.getAll': this.storageGetAll,
+
+            // ===== ipc 네임스페이스 =====
+            'ipc.invoke': this.ipcInvoke,
+            'ipc.on': this.ipcOn,
+            'ipc.send': this.ipcSend,
+
+            // ===== ui 추가 기능 =====
+            'ui.registerActivityBarItem': this.uiRegisterActivityBarItem,
+            'ui.removeActivityBarItem': this.uiRemoveActivityBarItem,
+            'ui.showSection': this.uiShowSection
         };
 
         return handlers[key];
@@ -428,6 +445,135 @@ class ExtensionAPI extends EventEmitter {
         } catch (err) {
             console.error(`[ExtensionAPI] 스토리지 저장 실패 (${extensionId}):`, err);
         }
+    }
+
+    // ===== IPC API =====
+
+    /**
+     * 메인 프로세스의 IPC 핸들러 호출
+     */
+    async ipcInvoke(extensionId, channel, ...args) {
+        // 허용된 채널만 호출 가능
+        const allowedChannels = [
+            'p2p:startHost', 'p2p:stopHost', 'p2p:connect', 'p2p:disconnect',
+            'p2p:sendMessage', 'p2p:sendFile', 'p2p:getStatus', 'p2p:selectFile',
+            'p2p:openDownloads', 'p2p:getUsers',
+            'shell-show-item-in-folder', 'clipboard-write-text',
+            'select-folder', 'select-file'
+        ];
+
+        if (!allowedChannels.includes(channel)) {
+            throw new Error(`허용되지 않은 IPC 채널: ${channel}`);
+        }
+
+        // IPC 핸들러가 등록되어 있는지 확인하고 호출
+        if (this.ipcHandlers.has(channel)) {
+            const handler = this.ipcHandlers.get(channel);
+            return await handler(...args);
+        }
+
+        // 이벤트로 전달하여 main.js에서 처리
+        return new Promise((resolve, reject) => {
+            const requestId = `${channel}:${Date.now()}`;
+
+            const responseHandler = (response) => {
+                if (response.requestId === requestId) {
+                    this.removeListener('ipc:response', responseHandler);
+                    if (response.error) {
+                        reject(new Error(response.error));
+                    } else {
+                        resolve(response.result);
+                    }
+                }
+            };
+
+            this.on('ipc:response', responseHandler);
+            this.emit('ipc:invoke', { requestId, channel, args, extensionId });
+
+            // 30초 타임아웃
+            setTimeout(() => {
+                this.removeListener('ipc:response', responseHandler);
+                reject(new Error(`IPC 요청 타임아웃: ${channel}`));
+            }, 30000);
+        });
+    }
+
+    /**
+     * IPC 이벤트 리스너 등록
+     */
+    ipcOn(extensionId, channel, callback) {
+        const hookId = `${extensionId}:ipc:${channel}:${Date.now()}`;
+        // 이벤트 핸들러 저장
+        this.on(`ipc:event:${channel}`, callback);
+        console.log(`[ExtensionAPI] IPC 리스너 등록: ${extensionId} -> ${channel}`);
+        return { hookId };
+    }
+
+    /**
+     * IPC 메시지 전송 (fire-and-forget)
+     */
+    ipcSend(extensionId, channel, ...args) {
+        this.emit('ipc:send', { channel, args, extensionId });
+        return { success: true };
+    }
+
+    /**
+     * IPC 핸들러 등록 (main.js에서 호출)
+     */
+    registerIpcHandler(channel, handler) {
+        this.ipcHandlers.set(channel, handler);
+    }
+
+    // ===== UI 추가 API =====
+
+    /**
+     * Activity Bar 아이템 등록
+     */
+    uiRegisterActivityBarItem(extensionId, options = {}) {
+        const id = options.id || `${extensionId}.activity.${Date.now()}`;
+        const fullId = `${extensionId}.${id}`;
+
+        this.activityBarItems.set(fullId, {
+            extensionId,
+            id,
+            icon: options.icon || '📦',
+            title: options.title || extensionId,
+            section: options.section || id,
+            order: options.order || 100
+        });
+
+        // 렌더러에 알림
+        this.notifyRenderer('extension:activitybar-add', {
+            id: fullId,
+            icon: options.icon,
+            title: options.title,
+            section: options.section
+        });
+
+        console.log(`[ExtensionAPI] Activity Bar 아이템 등록: ${fullId}`);
+        return { itemId: fullId };
+    }
+
+    /**
+     * Activity Bar 아이템 제거
+     */
+    uiRemoveActivityBarItem(extensionId, itemId) {
+        if (this.activityBarItems.has(itemId)) {
+            this.activityBarItems.delete(itemId);
+            this.notifyRenderer('extension:activitybar-remove', { id: itemId });
+        }
+        return { success: true };
+    }
+
+    /**
+     * 특정 섹션으로 이동
+     */
+    uiShowSection(extensionId, sectionId, options = {}) {
+        this.notifyRenderer('extension:show-section', {
+            sectionId,
+            ...options
+        });
+        return { success: true };
     }
 
     // ===== 헬퍼 메서드 =====

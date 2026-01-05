@@ -57,14 +57,178 @@ function createApiProxy() {
         });
     };
 
+    // IPC 이벤트 리스너
+    const ipcListeners = new Map();
+
+    // 명령어 핸들러
+    const commandHandlers = new Map();
+
     // docwatch.* API 네임스페이스
     return {
         files: createNamespaceProxy('files'),
         meetings: createNamespaceProxy('meetings'),
         ui: createNamespaceProxy('ui'),
-        commands: createNamespaceProxy('commands'),
         llm: createNamespaceProxy('llm'),
         storage: createNamespaceProxy('storage'),
+
+        // Commands 네임스페이스 (로컬 핸들러 지원)
+        commands: {
+            register: (commandId, handler, options = {}) => {
+                // 로컬에 핸들러 저장
+                commandHandlers.set(commandId, handler);
+
+                // Host에 명령어 등록 알림
+                return new Promise((resolve, reject) => {
+                    const id = callId++;
+                    pendingCalls.set(id, { resolve, reject });
+
+                    parentPort.postMessage({
+                        type: 'api-call',
+                        callId: id,
+                        namespace: 'commands',
+                        method: 'register',
+                        args: [commandId, options]
+                    });
+
+                    setTimeout(() => {
+                        if (pendingCalls.has(id)) {
+                            pendingCalls.delete(id);
+                            reject(new Error(`명령어 등록 타임아웃: ${commandId}`));
+                        }
+                    }, 30000);
+                });
+            },
+            execute: (commandId, ...args) => {
+                return new Promise((resolve, reject) => {
+                    const id = callId++;
+                    pendingCalls.set(id, { resolve, reject });
+
+                    parentPort.postMessage({
+                        type: 'api-call',
+                        callId: id,
+                        namespace: 'commands',
+                        method: 'execute',
+                        args: [commandId, ...args]
+                    });
+
+                    setTimeout(() => {
+                        if (pendingCalls.has(id)) {
+                            pendingCalls.delete(id);
+                            reject(new Error(`명령어 실행 타임아웃: ${commandId}`));
+                        }
+                    }, 30000);
+                });
+            },
+            getAll: () => {
+                return new Promise((resolve, reject) => {
+                    const id = callId++;
+                    pendingCalls.set(id, { resolve, reject });
+
+                    parentPort.postMessage({
+                        type: 'api-call',
+                        callId: id,
+                        namespace: 'commands',
+                        method: 'getAll',
+                        args: []
+                    });
+
+                    setTimeout(() => {
+                        if (pendingCalls.has(id)) {
+                            pendingCalls.delete(id);
+                            reject(new Error('명령어 목록 조회 타임아웃'));
+                        }
+                    }, 30000);
+                });
+            },
+            // 내부 사용: 명령어 실행 이벤트 처리
+            _executeHandler: async (commandId, args) => {
+                const handler = commandHandlers.get(commandId);
+                if (handler) {
+                    try {
+                        return await handler(...(args || []));
+                    } catch (e) {
+                        console.error(`Command handler error (${commandId}):`, e);
+                        throw e;
+                    }
+                } else {
+                    throw new Error(`Unknown command: ${commandId}`);
+                }
+            }
+        },
+
+        // IPC 네임스페이스 (직접 구현)
+        ipc: {
+            invoke: (channel, ...args) => {
+                return new Promise((resolve, reject) => {
+                    const id = callId++;
+                    pendingCalls.set(id, { resolve, reject });
+
+                    parentPort.postMessage({
+                        type: 'api-call',
+                        callId: id,
+                        namespace: 'ipc',
+                        method: 'invoke',
+                        args: [channel, ...args]
+                    });
+
+                    setTimeout(() => {
+                        if (pendingCalls.has(id)) {
+                            pendingCalls.delete(id);
+                            reject(new Error(`IPC 호출 타임아웃: ${channel}`));
+                        }
+                    }, 30000);
+                });
+            },
+            on: (channel, callback) => {
+                // 로컬에 리스너 저장
+                if (!ipcListeners.has(channel)) {
+                    ipcListeners.set(channel, []);
+                }
+                ipcListeners.get(channel).push(callback);
+
+                // ExtensionHost에 등록 요청
+                parentPort.postMessage({
+                    type: 'api-call',
+                    callId: callId++,
+                    namespace: 'ipc',
+                    method: 'on',
+                    args: [channel]
+                });
+
+                // 정리 함수 반환
+                return () => {
+                    const listeners = ipcListeners.get(channel);
+                    if (listeners) {
+                        const index = listeners.indexOf(callback);
+                        if (index > -1) {
+                            listeners.splice(index, 1);
+                        }
+                    }
+                };
+            },
+            send: (channel, ...args) => {
+                parentPort.postMessage({
+                    type: 'api-call',
+                    callId: callId++,
+                    namespace: 'ipc',
+                    method: 'send',
+                    args: [channel, ...args]
+                });
+            },
+            // 내부 사용: IPC 이벤트 발생 시 호출
+            _triggerListeners: (channel, data) => {
+                const listeners = ipcListeners.get(channel);
+                if (listeners) {
+                    for (const listener of listeners) {
+                        try {
+                            listener(data);
+                        } catch (e) {
+                            console.error(`IPC listener error (${channel}):`, e);
+                        }
+                    }
+                }
+            }
+        },
 
         // 확장 컨텍스트
         context: {
@@ -305,6 +469,37 @@ parentPort.on('message', async (msg) => {
                     extensionModule.onEvent(msg.event, msg.data);
                 } catch (err) {
                     console.error('이벤트 핸들러 에러:', err);
+                }
+            }
+            break;
+
+        case 'ipc-event':
+            // IPC 이벤트 전달
+            if (docwatchApi && docwatchApi.ipc && docwatchApi.ipc._triggerListeners) {
+                try {
+                    docwatchApi.ipc._triggerListeners(msg.channel, msg.data);
+                } catch (err) {
+                    console.error('IPC 이벤트 핸들러 에러:', err);
+                }
+            }
+            break;
+
+        case 'command-execute':
+            // 명령어 실행
+            if (docwatchApi && docwatchApi.commands && docwatchApi.commands._executeHandler) {
+                try {
+                    const result = await docwatchApi.commands._executeHandler(msg.commandId, msg.args);
+                    parentPort.postMessage({
+                        type: 'command-result',
+                        requestId: msg.requestId,
+                        result
+                    });
+                } catch (err) {
+                    parentPort.postMessage({
+                        type: 'command-result',
+                        requestId: msg.requestId,
+                        error: err.message
+                    });
                 }
             }
             break;

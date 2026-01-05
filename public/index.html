@@ -1147,11 +1147,19 @@
                 </div>
             </section>
 
-            <!-- P2P 메신저 섹션 -->
-            <section id="messenger" class="content-section">
+            <!-- P2P 메신저 섹션 (확장에서 제공) -->
+            <section id="messenger" class="content-section" data-extension-id="p2p-messenger" data-extension-enabled="true">
                 <div class="section-header">
                     <h1>P2P 메신저</h1>
                     <div class="header-actions">
+                        <span class="extension-badge" title="확장에서 제공">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                            </svg>
+                        </span>
                         <span class="messenger-status-badge" id="messengerStatusBadge">
                             <span class="status-dot offline"></span>
                             <span class="status-text">오프라인</span>
@@ -1159,7 +1167,26 @@
                     </div>
                 </div>
 
-                <!-- 연결 설정 카드 -->
+                <!-- 확장 비활성화 시 표시되는 안내 -->
+                <div class="extension-disabled-notice" id="messengerDisabledNotice" style="display: none;">
+                    <div class="notice-content">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1" stroke-dasharray="2 2"/>
+                        </svg>
+                        <h3>P2P 메신저 확장이 비활성화되어 있습니다</h3>
+                        <p>이 기능을 사용하려면 확장을 활성화해주세요.</p>
+                        <button class="btn btn-primary" onclick="showSection('extensions')">
+                            확장 관리로 이동
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 메신저 UI (확장 활성화 시 표시) -->
+                <div class="messenger-content" id="messengerContent">
+                    <!-- 연결 설정 카드 -->
                 <div class="settings-card messenger-connection-card" id="messengerConnectionCard">
                     <h3>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;">
@@ -1347,6 +1374,7 @@
                         * 폐쇄망 환경에서 동일 네트워크 내의 PC 간 통신만 가능합니다.
                     </p>
                 </div>
+                </div><!-- /messenger-content -->
             </section>
 
             <!-- 확장 관리 섹션 -->

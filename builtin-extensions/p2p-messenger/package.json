@@ -15,6 +15,22 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "activityBar": [
+      {
+        "id": "messenger",
+        "icon": "💬",
+        "title": "P2P 메신저",
+        "section": "messenger"
+      }
+    ],
+    "sections": [
+      {
+        "id": "messenger",
+        "title": "P2P 메신저",
+        "icon": "💬",
+        "webview": "src/webview.html"
+      }
+    ],
     "commands": [
       {
         "command": "p2pMessenger.startHost",
@@ -42,8 +58,23 @@
         "category": "P2P 메신저"
       },
       {
+        "command": "p2pMessenger.sendMessage",
+        "title": "메시지 전송",
+        "category": "P2P 메신저"
+      },
+      {
+        "command": "p2pMessenger.showStatus",
+        "title": "상태 표시",
+        "category": "P2P 메신저"
+      },
+      {
         "command": "p2pMessenger.openSettings",
         "title": "설정 열기",
+        "category": "P2P 메신저"
+      },
+      {
+        "command": "p2pMessenger.openDownloads",
+        "title": "다운로드 폴더 열기",
         "category": "P2P 메신저"
       }
     ],
@@ -52,7 +83,8 @@
         "id": "p2pMessenger.status",
         "text": "💬 P2P: 오프라인",
         "tooltip": "P2P 메신저 상태",
-        "position": "right"
+        "position": "right",
+        "command": "p2pMessenger.showStatus"
       }
     ],
     "configuration": {
@@ -90,6 +122,8 @@
     "ui:notifications",
     "ui:quickPick",
     "ui:inputBox",
+    "ui:activityBar",
+    "ui:sections",
     "commands",
     "storage"
   ],

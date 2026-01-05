@@ -10231,3 +10231,77 @@ body.resizing-bottom-panel * {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ========================================
+   확장 제공 섹션 스타일
+   ======================================== */
+
+/* 확장 배지 (섹션 헤더에 표시) */
+.extension-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    margin-right: 8px;
+}
+
+.extension-badge svg {
+    opacity: 0.6;
+}
+
+/* 확장 비활성화 안내 */
+.extension-disabled-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.extension-disabled-notice .notice-content {
+    max-width: 400px;
+}
+
+.extension-disabled-notice h3 {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.extension-disabled-notice p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.extension-disabled-notice svg {
+    color: var(--text-secondary);
+}
+
+/* 확장에서 제공하는 섹션 */
+[data-extension-enabled="false"] .messenger-content {
+    display: none !important;
+}
+
+[data-extension-enabled="false"] .extension-disabled-notice {
+    display: flex !important;
+}
+
+[data-extension-enabled="true"] .messenger-content {
+    display: block;
+}
+
+[data-extension-enabled="true"] .extension-disabled-notice {
+    display: none !important;
+}
+
+/* 비활성화된 사이드바 아이콘 */
+.activity-icon.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}

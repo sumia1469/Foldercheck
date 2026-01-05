@@ -10150,6 +10150,19 @@ async function updateExtensionMenus() {
             if (contributes.configuration) {
                 addExtensionSettingsCategory(ext);
             }
+
+            // 사이드바 섹션 등록 (확장에서 제공하는 경우)
+            if (ext.id === 'p2p-messenger') {
+                enableMessengerSection(true);
+            }
+        }
+
+        // 비활성화된 확장의 UI 숨기기
+        const inactiveExtensions = extensions.filter(e => e.state !== 'active');
+        for (const ext of inactiveExtensions) {
+            if (ext.id === 'p2p-messenger') {
+                enableMessengerSection(false);
+            }
         }
 
         // 설치된 확장 수 업데이트
@@ -10160,6 +10173,36 @@ async function updateExtensionMenus() {
 
     } catch (err) {
         console.error('확장 메뉴 업데이트 실패:', err);
+    }
+}
+
+// 메신저 섹션 활성화/비활성화
+function enableMessengerSection(enable) {
+    const messengerIcon = document.querySelector('[data-section="messenger"]');
+    const messengerSection = document.getElementById('messenger');
+
+    if (enable) {
+        // 활성화: 아이콘과 섹션 표시
+        if (messengerIcon) {
+            messengerIcon.style.display = '';
+            messengerIcon.classList.remove('disabled');
+        }
+        if (messengerSection) {
+            messengerSection.dataset.extensionEnabled = 'true';
+        }
+    } else {
+        // 비활성화: 아이콘 숨기기
+        if (messengerIcon) {
+            messengerIcon.style.display = 'none';
+        }
+        if (messengerSection) {
+            messengerSection.dataset.extensionEnabled = 'false';
+        }
+        // 현재 메신저 섹션이 활성화되어 있으면 대시보드로 전환
+        const activeSection = document.querySelector('.content-section.active');
+        if (activeSection && activeSection.id === 'messenger') {
+            showSection('dashboard');
+        }
     }
 }
 

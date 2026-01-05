@@ -14,6 +14,7 @@ dist-ssr
 
 # Large AI model files
 models/*.bin
+data/models/*.bin
 
 # Whisper CLI binaries (음성인식 바이너리)
 bin/

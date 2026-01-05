@@ -102,40 +102,6 @@ const InlineDownload = {
 
 // DOM 요소
 
-// 재시작 버튼 표시 함수
-function showRestartButton(type) {
-    const prefix = type === 'whisper' ? 'whisper' : 'ollama';
-    const box = document.getElementById(`${prefix}DownloadProgress`);
-
-    if (box) {
-        // 기존 재시작 버튼이 있으면 제거
-        const existingBtn = box.querySelector('.restart-btn');
-        if (existingBtn) existingBtn.remove();
-
-        // 재시작 버튼 생성
-        const restartBtn = document.createElement('button');
-        restartBtn.className = 'restart-btn';
-        restartBtn.innerHTML = '🔄 앱 재시작';
-        restartBtn.style.cssText = 'margin-top: 8px; padding: 6px 12px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;';
-        restartBtn.onclick = async () => {
-            restartBtn.disabled = true;
-            restartBtn.textContent = '재시작 중...';
-            try {
-                if (window.electronAPI && window.electronAPI.relaunchApp) {
-                    await window.electronAPI.relaunchApp();
-                } else {
-                    window.location.reload();
-                }
-            } catch (e) {
-                console.error('앱 재시작 실패:', e);
-                restartBtn.disabled = false;
-                restartBtn.innerHTML = '🔄 앱 재시작';
-            }
-        };
-        box.appendChild(restartBtn);
-        box.style.display = 'block';
-    }
-}
 const folderInput = document.getElementById('folderInput');
 const addBtn = document.getElementById('addBtn');
 const folderList = document.getElementById('folderList');
@@ -10463,3 +10429,53 @@ document.addEventListener('DOMContentLoaded', () => {
         loadTelegramSettings();
     }, 500);
 });
+
+// ========================================
+// 재시작 모달 함수
+// ========================================
+
+// 재시작 모달 표시 함수
+function showRestartButton(type) {
+    const modal = document.getElementById('restartModal');
+    const messageEl = document.getElementById('restartModalMessage');
+
+    if (modal) {
+        const messages = {
+            'whisper': '음성 인식이 설치되었습니다. 앱을 재시작해야 적용됩니다.',
+            'ollama': 'AI 모델이 설치되었습니다. 앱을 재시작해야 적용됩니다.'
+        };
+
+        if (messageEl) {
+            messageEl.textContent = messages[type] || '설치가 완료되었습니다. 앱을 재시작해야 적용됩니다.';
+        }
+
+        modal.style.display = 'flex';
+    }
+}
+
+// 재시작 모달 닫기
+function closeRestartModal() {
+    const modal = document.getElementById('restartModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// 앱 재시작
+async function restartApp() {
+    const modal = document.getElementById('restartModal');
+    const buttons = modal?.querySelectorAll('.btn');
+
+    buttons?.forEach(btn => btn.disabled = true);
+
+    try {
+        if (window.electronAPI && window.electronAPI.relaunchApp) {
+            await window.electronAPI.relaunchApp();
+        } else {
+            window.location.reload();
+        }
+    } catch (e) {
+        console.error('앱 재시작 실패:', e);
+        buttons?.forEach(btn => btn.disabled = false);
+    }
+}

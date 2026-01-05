@@ -9855,3 +9855,73 @@ body.resizing-bottom-panel * {
     width: 14px;
     height: 14px;
 }
+
+/* ===== 재시작 모달 ===== */
+.restart-modal {
+    width: 360px;
+    padding: 30px;
+    text-align: center;
+}
+
+.restart-modal-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.restart-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+}
+
+.restart-modal-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 24px 0;
+    line-height: 1.5;
+}
+
+.restart-modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.restart-modal-buttons .btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.restart-modal-buttons .btn-secondary {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.restart-modal-buttons .btn-secondary:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.restart-modal-buttons .btn-primary {
+    background: var(--primary-color);
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.restart-modal-buttons .btn-primary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.restart-btn-icon {
+    font-size: 14px;
+}

@@ -51,8 +51,11 @@ class P2PMessenger extends EventEmitter {
 
             this.server.listen(port, '0.0.0.0', () => {
                 this.mode = 'host';
+                // 호스트 자신을 사용자 목록에 추가
+                this.users.set('host', { nickname: this.nickname, isHost: true });
                 console.log(`[P2P] 호스트 시작: 포트 ${port}`);
                 this.emit('status', { mode: 'host', port });
+                this.emit('user_list', this.getUsers());
                 resolve({ success: true, port });
             });
         });
@@ -359,6 +362,13 @@ class P2PMessenger extends EventEmitter {
                 };
                 this._broadcast(leaveMsg);
                 this.emit('user_left', { nickname: user.nickname });
+
+                // 호스트에게 업데이트된 사용자 목록 알림
+                const userList = Array.from(this.users.values()).map(u => ({
+                    nickname: u.nickname,
+                    isHost: u.isHost || false
+                }));
+                this.emit('user_list', userList);
             }
 
             console.log(`[P2P] 클라이언트 연결 종료: ${clientId}`);
@@ -393,14 +403,19 @@ class P2PMessenger extends EventEmitter {
                 this.emit('message', joinMsg);
                 this.emit('user_joined', { nickname: msg.nickname });
 
-                // 사용자 목록 전송
+                // 사용자 목록 전송 (호스트 포함)
+                const userList = Array.from(this.users.values()).map(u => ({
+                    nickname: u.nickname,
+                    isHost: u.isHost || false
+                }));
                 this._sendToClient(clientId, {
                     type: 'user_list',
-                    users: Array.from(this.users.values()).map(u => ({
-                        nickname: u.nickname
-                    })),
+                    users: userList,
                     hostNickname: this.nickname
                 });
+
+                // 호스트에게도 업데이트된 사용자 목록 알림
+                this.emit('user_list', userList);
                 break;
 
             case 'leave':

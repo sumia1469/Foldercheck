@@ -1,106 +1,117 @@
-/**
- * SVG를 PNG 및 ICO 아이콘으로 변환하는 스크립트
- *
- * 사용법: node scripts/generate-icons.js
- * 필요 패키지: npm install sharp png-to-ico
- */
-
+const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
+const { default: pngToIco } = require('png-to-ico');
+
+const SVG_PATH = path.join(__dirname, '../public/assets/images/logo.svg');
+const BUILD_ICONS_DIR = path.join(__dirname, '../build/icons');
+const ICONSET_DIR = path.join(__dirname, '../build/icon.iconset');
+
+// Mac 앱 아이콘에 필요한 크기들
+const ICON_SIZES = [16, 32, 48, 64, 128, 256, 512, 1024];
+
+// Windows ICO에 필요한 크기들
+const ICO_SIZES = [16, 32, 48, 64, 128, 256];
+
+// iconset에 필요한 크기들 (Mac)
+const ICONSET_SIZES = [
+    { size: 16, suffix: '16x16' },
+    { size: 32, suffix: '16x16@2x' },
+    { size: 32, suffix: '32x32' },
+    { size: 64, suffix: '32x32@2x' },
+    { size: 128, suffix: '128x128' },
+    { size: 256, suffix: '128x128@2x' },
+    { size: 256, suffix: '256x256' },
+    { size: 512, suffix: '256x256@2x' },
+    { size: 512, suffix: '512x512' },
+    { size: 1024, suffix: '512x512@2x' }
+];
 
 async function generateIcons() {
-    try {
-        // sharp 모듈 동적 로드
-        let sharp;
-        try {
-            sharp = require('sharp');
-        } catch (e) {
-            console.log('sharp 패키지가 설치되어 있지 않습니다.');
-            console.log('설치 명령: npm install sharp png-to-ico');
-            process.exit(1);
-        }
+    console.log('아이콘 생성 시작...');
 
-        const inputSvg = path.join(__dirname, '../public/assets/images/logo.svg');
-        const outputDir = path.join(__dirname, '..', 'build', 'icons');
-
-        // 출력 디렉토리 생성
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        // SVG 파일 읽기 및 색상 변경 (검정 → 초록색 톤앤매너)
-        let svgContent = fs.readFileSync(inputSvg, 'utf8');
-        // #000000 (검정색)을 #10b981 (앱 강조 색상)으로 변경
-        svgContent = svgContent.replace(/fill:#000000/g, 'fill:#10b981');
-        svgContent = svgContent.replace(/fill="#000000"/g, 'fill="#10b981"');
-        // viewBox 조정하여 아이콘이 더 크게 보이도록 (여백 줄임)
-        // 원본: 0.00 0.00 736.00 520.00 → 조정: 80 60 576 400 (여백 약 10% 정도만 남김)
-        svgContent = svgContent.replace(
-            /viewBox="0\.00 0\.00 736\.00 520\.00"/,
-            'viewBox="80 60 576 400"'
-        );
-        const svgBuffer = Buffer.from(svgContent);
-
-        // 다양한 크기의 PNG 생성
-        const sizes = [16, 32, 48, 64, 128, 256, 512];
-        const pngFiles = [];
-
-        console.log('PNG 아이콘 생성 중...');
-
-        for (const size of sizes) {
-            const outputPath = path.join(outputDir, `icon-${size}.png`);
-            await sharp(svgBuffer)
-                .resize(size, size)
-                .png()
-                .toFile(outputPath);
-            console.log(`  ✓ icon-${size}.png 생성됨`);
-            pngFiles.push(outputPath);
-        }
-
-        // 메인 아이콘 (256x256)
-        const mainIconPath = path.join(outputDir, 'icon.png');
-        await sharp(svgBuffer)
-            .resize(256, 256)
-            .png()
-            .toFile(mainIconPath);
-        console.log('  ✓ icon.png (256x256) 생성됨');
-
-        // ICO 파일 생성 (Windows용)
-        try {
-            const pngToIcoModule = require('png-to-ico');
-            // png-to-ico v3.x는 default export 사용
-            const pngToIco = pngToIcoModule.default || pngToIcoModule;
-            const pngFilePaths = [
-                path.join(outputDir, 'icon-16.png'),
-                path.join(outputDir, 'icon-32.png'),
-                path.join(outputDir, 'icon-48.png'),
-                path.join(outputDir, 'icon-256.png')
-            ];
-            const icoBuffer = await pngToIco(pngFilePaths);
-            fs.writeFileSync(path.join(outputDir, 'icon.ico'), icoBuffer);
-            console.log('  ✓ icon.ico 생성됨');
-        } catch (e) {
-            console.log('  ⚠ ICO 생성 실패:', e.message);
-        }
-
-        // 임시 PNG 파일들 삭제 (선택적)
-        // sizes.forEach(size => {
-        //     fs.unlinkSync(path.join(outputDir, `icon-${size}.png`));
-        // });
-
-        // macOS용 icns 파일 생성 안내
-        console.log('\n아이콘 생성 완료!');
-        console.log('생성된 파일 (build/icons/):');
-        console.log('  - icon.png (메인 PNG 아이콘)');
-        console.log('  - icon.ico (Windows 아이콘)');
-        console.log('  - icon-*.png (다양한 크기)');
-        console.log('\nmacOS용 icns 파일 생성 (macOS에서만 가능):');
-        console.log('  1. iconutil 사용: mkdir icon.iconset && cp build/icons/icon-*.png icon.iconset/ && iconutil -c icns icon.iconset');
-
-    } catch (error) {
-        console.error('아이콘 생성 실패:', error);
-        process.exit(1);
+    // 디렉토리 생성
+    if (!fs.existsSync(BUILD_ICONS_DIR)) {
+        fs.mkdirSync(BUILD_ICONS_DIR, { recursive: true });
     }
+    if (!fs.existsSync(ICONSET_DIR)) {
+        fs.mkdirSync(ICONSET_DIR, { recursive: true });
+    }
+
+    // SVG 파일 읽기
+    const svgBuffer = fs.readFileSync(SVG_PATH);
+
+    // 일반 아이콘 생성
+    console.log('PNG 아이콘 생성 중...');
+    for (const size of ICON_SIZES) {
+        const outputPath = path.join(BUILD_ICONS_DIR, `icon-${size}.png`);
+        await sharp(svgBuffer)
+            .resize(size, size, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .png()
+            .toFile(outputPath);
+        console.log(`  생성됨: icon-${size}.png`);
+    }
+
+    // 기본 icon.png (256x256)
+    await sharp(svgBuffer)
+        .resize(256, 256, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .png()
+        .toFile(path.join(BUILD_ICONS_DIR, 'icon.png'));
+    console.log('  생성됨: icon.png');
+
+    // Mac iconset 생성
+    console.log('Mac iconset 생성 중...');
+    for (const { size, suffix } of ICONSET_SIZES) {
+        const outputPath = path.join(ICONSET_DIR, `icon_${suffix}.png`);
+        await sharp(svgBuffer)
+            .resize(size, size, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .png()
+            .toFile(outputPath);
+        console.log(`  생성됨: icon_${suffix}.png`);
+    }
+
+    // iconutil로 icns 파일 생성 (Mac에서만 가능)
+    if (process.platform === 'darwin') {
+        console.log('icns 파일 생성 중...');
+        try {
+            const icnsPath = path.join(BUILD_ICONS_DIR, 'icon.icns');
+            execSync(`iconutil -c icns "${ICONSET_DIR}" -o "${icnsPath}"`);
+            console.log('  생성됨: icon.icns');
+
+            // iconset 디렉토리 정리
+            fs.rmSync(ICONSET_DIR, { recursive: true });
+            console.log('  iconset 디렉토리 정리됨');
+        } catch (err) {
+            console.error('icns 생성 실패:', err.message);
+        }
+    } else {
+        console.log('Mac이 아니므로 icns 파일 생성 건너뜀');
+    }
+
+    // Windows ICO 파일 생성
+    console.log('Windows ICO 파일 생성 중...');
+    try {
+        const icoPngPaths = ICO_SIZES.map(size =>
+            path.join(BUILD_ICONS_DIR, `icon-${size}.png`)
+        );
+        const icoBuffer = await pngToIco(icoPngPaths);
+        fs.writeFileSync(path.join(BUILD_ICONS_DIR, 'icon.ico'), icoBuffer);
+        console.log('  생성됨: icon.ico');
+    } catch (err) {
+        console.error('ICO 생성 실패:', err.message);
+    }
+
+    console.log('아이콘 생성 완료!');
 }
 
-generateIcons();
+generateIcons().catch(console.error);

@@ -104,7 +104,8 @@
       "Bash(dir \"%APPDATA%\\\\docwatch\\\\meetings\")",
       "Bash(cmd /c \"dir %APPDATA%\\\\docwatch\\\\meetings\")",
       "Bash(powershell -Command:*)",
-      "Bash(node scripts/generate-icons.js:*)"
+      "Bash(node scripts/generate-icons.js:*)",
+      "Bash(git push:*)"
     ]
   }
 }

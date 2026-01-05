@@ -9802,7 +9802,7 @@ function initExtensionsUI() {
 // 마켓플레이스 시스템
 // ========================================
 
-// 마켓플레이스 확장 목록 (내장 확장을 마켓플레이스처럼 표시)
+// 마켓플레이스 확장 목록 (실제 내장 확장만 표시)
 const marketplaceExtensions = [
     {
         id: 'p2p-messenger',
@@ -9811,8 +9811,6 @@ const marketplaceExtensions = [
         icon: '💬',
         version: '1.0.0',
         publisher: 'DocWatch',
-        downloads: 1250,
-        rating: 4.8,
         categories: ['communication', 'collaboration'],
         isBuiltin: true,
         contributes: {
@@ -9823,75 +9821,6 @@ const marketplaceExtensions = [
                 { id: 'p2pMessenger.defaultPort', title: '기본 포트', type: 'number', default: 9900 },
                 { id: 'p2pMessenger.defaultNickname', title: '기본 닉네임', type: 'string', default: '' }
             ]
-        }
-    },
-    {
-        id: 'file-notifier',
-        name: '파일 변경 알림',
-        description: '폴더 감시 시 파일 변경을 실시간으로 알려줍니다. 데스크톱 알림과 소리 알림을 지원합니다.',
-        icon: '🔔',
-        version: '1.0.0',
-        publisher: 'DocWatch',
-        downloads: 980,
-        rating: 4.5,
-        categories: ['productivity', 'notification'],
-        isBuiltin: true,
-        contributes: {
-            menus: [],
-            settings: [
-                { id: 'fileNotifier.soundEnabled', title: '소리 알림', type: 'boolean', default: true }
-            ]
-        }
-    },
-    {
-        id: 'meeting-summarizer',
-        name: '회의록 요약',
-        description: 'AI를 사용하여 회의 녹음을 자동으로 요약합니다. 참석자, 안건, 결정사항을 추출합니다.',
-        icon: '📋',
-        version: '1.0.0',
-        publisher: 'DocWatch',
-        downloads: 2100,
-        rating: 4.9,
-        categories: ['productivity', 'ai'],
-        isBuiltin: true,
-        contributes: {
-            menus: [],
-            settings: []
-        }
-    },
-    {
-        id: 'telegram-notifier',
-        name: '텔레그램 알림',
-        description: '파일 변경 및 회의록 생성 시 텔레그램으로 알림을 보냅니다.',
-        icon: '✈️',
-        version: '1.0.0',
-        publisher: 'Community',
-        downloads: 650,
-        rating: 4.3,
-        categories: ['integration', 'notification'],
-        isBuiltin: false,
-        contributes: {
-            menus: [],
-            settings: [
-                { id: 'telegram.botToken', title: '봇 토큰', type: 'string', default: '' },
-                { id: 'telegram.chatId', title: '채팅 ID', type: 'string', default: '' }
-            ]
-        }
-    },
-    {
-        id: 'slack-integration',
-        name: 'Slack 연동',
-        description: 'Slack 채널로 파일 변경 알림과 회의록을 자동으로 전송합니다.',
-        icon: '💼',
-        version: '1.0.0',
-        publisher: 'Community',
-        downloads: 420,
-        rating: 4.2,
-        categories: ['integration', 'communication'],
-        isBuiltin: false,
-        contributes: {
-            menus: [],
-            settings: []
         }
     }
 ];

@@ -15,13 +15,13 @@ class ExtensionManager extends EventEmitter {
     constructor(options = {}) {
         super();
 
-        // 확장 저장 경로
+        // 확장 저장 경로 (사용자 확장)
         this.extensionsDir = options.extensionsDir ||
             path.join(process.env.LOCALAPPDATA || process.env.HOME, 'docwatch', 'extensions');
 
-        // 내장 확장 디렉토리
-        this.builtinDir = options.builtinDir ||
-            path.join(__dirname, '..', 'builtin-extensions');
+        // 번들 확장 디렉토리 (앱에 포함된 기본 확장, 첫 실행 시 사용자 디렉토리로 복사됨)
+        this.bundledDir = options.bundledDir ||
+            path.join(__dirname, '..', 'bundled-extensions');
 
         // 확장 레지스트리
         this.registry = new Map();
@@ -52,12 +52,104 @@ class ExtensionManager extends EventEmitter {
         // 설정 로드
         this.loadConfig();
 
-        // 확장 스캔 및 로드
+        // 번들 확장을 사용자 디렉토리에 복사 (없거나 버전이 낮은 경우)
+        await this.installBundledExtensions();
+
+        // 확장 스캔 및 로드 (사용자 디렉토리만)
         await this.scanExtensions();
 
         console.log(`[ExtensionManager] ${this.registry.size}개 확장 발견`);
 
         return this;
+    }
+
+    /**
+     * 번들 확장을 사용자 디렉토리에 설치
+     */
+    async installBundledExtensions() {
+        if (!fs.existsSync(this.bundledDir)) {
+            console.log('[ExtensionManager] 번들 확장 디렉토리 없음');
+            return;
+        }
+
+        const entries = fs.readdirSync(this.bundledDir, { withFileTypes: true });
+
+        for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            if (entry.name.startsWith('.')) continue;
+
+            const bundledPath = path.join(this.bundledDir, entry.name);
+            const bundledManifestPath = path.join(bundledPath, 'package.json');
+
+            if (!fs.existsSync(bundledManifestPath)) continue;
+
+            try {
+                const bundledManifest = JSON.parse(fs.readFileSync(bundledManifestPath, 'utf8'));
+                const targetPath = path.join(this.extensionsDir, entry.name);
+                const targetManifestPath = path.join(targetPath, 'package.json');
+
+                let shouldInstall = false;
+
+                if (!fs.existsSync(targetPath)) {
+                    // 확장이 없으면 설치
+                    shouldInstall = true;
+                    console.log(`[ExtensionManager] 번들 확장 설치: ${entry.name}`);
+                } else if (fs.existsSync(targetManifestPath)) {
+                    // 버전 비교
+                    const targetManifest = JSON.parse(fs.readFileSync(targetManifestPath, 'utf8'));
+                    if (this.compareVersions(bundledManifest.version, targetManifest.version) > 0) {
+                        shouldInstall = true;
+                        console.log(`[ExtensionManager] 번들 확장 업데이트: ${entry.name} (${targetManifest.version} → ${bundledManifest.version})`);
+                    }
+                }
+
+                if (shouldInstall) {
+                    // 기존 폴더 삭제 후 복사
+                    if (fs.existsSync(targetPath)) {
+                        fs.rmSync(targetPath, { recursive: true });
+                    }
+                    this.copyDirectory(bundledPath, targetPath);
+                }
+            } catch (err) {
+                console.error(`[ExtensionManager] 번들 확장 설치 실패: ${entry.name}`, err.message);
+            }
+        }
+    }
+
+    /**
+     * 버전 비교 (semver 간단 비교)
+     * @returns 양수: v1 > v2, 0: v1 == v2, 음수: v1 < v2
+     */
+    compareVersions(v1, v2) {
+        const parts1 = (v1 || '0.0.0').split('.').map(Number);
+        const parts2 = (v2 || '0.0.0').split('.').map(Number);
+
+        for (let i = 0; i < 3; i++) {
+            const p1 = parts1[i] || 0;
+            const p2 = parts2[i] || 0;
+            if (p1 !== p2) return p1 - p2;
+        }
+        return 0;
+    }
+
+    /**
+     * 디렉토리 복사 (재귀)
+     */
+    copyDirectory(src, dest) {
+        fs.mkdirSync(dest, { recursive: true });
+
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+
+            if (entry.isDirectory()) {
+                this.copyDirectory(srcPath, destPath);
+            } else {
+                fs.copyFileSync(srcPath, destPath);
+            }
+        }
     }
 
     /**
@@ -88,32 +180,30 @@ class ExtensionManager extends EventEmitter {
     }
 
     /**
-     * 확장 디렉토리 스캔
+     * 확장 디렉토리 스캔 (사용자 디렉토리만)
      */
     async scanExtensions() {
-        const dirs = [this.builtinDir, this.extensionsDir];
+        // 사용자 확장 디렉토리만 스캔 (번들 확장은 이미 복사됨)
+        if (!fs.existsSync(this.extensionsDir)) return;
 
-        for (const baseDir of dirs) {
-            if (!fs.existsSync(baseDir)) continue;
+        const entries = fs.readdirSync(this.extensionsDir, { withFileTypes: true });
 
-            const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            if (entry.name.startsWith('.')) continue; // 숨김 폴더 무시
 
-            for (const entry of entries) {
-                if (!entry.isDirectory()) continue;
-                if (entry.name.startsWith('.')) continue; // 숨김 폴더 무시
+            const extPath = path.join(this.extensionsDir, entry.name);
+            const manifestPath = path.join(extPath, 'package.json');
 
-                const extPath = path.join(baseDir, entry.name);
-                const manifestPath = path.join(extPath, 'package.json');
-
-                if (fs.existsSync(manifestPath)) {
-                    try {
-                        const manifest = JSON.parse(
-                            fs.readFileSync(manifestPath, 'utf8')
-                        );
-                        await this.registerExtension(extPath, manifest, baseDir === this.builtinDir);
-                    } catch (err) {
-                        console.error(`[ExtensionManager] 확장 로드 실패: ${entry.name}`, err.message);
-                    }
+            if (fs.existsSync(manifestPath)) {
+                try {
+                    const manifest = JSON.parse(
+                        fs.readFileSync(manifestPath, 'utf8')
+                    );
+                    // 모든 확장은 사용자 확장 (isBuiltin = false)
+                    await this.registerExtension(extPath, manifest, false);
+                } catch (err) {
+                    console.error(`[ExtensionManager] 확장 로드 실패: ${entry.name}`, err.message);
                 }
             }
         }

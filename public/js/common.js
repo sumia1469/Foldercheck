@@ -11300,7 +11300,8 @@ function addExtensionSettingsCategory(ext) {
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'settings-category';
         categoryDiv.id = `settings-${categoryId}`;
-        categoryDiv.style.display = 'none';
+        // CSS에서 .settings-category { display: none; }이 적용되므로 inline style 불필요
+        // inline style은 CSS class보다 우선순위가 높아서 .active 클래스가 무시됨
         categoryDiv.innerHTML = generateExtensionSettingsHTML(ext);
         settingsContent.appendChild(categoryDiv);
     }

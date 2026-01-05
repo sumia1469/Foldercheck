@@ -1,22 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-    </linearGradient>
-  </defs>
   <!-- Background circle -->
-  <circle cx="64" cy="64" r="56" fill="url(#grad1)" opacity="0.9"/>
-  <!-- Chat bubble 1 -->
-  <path d="M32 40 h32 a8 8 0 0 1 8 8 v20 a8 8 0 0 1 -8 8 h-20 l-12 12 v-12 a8 8 0 0 1 -8 -8 v-20 a8 8 0 0 1 8 -8"
-        fill="white" opacity="0.95"/>
-  <!-- Chat bubble 2 -->
-  <path d="M56 52 h32 a8 8 0 0 1 8 8 v20 a8 8 0 0 1 -8 8 v12 l-12 -12 h-20 a8 8 0 0 1 -8 -8 v-20 a8 8 0 0 1 8 -8"
-        fill="white" opacity="0.85"/>
-  <!-- Connection dots -->
-  <circle cx="42" cy="58" r="3" fill="#667eea"/>
-  <circle cx="52" cy="58" r="3" fill="#667eea"/>
-  <circle cx="62" cy="58" r="3" fill="#667eea"/>
-  <!-- Arrow indicating P2P -->
-  <path d="M75 72 l10 0 l-3 -3 m3 3 l-3 3" stroke="#764ba2" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <circle cx="64" cy="64" r="56" fill="#667eea"/>
+  <!-- Chat bubble 1 (left) -->
+  <rect x="28" y="36" width="40" height="32" rx="6" ry="6" fill="white"/>
+  <polygon points="36,68 36,80 48,68" fill="white"/>
+  <!-- Chat bubble 2 (right) -->
+  <rect x="60" y="48" width="40" height="32" rx="6" ry="6" fill="white" opacity="0.9"/>
+  <polygon points="92,80 92,92 80,80" fill="white" opacity="0.9"/>
+  <!-- Connection dots in bubble 1 -->
+  <circle cx="40" cy="52" r="3" fill="#667eea"/>
+  <circle cx="52" cy="52" r="3" fill="#667eea"/>
+  <circle cx="64" cy="52" r="3" fill="#667eea"/>
+  <!-- P2P arrow -->
+  <line x1="72" y1="64" x2="88" y2="64" stroke="#764ba2" stroke-width="3" stroke-linecap="round"/>
+  <polyline points="82,58 88,64 82,70" stroke="#764ba2" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

@@ -1298,169 +1298,109 @@
 
             <!-- 확장 관리 섹션 -->
             <section id="extensions" class="content-section">
-                <div class="section-header">
-                    <h1>확장</h1>
-                    <div class="header-actions">
-                        <button class="btn btn-secondary" id="refreshExtensionsBtn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                                <path d="M23 4v6h-6M1 20v-6h6"/>
-                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                <!-- 확장 상세 정보 전체 화면 (사이드바에서 선택 시 표시) -->
+                <div class="extension-detail-fullpage" id="extensionDetailFullpage">
+                    <!-- 빈 상태 -->
+                    <div class="extension-detail-welcome" id="extensionDetailWelcome">
+                        <div class="welcome-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <rect x="14" y="14" width="7" height="7" rx="1" stroke-dasharray="2 2"/>
                             </svg>
-                            새로고침
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 확장 탭 메뉴 -->
-                <div class="extension-tabs">
-                    <button class="extension-tab active" data-tab="installed" onclick="switchExtensionTab('installed')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                        </svg>
-                        설치됨
-                        <span class="tab-badge" id="installedCount">0</span>
-                    </button>
-                    <button class="extension-tab" data-tab="marketplace" onclick="switchExtensionTab('marketplace')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                            <circle cx="9" cy="21" r="1"/>
-                            <circle cx="20" cy="21" r="1"/>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
-                        </svg>
-                        마켓플레이스
-                    </button>
-                </div>
-
-                <!-- 확장 검색 -->
-                <div class="extension-search-bar">
-                    <div class="search-box">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"/>
-                            <path d="M21 21l-4.35-4.35"/>
-                        </svg>
-                        <input type="text" id="extensionSearch" placeholder="확장 검색...">
-                    </div>
-                </div>
-
-                <!-- 설치된 확장 탭 -->
-                <div class="extension-tab-content active" id="installedTab">
-                    <div class="extension-layout">
-                        <!-- 좌측: 확장 리스트 -->
-                        <div class="extension-list-panel">
-                            <div class="extension-list" id="extensionsList">
-                                <div class="extension-loading" id="extensionLoading">
-                                    <div class="spinner"></div>
-                                    <p>확장 목록을 불러오는 중...</p>
-                                </div>
-                                <div class="extension-empty" id="extensionEmpty" style="display: none;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                                    </svg>
-                                    <p>설치된 확장이 없습니다</p>
-                                    <button class="btn btn-primary" onclick="switchExtensionTab('marketplace')">마켓플레이스 둘러보기</button>
-                                </div>
-                            </div>
                         </div>
-                        <!-- 우측: 확장 상세 정보 패널 -->
-                        <div class="extension-detail-panel" id="extensionDetailPanel">
-                            <div class="extension-detail-empty" id="extensionDetailEmpty">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <h2>확장</h2>
+                        <p>좌측 사이드바에서 확장을 선택하면 상세 정보가 표시됩니다</p>
+                        <div class="welcome-tips">
+                            <div class="tip-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <path d="M21 21l-4.35-4.35"/>
+                                </svg>
+                                <span>사이드바 검색창에서 마켓플레이스 확장을 검색하세요</span>
+                            </div>
+                            <div class="tip-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
                                 </svg>
-                                <p>확장을 선택하면 상세 정보가 표시됩니다</p>
+                                <span>설치됨 섹션에서 설치된 확장을 관리하세요</span>
                             </div>
-                            <div class="extension-detail-content" id="extensionDetailContent" style="display: none;">
-                                <!-- 확장 헤더 -->
-                                <div class="extension-detail-header">
-                                    <div class="extension-detail-icon" id="extDetailIcon"></div>
-                                    <div class="extension-detail-title-area">
-                                        <h2 id="extDetailName">확장 이름</h2>
-                                        <div class="extension-detail-meta">
-                                            <span class="publisher" id="extDetailPublisher">게시자</span>
-                                            <span class="separator">|</span>
-                                            <span class="version" id="extDetailVersion">v1.0.0</span>
-                                            <span class="separator">|</span>
-                                            <span class="category" id="extDetailCategory">카테고리</span>
-                                        </div>
-                                    </div>
-                                    <div class="extension-detail-actions" id="extDetailActions">
-                                        <!-- 버튼들이 동적으로 추가됨 -->
-                                    </div>
-                                </div>
-                                <!-- 확장 탭 네비게이션 -->
-                                <div class="extension-detail-tabs">
-                                    <button class="detail-tab active" data-detail-tab="details" onclick="switchDetailTab('details')">상세 정보</button>
-                                    <button class="detail-tab" data-detail-tab="features" onclick="switchDetailTab('features')">기능</button>
-                                    <button class="detail-tab" data-detail-tab="changelog" onclick="switchDetailTab('changelog')">변경 로그</button>
-                                </div>
-                                <!-- 탭 컨텐츠 -->
-                                <div class="extension-detail-body">
-                                    <div class="detail-tab-content active" id="detailsTabContent">
-                                        <div class="extension-description" id="extDetailDescription"></div>
-                                        <div class="extension-info-section">
-                                            <h4>정보</h4>
-                                            <div class="info-grid" id="extDetailInfo"></div>
-                                        </div>
-                                        <div class="extension-info-section" id="extPermissionsSection" style="display: none;">
-                                            <h4>권한</h4>
-                                            <div class="permission-tags" id="extDetailPermissions"></div>
-                                        </div>
-                                    </div>
-                                    <div class="detail-tab-content" id="featuresTabContent">
-                                        <div class="extension-info-section" id="extCommandsSection" style="display: none;">
-                                            <h4>명령어</h4>
-                                            <div class="commands-list" id="extDetailCommands"></div>
-                                        </div>
-                                        <div class="extension-info-section" id="extSettingsSection" style="display: none;">
-                                            <h4>설정</h4>
-                                            <div class="settings-list" id="extDetailSettings"></div>
-                                        </div>
-                                        <div class="extension-info-section" id="extContributesSection" style="display: none;">
-                                            <h4>기여 항목</h4>
-                                            <div class="contributes-list" id="extDetailContributes"></div>
-                                        </div>
-                                    </div>
-                                    <div class="detail-tab-content" id="changelogTabContent">
-                                        <div class="changelog-content" id="extDetailChangelog">
-                                            <p class="empty-message">변경 로그가 없습니다.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 마켓플레이스 탭 -->
-                <div class="extension-tab-content" id="marketplaceTab">
-                    <div class="marketplace-categories">
-                        <button class="category-chip active" data-category="all" onclick="filterMarketplace('all')">전체</button>
-                        <button class="category-chip" data-category="communication" onclick="filterMarketplace('communication')">커뮤니케이션</button>
-                        <button class="category-chip" data-category="productivity" onclick="filterMarketplace('productivity')">생산성</button>
-                        <button class="category-chip" data-category="integration" onclick="filterMarketplace('integration')">통합</button>
-                    </div>
-
-                    <div class="extension-layout">
-                        <!-- 좌측: 마켓플레이스 리스트 -->
-                        <div class="extension-list-panel">
-                            <div class="extension-list" id="marketplaceList">
-                                <div class="extension-loading" id="marketplaceLoading" style="display: none;">
-                                    <div class="spinner"></div>
-                                    <p>마켓플레이스를 불러오는 중...</p>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- 우측: 마켓플레이스 확장 상세 정보 -->
-                        <div class="extension-detail-panel" id="marketplaceDetailPanel">
-                            <div class="extension-detail-empty" id="marketplaceDetailEmpty">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <circle cx="9" cy="21" r="1"/>
-                                    <circle cx="20" cy="21" r="1"/>
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+                            <div class="tip-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                                 </svg>
-                                <p>확장을 선택하면 상세 정보가 표시됩니다</p>
+                                <span>추천 및 인기 확장을 확인해 보세요</span>
                             </div>
-                            <div class="extension-detail-content" id="marketplaceDetailContent" style="display: none;">
-                                <!-- 마켓플레이스 확장 상세 내용이 동적으로 추가됨 -->
+                        </div>
+                    </div>
+
+                    <!-- 확장 상세 정보 콘텐츠 -->
+                    <div class="extension-detail-main" id="extensionDetailMain" style="display: none;">
+                        <!-- 확장 헤더 -->
+                        <div class="extension-detail-header">
+                            <div class="extension-detail-icon" id="extDetailIcon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                                </svg>
+                            </div>
+                            <div class="extension-detail-title-area">
+                                <h1 id="extDetailName">확장 이름</h1>
+                                <div class="extension-detail-meta">
+                                    <span class="publisher" id="extDetailPublisher">게시자</span>
+                                    <span class="separator">|</span>
+                                    <span class="version" id="extDetailVersion">v1.0.0</span>
+                                    <span class="separator" id="extCategorySeparator">|</span>
+                                    <span class="category" id="extDetailCategory">카테고리</span>
+                                </div>
+                                <p class="extension-short-desc" id="extDetailShortDesc"></p>
+                            </div>
+                            <div class="extension-detail-actions" id="extDetailActions">
+                                <!-- 버튼들이 동적으로 추가됨 -->
+                            </div>
+                        </div>
+
+                        <!-- 확장 탭 네비게이션 -->
+                        <div class="extension-detail-tabs">
+                            <button class="detail-tab active" data-detail-tab="details" onclick="switchDetailTab('details')">상세 정보</button>
+                            <button class="detail-tab" data-detail-tab="features" onclick="switchDetailTab('features')">기능</button>
+                            <button class="detail-tab" data-detail-tab="changelog" onclick="switchDetailTab('changelog')">변경 로그</button>
+                        </div>
+
+                        <!-- 탭 컨텐츠 -->
+                        <div class="extension-detail-body">
+                            <div class="detail-tab-content active" id="detailsTabContent">
+                                <div class="extension-description" id="extDetailDescription"></div>
+                                <div class="extension-info-section">
+                                    <h4>정보</h4>
+                                    <div class="info-grid" id="extDetailInfo"></div>
+                                </div>
+                                <div class="extension-info-section" id="extPermissionsSection" style="display: none;">
+                                    <h4>권한</h4>
+                                    <div class="permission-tags" id="extDetailPermissions"></div>
+                                </div>
+                            </div>
+                            <div class="detail-tab-content" id="featuresTabContent">
+                                <div class="extension-info-section" id="extCommandsSection" style="display: none;">
+                                    <h4>명령어</h4>
+                                    <div class="commands-list" id="extDetailCommands"></div>
+                                </div>
+                                <div class="extension-info-section" id="extSettingsSection" style="display: none;">
+                                    <h4>설정</h4>
+                                    <div class="settings-list" id="extDetailSettings"></div>
+                                </div>
+                                <div class="extension-info-section" id="extContributesSection" style="display: none;">
+                                    <h4>기여 항목</h4>
+                                    <div class="contributes-list" id="extDetailContributes"></div>
+                                </div>
+                            </div>
+                            <div class="detail-tab-content" id="changelogTabContent">
+                                <div class="changelog-content" id="extDetailChangelog">
+                                    <p class="empty-message">변경 로그가 없습니다.</p>
+                                </div>
                             </div>
                         </div>
                     </div>

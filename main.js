@@ -581,12 +581,18 @@ function createWindow() {
     });
 
     // 플랫폼별 윈도우 설정
+    // 아이콘 경로 설정
+    const iconPath = process.platform === 'win32'
+        ? path.join(__dirname, 'icon.ico')
+        : path.join(__dirname, 'icon.png');
+
     const windowOptions = {
         width: 1000,
         height: 700,
         minWidth: 600,
         minHeight: 400,
         title: 'DocWatch',
+        icon: iconPath,
         center: true,
         frame: false,
         webPreferences: {

@@ -103,7 +103,8 @@
       "Bash(cmd /c \"dir %LOCALAPPDATA%\\\\docwatch 2>nul\")",
       "Bash(dir \"%APPDATA%\\\\docwatch\\\\meetings\")",
       "Bash(cmd /c \"dir %APPDATA%\\\\docwatch\\\\meetings\")",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(node scripts/generate-icons.js:*)"
     ]
   }
 }

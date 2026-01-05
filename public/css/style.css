@@ -65,6 +65,26 @@ body {
     z-index: 0; /* 가장 뒤에 배치 */
 }
 
+.titlebar-logo-area {
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    -webkit-app-region: no-drag;
+}
+
+.titlebar-logo {
+    width: 35px;
+    height: 35px;
+    object-fit: contain;
+}
+
 .titlebar-title {
     font-size: 13px;
     font-weight: 500;

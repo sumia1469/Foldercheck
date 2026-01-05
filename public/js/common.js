@@ -10073,11 +10073,19 @@ async function updateExtensionMenus() {
 
         // 각 활성 확장의 메뉴 기여 확인
         for (const ext of activeExtensions) {
-            const contributes = ext.contributes || {};
+            // manifest.contributes 또는 contributes에서 설정 정보 가져오기
+            const contributes = ext.manifest?.contributes || ext.contributes || {};
 
             // 설정 카테고리에 확장 설정 메뉴 동적 추가
             if (contributes.configuration) {
-                addExtensionSettingsCategory(ext);
+                // ext 객체에 contributes를 직접 설정하여 addExtensionSettingsCategory에서 사용
+                const extWithContributes = {
+                    ...ext,
+                    contributes: contributes,
+                    displayName: ext.manifest?.displayName || ext.name,
+                    icon: ext.manifest?.icon || ''
+                };
+                addExtensionSettingsCategory(extWithContributes);
             }
 
             // 사이드바 섹션 등록 (확장에서 제공하는 경우)
@@ -10086,12 +10094,14 @@ async function updateExtensionMenus() {
             }
         }
 
-        // 비활성화된 확장의 UI 숨기기
+        // 비활성화된 확장의 UI 숨기기 및 설정 메뉴 제거
         const inactiveExtensions = extensions.filter(e => e.state !== 'active');
         for (const ext of inactiveExtensions) {
             if (ext.id === 'p2p-messenger') {
                 enableMessengerSection(false);
             }
+            // 비활성화된 확장의 설정 메뉴 제거
+            removeExtensionSettingsCategory(ext.id);
         }
 
         // 설치된 확장 수 업데이트
@@ -10175,6 +10185,29 @@ function addExtensionSettingsCategory(ext) {
         categoryDiv.style.display = 'none';
         categoryDiv.innerHTML = generateExtensionSettingsHTML(ext);
         settingsContent.appendChild(categoryDiv);
+    }
+}
+
+// 확장 설정 카테고리 제거 (확장 비활성화 시)
+function removeExtensionSettingsCategory(extId) {
+    const categoryId = `ext-${extId}`;
+
+    // 설정 네비게이션 메뉴 제거
+    const navItem = document.querySelector(`[data-category="${categoryId}"]`);
+    if (navItem) {
+        navItem.remove();
+    }
+
+    // 설정 콘텐츠 영역 제거
+    const categoryDiv = document.getElementById(`settings-${categoryId}`);
+    if (categoryDiv) {
+        categoryDiv.remove();
+    }
+
+    // 만약 현재 해당 카테고리를 보고 있으면 일반 설정으로 이동
+    const activeCategory = document.querySelector('.settings-category:not([style*="display: none"])');
+    if (activeCategory && activeCategory.id === `settings-${categoryId}`) {
+        showSettingsCategory('general');
     }
 }
 

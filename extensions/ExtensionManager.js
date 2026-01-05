@@ -331,7 +331,18 @@ class ExtensionManager extends EventEmitter {
             isBuiltin: ext.isBuiltin,
             enabled: !this.config.disabled.includes(ext.id),
             error: ext.error,
-            permissions: ext.manifest.permissions || []
+            permissions: ext.manifest.permissions || [],
+            // 프론트엔드에서 manifest 접근이 필요하므로 포함
+            manifest: {
+                name: ext.manifest.name,
+                displayName: ext.manifest.displayName,
+                version: ext.manifest.version,
+                description: ext.manifest.description || '',
+                publisher: ext.manifest.publisher || ext.manifest.author || 'Unknown',
+                icon: ext.manifest.icon || '',
+                categories: ext.manifest.categories || [],
+                contributes: ext.manifest.contributes || {}
+            }
         }));
     }
 

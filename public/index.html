@@ -705,12 +705,7 @@
                             </svg>
                             <span>모니터링</span>
                         </div>
-                        <div class="settings-nav-item" data-category="messenger" onclick="showSettingsCategory('messenger')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                            </svg>
-                            <span>P2P 메신저</span>
-                        </div>
+                        <!-- P2P 메신저 설정은 확장 활성화 시 동적으로 추가됨 -->
                         <div class="settings-nav-item" data-category="notifications" onclick="showSettingsCategory('notifications')">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -778,83 +773,7 @@
                             </div>
                         </div>
 
-                        <!-- P2P 메신저 설정 -->
-                        <div class="settings-category" id="settings-messenger">
-                            <h2 class="settings-category-title">P2P 메신저 설정</h2>
-
-                            <div class="settings-card">
-                                <h3>연결 설정</h3>
-                                <p class="help-text">P2P 메신저 연결에 사용되는 기본 설정입니다.</p>
-
-                                <div class="settings-group">
-                                    <div class="settings-item">
-                                        <div class="settings-item-info">
-                                            <label>기본 닉네임</label>
-                                            <p class="settings-item-desc">채팅에서 사용할 기본 닉네임입니다.</p>
-                                        </div>
-                                        <div class="settings-item-control">
-                                            <input type="text" id="messengerNickname" class="settings-input" placeholder="닉네임 입력" onchange="saveMessengerSettings()">
-                                        </div>
-                                    </div>
-                                    <div class="settings-item">
-                                        <div class="settings-item-info">
-                                            <label>기본 포트</label>
-                                            <p class="settings-item-desc">호스트 모드에서 사용할 기본 포트 번호입니다.</p>
-                                        </div>
-                                        <div class="settings-item-control">
-                                            <input type="number" id="messengerPort" class="settings-input" value="9900" min="1024" max="65535" onchange="saveMessengerSettings()">
-                                        </div>
-                                    </div>
-                                    <div class="settings-item">
-                                        <div class="settings-item-info">
-                                            <label>다운로드 폴더</label>
-                                            <p class="settings-item-desc">수신한 파일이 저장되는 폴더입니다.</p>
-                                        </div>
-                                        <div class="settings-item-control" style="display: flex; gap: 8px;">
-                                            <input type="text" id="messengerDownloadPath" class="settings-input" readonly placeholder="폴더 선택...">
-                                            <button class="btn btn-secondary btn-sm" onclick="selectMessengerDownloadFolder()">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-                                                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                                                </svg>
-                                                선택
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="settings-card">
-                                <h3>알림 설정</h3>
-                                <p class="help-text">메시지 및 파일 수신 시 알림 설정입니다.</p>
-
-                                <div class="settings-group">
-                                    <div class="settings-item">
-                                        <div class="settings-item-info">
-                                            <label>메시지 알림</label>
-                                            <p class="settings-item-desc">새 메시지 수신 시 알림을 표시합니다.</p>
-                                        </div>
-                                        <div class="settings-item-control">
-                                            <label class="settings-toggle">
-                                                <input type="checkbox" id="messengerNotifyMessage" checked onchange="saveMessengerSettings()">
-                                                <span class="settings-toggle-slider"></span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="settings-item">
-                                        <div class="settings-item-info">
-                                            <label>파일 수신 알림</label>
-                                            <p class="settings-item-desc">파일 수신 완료 시 알림을 표시합니다.</p>
-                                        </div>
-                                        <div class="settings-item-control">
-                                            <label class="settings-toggle">
-                                                <input type="checkbox" id="messengerNotifyFile" checked onchange="saveMessengerSettings()">
-                                                <span class="settings-toggle-slider"></span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- P2P 메신저 설정은 확장 활성화 시 동적으로 추가됨 (settings-ext-p2p-messenger) -->
 
                         <!-- 알림 설정 -->
                         <div class="settings-category" id="settings-notifications">

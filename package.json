@@ -29,7 +29,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "icon.ico",
+      "icon": "build/icons/icon.ico",
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -88,7 +88,7 @@
         "dmg",
         "zip"
       ],
-      "icon": "icon.icns",
+      "icon": "build/icons/icon.icns",
       "category": "public.app-category.productivity",
       "identity": "BYUNGHYUN LEE (UF9B4Q43XH)",
       "hardenedRuntime": true,

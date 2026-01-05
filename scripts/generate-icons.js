@@ -21,7 +21,12 @@ async function generateIcons() {
         }
 
         const inputSvg = path.join(__dirname, '../public/assets/images/logo.svg');
-        const outputDir = path.join(__dirname, '..');
+        const outputDir = path.join(__dirname, '..', 'build', 'icons');
+
+        // 출력 디렉토리 생성
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
 
         // SVG 파일 읽기 및 색상 변경 (검정 → 초록색 톤앤매너)
         let svgContent = fs.readFileSync(inputSvg, 'utf8');
@@ -85,12 +90,12 @@ async function generateIcons() {
 
         // macOS용 icns 파일 생성 안내
         console.log('\n아이콘 생성 완료!');
-        console.log('생성된 파일:');
+        console.log('생성된 파일 (build/icons/):');
         console.log('  - icon.png (메인 PNG 아이콘)');
         console.log('  - icon.ico (Windows 아이콘)');
         console.log('  - icon-*.png (다양한 크기)');
         console.log('\nmacOS용 icns 파일 생성 (macOS에서만 가능):');
-        console.log('  1. iconutil 사용: mkdir icon.iconset && cp icon-*.png icon.iconset/ && iconutil -c icns icon.iconset');
+        console.log('  1. iconutil 사용: mkdir icon.iconset && cp build/icons/icon-*.png icon.iconset/ && iconutil -c icns icon.iconset');
 
     } catch (error) {
         console.error('아이콘 생성 실패:', error);

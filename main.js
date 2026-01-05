@@ -583,8 +583,8 @@ function createWindow() {
     // 플랫폼별 윈도우 설정
     // 아이콘 경로 설정
     const iconPath = process.platform === 'win32'
-        ? path.join(__dirname, 'icon.ico')
-        : path.join(__dirname, 'icon.png');
+        ? path.join(__dirname, 'build', 'icons', 'icon.ico')
+        : path.join(__dirname, 'build', 'icons', 'icon.png');
 
     const windowOptions = {
         width: 1000,
@@ -653,7 +653,7 @@ function createTray() {
     if (process.platform === 'darwin') {
         trayIcon = nativeImage.createEmpty();
     } else {
-        const iconPath = path.join(__dirname, 'icon.ico');
+        const iconPath = path.join(__dirname, 'build', 'icons', 'icon.ico');
         if (fs.existsSync(iconPath)) {
             trayIcon = nativeImage.createFromPath(iconPath);
         } else {

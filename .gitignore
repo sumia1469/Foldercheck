@@ -37,3 +37,7 @@ meetings/*.webm
 
 # Meeting transcripts (회의록)
 meetings/transcript_*.txt
+
+# User data files (사용자 데이터)
+data/*.json
+!data/license.json

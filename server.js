@@ -54,7 +54,7 @@ if (isPackaged) {
         USER_DATA_DIR = path.join(os.homedir(), '.config', appName);
     }
 } else {
-    USER_DATA_DIR = __dirname;
+    USER_DATA_DIR = path.join(__dirname, 'data');
 }
 
 // 개발 모드 (Pro 토글 버튼 등 개발용 기능 활성화)

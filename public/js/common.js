@@ -8971,7 +8971,9 @@ async function activateOnline() {
 
         if (result.success) {
             alert('라이선스가 활성화되었습니다!');
-            loadLicenseStatus(true); // 확장 목록도 새로고침
+            // ExtensionManager 라이선스 업데이트 후 UI 새로고침
+            await loadLicenseStatus(true);
+            location.reload(); // 앱 새로고침으로 완전히 반영
         } else {
             alert('활성화 실패: ' + (result.error || '알 수 없는 오류'));
         }
@@ -9001,7 +9003,9 @@ async function activateOffline() {
 
         if (result.success) {
             alert('오프라인 라이선스가 활성화되었습니다!');
-            loadLicenseStatus(true); // 확장 목록도 새로고침
+            // ExtensionManager 라이선스 업데이트 후 UI 새로고침
+            await loadLicenseStatus(true);
+            location.reload(); // 앱 새로고침으로 완전히 반영
         } else {
             alert('활성화 실패: ' + (result.error || '알 수 없는 오류'));
         }
@@ -9113,7 +9117,8 @@ async function checkDevMode() {
 
                         if (result.success) {
                             alert(`라이선스가 ${result.newType}으로 변경되었습니다.`);
-                            loadLicenseStatus();  // 라이선스 상태 새로고침
+                            // ExtensionManager 라이선스 업데이트 후 UI 새로고침
+                            await loadLicenseStatus(true);
                             location.reload();  // 페이지 새로고침하여 UI 갱신
                         } else {
                             alert('라이선스 변경 실패: ' + (result.error || '알 수 없는 오류'));

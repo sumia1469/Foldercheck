@@ -515,6 +515,10 @@ class ExtensionManager extends EventEmitter {
         return Array.from(this.registry.values()).map(ext => {
             const requiredLicense = ext.manifest.license || 'free';
             const canUse = this.canUseExtension(ext.id);
+            const isDisabled = this.config.disabled.includes(ext.id);
+
+            // 라이선스 잠금 시 enabled는 항상 false
+            const enabled = canUse ? !isDisabled : false;
 
             return {
                 id: ext.id,
@@ -525,7 +529,7 @@ class ExtensionManager extends EventEmitter {
                 author: ext.manifest.author || '',
                 categories: ext.manifest.categories || [],
                 isBuiltin: ext.isBuiltin,
-                enabled: !this.config.disabled.includes(ext.id),
+                enabled: enabled,
                 error: ext.error,
                 permissions: ext.manifest.permissions || [],
                 // 라이선스 관련 정보
@@ -555,6 +559,13 @@ class ExtensionManager extends EventEmitter {
         const ext = this.registry.get(id);
         if (!ext) return null;
 
+        const requiredLicense = ext.manifest.license || 'free';
+        const canUse = this.canUseExtension(id);
+        const isDisabled = this.config.disabled.includes(id);
+
+        // 라이선스 잠금 시 enabled는 항상 false
+        const enabled = canUse ? !isDisabled : false;
+
         return {
             id: ext.id,
             name: ext.manifest.displayName || ext.id,
@@ -564,10 +575,14 @@ class ExtensionManager extends EventEmitter {
             author: ext.manifest.author || '',
             categories: ext.manifest.categories || [],
             isBuiltin: ext.isBuiltin,
-            enabled: !this.config.disabled.includes(ext.id),
+            enabled: enabled,
             error: ext.error,
             permissions: ext.manifest.permissions || [],
-            contributes: ext.manifest.contributes || {}
+            contributes: ext.manifest.contributes || {},
+            // 라이선스 관련 정보
+            requiredLicense: requiredLicense,
+            canUse: canUse,
+            licenseLocked: !canUse
         };
     }
 

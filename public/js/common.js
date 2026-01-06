@@ -853,6 +853,121 @@ function showConfirmModal(title, message, onConfirm) {
     document.addEventListener('keydown', keyHandler);
 }
 
+// 라이선스 업그레이드 안내 모달
+function showLicenseUpgradeModal(extensionName) {
+    const existingModal = document.getElementById('licenseUpgradeModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'licenseUpgradeModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100000;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: var(--bg-secondary, #252526);
+            border: 1px solid var(--border-color, #3c3c3c);
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 320px;
+            max-width: 420px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        ">
+            <div style="
+                width: 56px;
+                height: 56px;
+                margin: 0 auto 16px;
+                background: linear-gradient(135deg, #f59e0b, #d97706);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+            </div>
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; color: var(--text-primary, #fff); font-weight: 600;">Pro 라이선스 필요</h3>
+            <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--text-secondary, #aaa);">
+                <strong style="color: var(--text-primary, #fff);">${escapeHtml(extensionName)}</strong> 확장은<br>Pro 라이선스에서만 사용할 수 있습니다.
+            </p>
+            <p style="margin: 0 0 20px 0; font-size: 12px; color: var(--text-muted, #888);">
+                Pro로 업그레이드하여 모든 기능을 이용해보세요.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button id="licenseModalCancel" style="
+                    padding: 10px 20px;
+                    border: 1px solid var(--border-color, #3c3c3c);
+                    border-radius: 6px;
+                    background: transparent;
+                    color: var(--text-primary, #fff);
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.2s;
+                ">닫기</button>
+                <button id="licenseModalUpgrade" style="
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 6px;
+                    background: linear-gradient(135deg, #f59e0b, #d97706);
+                    color: white;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                ">Pro로 업그레이드</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const cancelBtn = document.getElementById('licenseModalCancel');
+    const upgradeBtn = document.getElementById('licenseModalUpgrade');
+
+    cancelBtn.onclick = () => {
+        modal.remove();
+    };
+
+    upgradeBtn.onclick = () => {
+        modal.remove();
+        // 설정의 라이선스 섹션으로 이동
+        showSection('settings');
+        setTimeout(() => {
+            const licenseNav = document.querySelector('[data-setting="license"]');
+            if (licenseNav) licenseNav.click();
+        }, 100);
+    };
+
+    // 배경 클릭 시 닫기
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+
+    // ESC 키로 닫기
+    const keyHandler = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', keyHandler);
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+}
+
 // 폴더 그룹에 폴더/파일 추가
 async function addToFolderGroup(groupId) {
     try {
@@ -10740,13 +10855,30 @@ function switchDetailTab(tabName) {
 
 // 상세 패널에서 토글
 async function toggleExtensionFromDetail(extId, enabled) {
+    // 활성화 시도 전에 라이선스 체크
+    if (enabled) {
+        const ext = extensionsData.find(e => e.id === extId);
+        if (ext && ext.licenseLocked) {
+            const extName = ext.manifest?.displayName || ext.manifest?.name || extId;
+            showLicenseUpgradeModal(extName);
+            return;
+        }
+    }
+
     try {
         await window.extensionAPI.toggle(extId, enabled);
         await loadExtensions();
         showToast(enabled ? '확장이 활성화되었습니다.' : '확장이 비활성화되었습니다.', 'success');
     } catch (err) {
         console.error('확장 토글 실패:', err);
-        showToast(`확장 ${enabled ? '활성화' : '비활성화'} 실패: ${err.message}`, 'error');
+        // 라이선스 오류인 경우 모달로 안내
+        if (err.message && (err.message.includes('라이선스') || err.message.includes('license') || err.message.includes('Pro'))) {
+            const ext = extensionsData.find(e => e.id === extId);
+            const extName = ext?.manifest?.displayName || ext?.manifest?.name || extId;
+            showLicenseUpgradeModal(extName);
+        } else {
+            showToast(`확장 ${enabled ? '활성화' : '비활성화'} 실패: ${err.message}`, 'error');
+        }
     }
 }
 

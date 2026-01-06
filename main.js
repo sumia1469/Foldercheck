@@ -33,6 +33,7 @@ const OLLAMA_PORT = 11434;
 const ExtensionManager = require('./extensions/ExtensionManager');
 const ExtensionHost = require('./extensions/ExtensionHost');
 const ExtensionAPI = require('./extensions/ExtensionAPI');
+const license = require('./license');
 
 let extensionManager = null;
 let extensionHost = null;
@@ -1261,6 +1262,10 @@ async function initializeExtensions() {
 
         // 초기화
         await extensionManager.initialize();
+
+        // 라이선스 타입 설정
+        const licenseStatus = license.getLicenseStatus();
+        extensionManager.setLicenseType(licenseStatus.type);
 
         // 시작 시 모든 '*' 활성화 이벤트 확장 활성화
         await extensionManager.activateByEvent('*');

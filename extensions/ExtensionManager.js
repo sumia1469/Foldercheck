@@ -38,6 +38,66 @@ class ExtensionManager extends EventEmitter {
         // 설정 저장 경로
         this.configPath = options.configPath ||
             path.join(this.extensionsDir, 'extensions-config.json');
+
+        // 현재 라이선스 타입 (free, trial, pro)
+        this.currentLicenseType = 'free';
+    }
+
+    /**
+     * 라이선스 타입 설정
+     * @param {string} licenseType - 'free', 'trial', 'pro'
+     */
+    setLicenseType(licenseType) {
+        this.currentLicenseType = licenseType;
+        console.log(`[ExtensionManager] 라이선스 타입 설정: ${licenseType}`);
+
+        // 라이선스 변경 시 Pro 확장 상태 업데이트
+        this.updateExtensionsForLicense();
+    }
+
+    /**
+     * 라이선스 변경에 따라 확장 상태 업데이트
+     */
+    async updateExtensionsForLicense() {
+        for (const [id, extension] of this.registry) {
+            const requiredLicense = extension.manifest.license || 'free';
+
+            if (requiredLicense === 'pro' && this.currentLicenseType === 'free') {
+                // Pro 확장이 활성화되어 있으면 비활성화
+                if (extension.state === 'active') {
+                    console.log(`[ExtensionManager] 라이선스 제한으로 확장 비활성화: ${id}`);
+                    try {
+                        await this.deactivateExtension(id);
+                    } catch (err) {
+                        console.error(`[ExtensionManager] 확장 비활성화 실패: ${id}`, err.message);
+                    }
+                }
+            }
+        }
+
+        this.emit('license:changed', { licenseType: this.currentLicenseType });
+    }
+
+    /**
+     * 확장의 라이선스 요구사항 확인
+     * @param {string} id - 확장 ID
+     * @returns {boolean} - 현재 라이선스로 사용 가능 여부
+     */
+    canUseExtension(id) {
+        const extension = this.registry.get(id);
+        if (!extension) return false;
+
+        const requiredLicense = extension.manifest.license || 'free';
+
+        // free 확장은 모든 라이선스에서 사용 가능
+        if (requiredLicense === 'free') return true;
+
+        // pro 확장은 pro 또는 trial 라이선스에서만 사용 가능
+        if (requiredLicense === 'pro') {
+            return this.currentLicenseType === 'pro' || this.currentLicenseType === 'trial';
+        }
+
+        return true;
     }
 
     /**
@@ -291,6 +351,13 @@ class ExtensionManager extends EventEmitter {
             return null;
         }
 
+        // 라이선스 검증
+        if (!this.canUseExtension(id)) {
+            const requiredLicense = extension.manifest.license || 'free';
+            console.log(`[ExtensionManager] 라이선스 제한: ${id} (필요: ${requiredLicense}, 현재: ${this.currentLicenseType})`);
+            throw new Error(`이 확장은 ${requiredLicense === 'pro' ? 'Pro' : requiredLicense} 라이선스가 필요합니다`);
+        }
+
         extension.state = 'activating';
         extension.error = null;
         this.emit('extension:activating', extension);
@@ -427,30 +494,40 @@ class ExtensionManager extends EventEmitter {
      * 모든 확장 정보 반환
      */
     getExtensions() {
-        return Array.from(this.registry.values()).map(ext => ({
-            id: ext.id,
-            name: ext.manifest.displayName || ext.id,
-            version: ext.manifest.version,
-            description: ext.manifest.description || '',
-            state: ext.state,
-            author: ext.manifest.author || '',
-            categories: ext.manifest.categories || [],
-            isBuiltin: ext.isBuiltin,
-            enabled: !this.config.disabled.includes(ext.id),
-            error: ext.error,
-            permissions: ext.manifest.permissions || [],
-            // 프론트엔드에서 manifest 접근이 필요하므로 포함
-            manifest: {
-                name: ext.manifest.name,
-                displayName: ext.manifest.displayName,
+        return Array.from(this.registry.values()).map(ext => {
+            const requiredLicense = ext.manifest.license || 'free';
+            const canUse = this.canUseExtension(ext.id);
+
+            return {
+                id: ext.id,
+                name: ext.manifest.displayName || ext.id,
                 version: ext.manifest.version,
                 description: ext.manifest.description || '',
-                publisher: ext.manifest.publisher || ext.manifest.author || 'Unknown',
-                icon: ext.manifest.icon || '',
+                state: ext.state,
+                author: ext.manifest.author || '',
                 categories: ext.manifest.categories || [],
-                contributes: ext.manifest.contributes || {}
-            }
-        }));
+                isBuiltin: ext.isBuiltin,
+                enabled: !this.config.disabled.includes(ext.id),
+                error: ext.error,
+                permissions: ext.manifest.permissions || [],
+                // 라이선스 관련 정보
+                requiredLicense: requiredLicense,
+                canUse: canUse,
+                licenseLocked: !canUse,
+                // 프론트엔드에서 manifest 접근이 필요하므로 포함
+                manifest: {
+                    name: ext.manifest.name,
+                    displayName: ext.manifest.displayName,
+                    version: ext.manifest.version,
+                    description: ext.manifest.description || '',
+                    publisher: ext.manifest.publisher || ext.manifest.author || 'Unknown',
+                    icon: ext.manifest.icon || '',
+                    categories: ext.manifest.categories || [],
+                    contributes: ext.manifest.contributes || {},
+                    license: requiredLicense
+                }
+            };
+        });
     }
 
     /**

@@ -10450,24 +10450,34 @@ async function loadExtensions() {
 // 확장 리스트 아이템 생성 (VSCode 스타일)
 function createExtensionListItem(ext) {
     const item = document.createElement('div');
-    item.className = `extension-list-item ${ext.enabled ? '' : 'disabled'} ${selectedExtensionId === ext.id ? 'selected' : ''}`;
+    const isLicenseLocked = ext.licenseLocked === true;
+    item.className = `extension-list-item ${ext.enabled ? '' : 'disabled'} ${selectedExtensionId === ext.id ? 'selected' : ''} ${isLicenseLocked ? 'license-locked' : ''}`;
     item.dataset.extensionId = ext.id;
 
     const isActive = ext.state === 'active';
+    const licenseBadge = ext.requiredLicense === 'pro' ? '<span class="license-badge pro">Pro</span>' : '';
+    const lockIcon = isLicenseLocked ? `
+        <div class="ext-lock-overlay" title="Pro 라이선스가 필요합니다">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+        </div>
+    ` : '';
 
     item.innerHTML = `
         <div class="ext-icon">
             ${ext.manifest.icon || getDefaultExtensionIcon()}
+            ${lockIcon}
         </div>
         <div class="ext-info">
-            <div class="ext-name">${ext.manifest.displayName || ext.manifest.name}</div>
+            <div class="ext-name">${ext.manifest.displayName || ext.manifest.name} ${licenseBadge}</div>
             <div class="ext-publisher">${ext.manifest.publisher || '알 수 없음'}</div>
             <div class="ext-description">${ext.manifest.description || '설명 없음'}</div>
         </div>
         <div class="ext-actions">
             <div class="ext-status-dot ${isActive ? 'active' : ''}" title="${isActive ? '실행 중' : '비활성'}"></div>
             <div class="ext-btn-group">
-                <button class="ext-btn settings-btn" onclick="event.stopPropagation(); openExtensionSettings('${ext.id}')" title="설정">
+                <button class="ext-btn settings-btn" onclick="event.stopPropagation(); openExtensionSettings('${ext.id}')" title="설정" ${isLicenseLocked ? 'disabled' : ''}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"/>
                         <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -10509,51 +10519,74 @@ async function selectExtension(extId) {
 async function updateExtensionDetailPanel(ext) {
     const isActive = ext.state === 'active';
     const isBuiltin = ext.id.startsWith('docwatch.');
+    const isLicenseLocked = ext.licenseLocked === true;
+    const requiredLicense = ext.requiredLicense || 'free';
 
     // 아이콘
     document.getElementById('extDetailIcon').innerHTML = ext.manifest.icon || getDefaultExtensionIcon();
 
     // 제목 및 메타 정보
-    document.getElementById('extDetailName').textContent = ext.manifest.displayName || ext.manifest.name;
+    const licenseBadge = requiredLicense === 'pro' ? ' <span class="license-badge pro">Pro</span>' : '';
+    document.getElementById('extDetailName').innerHTML = (ext.manifest.displayName || ext.manifest.name) + licenseBadge;
     document.getElementById('extDetailPublisher').textContent = ext.manifest.publisher || '알 수 없음';
     document.getElementById('extDetailVersion').textContent = `v${ext.manifest.version}`;
     document.getElementById('extDetailCategory').textContent = (ext.manifest.categories || ['기타']).join(', ');
 
     // 액션 버튼
     const actionsEl = document.getElementById('extDetailActions');
-    actionsEl.innerHTML = `
-        ${ext.enabled ? `
-            <button class="btn btn-disable" onclick="toggleExtensionFromDetail('${ext.id}', false)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <line x1="9" y1="9" x2="15" y2="15"/>
-                    <line x1="15" y1="9" x2="9" y2="15"/>
+
+    // 라이선스 잠금 상태면 업그레이드 버튼 표시
+    if (isLicenseLocked) {
+        actionsEl.innerHTML = `
+            <div class="license-locked-notice">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="margin-right: 8px;">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
                 </svg>
-                비활성화
-            </button>
-        ` : `
-            <button class="btn btn-enable" onclick="toggleExtensionFromDetail('${ext.id}', true)">
+                Pro 라이선스가 필요합니다
+            </div>
+            <button class="btn btn-upgrade" onclick="showSection('settings'); showSettingsCategory('license');">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
-                    <polyline points="20 6 9 17 4 12"/>
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                 </svg>
-                활성화
+                Pro로 업그레이드
             </button>
-        `}
-        ${!isBuiltin ? `
-            <button class="btn btn-uninstall" onclick="uninstallExtensionFromDetail('${ext.id}')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                </svg>
-                제거
-            </button>
-        ` : ''}
-    `;
+        `;
+    } else {
+        actionsEl.innerHTML = `
+            ${ext.enabled ? `
+                <button class="btn btn-disable" onclick="toggleExtensionFromDetail('${ext.id}', false)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                    </svg>
+                    비활성화
+                </button>
+            ` : `
+                <button class="btn btn-enable" onclick="toggleExtensionFromDetail('${ext.id}', true)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    활성화
+                </button>
+            `}
+            ${!isBuiltin ? `
+                <button class="btn btn-uninstall" onclick="uninstallExtensionFromDetail('${ext.id}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                    제거
+                </button>
+            ` : ''}
+        `;
+    }
 
     // 설명
     document.getElementById('extDetailDescription').textContent = ext.manifest.description || '설명이 없습니다.';
 
     // 정보 그리드
+    const licenseText = requiredLicense === 'pro' ? 'Pro 전용' : '무료';
     document.getElementById('extDetailInfo').innerHTML = `
         <span class="info-label">ID</span>
         <span class="info-value mono">${ext.id}</span>
@@ -10565,6 +10598,8 @@ async function updateExtensionDetailPanel(ext) {
         <span class="info-value">${getExtensionStateText(ext.state)}</span>
         <span class="info-label">유형</span>
         <span class="info-value">${isBuiltin ? '내장 확장' : '사용자 확장'}</span>
+        <span class="info-label">라이선스</span>
+        <span class="info-value ${requiredLicense === 'pro' ? 'license-pro' : ''}">${licenseText}</span>
     `;
 
     // 권한

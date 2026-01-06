@@ -1605,10 +1605,10 @@ ipcMain.handle('p2p:selectFile', async () => {
     });
 
     if (result.canceled || result.filePaths.length === 0) {
-        return null;
+        return { success: false, filePath: null };
     }
 
-    return result.filePaths[0];
+    return { success: true, filePath: result.filePaths[0] };
 });
 
 // P2P 다운로드 폴더 열기

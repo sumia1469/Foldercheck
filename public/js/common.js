@@ -12205,12 +12205,14 @@ async function attachFile() {
         const result = await window.p2pAPI.selectFile();
         if (result.success && result.filePath) {
             const sendResult = await window.p2pAPI.sendFile(result.filePath);
-            if (!sendResult.success) {
-                alert('파일 전송 실패: ' + sendResult.error);
+            // sendFile은 { transferId, filename, size }를 반환
+            if (sendResult && sendResult.transferId) {
+                console.log('파일 전송 시작:', sendResult.filename);
             }
         }
     } catch (error) {
         console.error('파일 첨부 실패:', error);
+        alert('파일 전송 실패: ' + error.message);
     }
 }
 

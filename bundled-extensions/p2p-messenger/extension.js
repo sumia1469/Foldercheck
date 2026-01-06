@@ -191,10 +191,10 @@ function registerCommands() {
         }
 
         try {
-            const filePath = await docwatch.ipc.invoke('p2p:selectFile');
-            if (!filePath) return;
+            const result = await docwatch.ipc.invoke('p2p:selectFile');
+            if (!result || !result.success || !result.filePath) return;
 
-            await docwatch.ipc.invoke('p2p:sendFile', filePath);
+            await docwatch.ipc.invoke('p2p:sendFile', result.filePath);
 
             docwatch.ui.showNotification({
                 type: 'info',

@@ -6,6 +6,7 @@ const os = require('os');
 const http = require('http');
 const { execSync, spawn } = require('child_process');
 const net = require('net');
+const { autoUpdater } = require('electron-updater');
 
 // Windows 콘솔 UTF-8 인코딩 설정
 if (process.platform === 'win32') {
@@ -688,6 +689,146 @@ function createTray() {
     }
 }
 
+// ========================================
+// 자동 업데이트 시스템
+// ========================================
+
+function setupAutoUpdater() {
+    // 개발 모드에서는 업데이트 체크 건너뛰기
+    if (!isPackaged) {
+        console.log('개발 모드: 자동 업데이트 비활성화');
+        return;
+    }
+
+    // 로깅 활성화
+    autoUpdater.logger = {
+        info: (msg) => console.log('[AutoUpdater] INFO:', msg),
+        warn: (msg) => console.log('[AutoUpdater] WARN:', msg),
+        error: (msg) => console.error('[AutoUpdater] ERROR:', msg),
+        debug: (msg) => console.log('[AutoUpdater] DEBUG:', msg)
+    };
+
+    // 자동 다운로드 비활성화 (사용자 확인 후 다운로드)
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    // 업데이트 확인 가능
+    autoUpdater.on('checking-for-update', () => {
+        console.log('업데이트 확인 중...');
+        sendUpdateStatus('checking', '업데이트 확인 중...');
+    });
+
+    // 업데이트 가능
+    autoUpdater.on('update-available', (info) => {
+        console.log('새 업데이트 발견:', info.version);
+        sendUpdateStatus('available', `새 버전 ${info.version}을 사용할 수 있습니다.`, info);
+
+        // 사용자에게 업데이트 알림
+        if (mainWindow) {
+            dialog.showMessageBox(mainWindow, {
+                type: 'info',
+                title: '업데이트 발견',
+                message: `DocWatch ${info.version} 버전을 사용할 수 있습니다.`,
+                detail: '지금 다운로드하시겠습니까?',
+                buttons: ['다운로드', '나중에'],
+                defaultId: 0,
+                cancelId: 1
+            }).then(result => {
+                if (result.response === 0) {
+                    autoUpdater.downloadUpdate();
+                }
+            });
+        }
+    });
+
+    // 업데이트 없음
+    autoUpdater.on('update-not-available', (info) => {
+        console.log('최신 버전 사용 중');
+        sendUpdateStatus('not-available', '최신 버전을 사용 중입니다.');
+    });
+
+    // 다운로드 진행률
+    autoUpdater.on('download-progress', (progressObj) => {
+        const percent = Math.round(progressObj.percent);
+        console.log(`다운로드 진행: ${percent}%`);
+        sendUpdateStatus('downloading', `다운로드 중: ${percent}%`, {
+            percent: percent,
+            bytesPerSecond: progressObj.bytesPerSecond,
+            transferred: progressObj.transferred,
+            total: progressObj.total
+        });
+    });
+
+    // 다운로드 완료
+    autoUpdater.on('update-downloaded', (info) => {
+        console.log('업데이트 다운로드 완료:', info.version);
+        sendUpdateStatus('downloaded', '업데이트가 준비되었습니다.', info);
+
+        // 사용자에게 재시작 알림
+        if (mainWindow) {
+            dialog.showMessageBox(mainWindow, {
+                type: 'info',
+                title: '업데이트 준비 완료',
+                message: 'DocWatch 업데이트가 다운로드되었습니다.',
+                detail: '지금 재시작하여 업데이트를 적용하시겠습니까?',
+                buttons: ['지금 재시작', '나중에'],
+                defaultId: 0,
+                cancelId: 1
+            }).then(result => {
+                if (result.response === 0) {
+                    autoUpdater.quitAndInstall(false, true);
+                }
+            });
+        }
+    });
+
+    // 오류 처리
+    autoUpdater.on('error', (err) => {
+        console.error('업데이트 오류:', err.message);
+        sendUpdateStatus('error', `업데이트 오류: ${err.message}`);
+    });
+
+    // 업데이트 확인 시작 (30초 후)
+    setTimeout(() => {
+        console.log('자동 업데이트 확인 시작...');
+        autoUpdater.checkForUpdates().catch(err => {
+            console.error('업데이트 확인 실패:', err.message);
+        });
+    }, 30000);
+
+    // 이후 6시간마다 업데이트 확인
+    setInterval(() => {
+        autoUpdater.checkForUpdates().catch(err => {
+            console.error('업데이트 확인 실패:', err.message);
+        });
+    }, 6 * 60 * 60 * 1000);
+}
+
+// 업데이트 상태를 렌더러 프로세스로 전송
+function sendUpdateStatus(status, message, data = null) {
+    if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('update-status', { status, message, data });
+    }
+}
+
+// IPC 핸들러: 수동 업데이트 확인
+ipcMain.handle('check-for-updates', async () => {
+    if (!isPackaged) {
+        return { status: 'dev-mode', message: '개발 모드에서는 업데이트를 확인할 수 없습니다.' };
+    }
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return { status: 'success', data: result };
+    } catch (err) {
+        return { status: 'error', message: err.message };
+    }
+});
+
+// IPC 핸들러: 현재 버전 가져오기
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
+
 // 단일 인스턴스 실행
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -775,6 +916,9 @@ if (!gotTheLock) {
         } catch (err) {
             console.error('Extension system initialization failed:', err.message);
         }
+
+        // 자동 업데이트 설정
+        setupAutoUpdater();
     });
 }
 

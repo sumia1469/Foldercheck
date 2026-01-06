@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 앱 재시작
     relaunchApp: () => ipcRenderer.invoke('app-relaunch'),
 
+    // 자동 업데이트 API
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    onUpdateStatus: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('update-status', handler);
+        return () => ipcRenderer.removeListener('update-status', handler);
+    },
+
     // Electron 환경 확인
     isElectron: true
 });

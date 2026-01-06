@@ -1,15 +1,15 @@
 {
-  "type": "pro",
+  "type": "free",
   "machineId": "467AED299CDFE62B6E51AD4970747A98",
-  "licenseKey": "ADMIN-TOGGLE-1766982515459",
+  "licenseKey": null,
   "activatedAt": "2025-12-27T18:17:46.617Z",
-  "expiresAt": "2026-03-29T04:28:35.459Z",
+  "expiresAt": null,
   "features": {
     "documentMonitoring": true,
-    "meetingTranscription": true,
-    "aiSummary": true
+    "meetingTranscription": false,
+    "aiSummary": false
   },
-  "signature": "admin-signature",
-  "testLicense": true,
+  "signature": null,
+  "testLicense": false,
   "testDuration": "3개월"
 }

@@ -59,15 +59,27 @@ class ExtensionManager extends EventEmitter {
      * 라이선스 변경에 따라 확장 상태 업데이트
      */
     async updateExtensionsForLicense() {
+        const deactivatedExtensions = [];
+
         for (const [id, extension] of this.registry) {
             const requiredLicense = extension.manifest.license || 'free';
 
             if (requiredLicense === 'pro' && this.currentLicenseType === 'free') {
                 // Pro 확장이 활성화되어 있으면 비활성화
-                if (extension.state === 'active') {
+                if (extension.state === 'active' || extension.enabled) {
                     console.log(`[ExtensionManager] 라이선스 제한으로 확장 비활성화: ${id}`);
                     try {
-                        await this.deactivateExtension(id);
+                        // 실행 중이면 비활성화
+                        if (extension.state === 'active') {
+                            await this.deactivateExtension(id);
+                        }
+                        // enabled 상태도 false로 변경
+                        extension.enabled = false;
+                        // 비활성화 목록에 추가
+                        if (!this.config.disabled.includes(id)) {
+                            this.config.disabled.push(id);
+                        }
+                        deactivatedExtensions.push(id);
                     } catch (err) {
                         console.error(`[ExtensionManager] 확장 비활성화 실패: ${id}`, err.message);
                     }
@@ -75,7 +87,13 @@ class ExtensionManager extends EventEmitter {
             }
         }
 
-        this.emit('license:changed', { licenseType: this.currentLicenseType });
+        // 설정 저장
+        if (deactivatedExtensions.length > 0) {
+            this.saveConfig();
+            console.log(`[ExtensionManager] 라이선스 변경으로 ${deactivatedExtensions.length}개 확장 비활성화됨: ${deactivatedExtensions.join(', ')}`);
+        }
+
+        this.emit('license:changed', { licenseType: this.currentLicenseType, deactivatedExtensions });
     }
 
     /**

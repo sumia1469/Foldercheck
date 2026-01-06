@@ -8687,87 +8687,105 @@ function updateLicenseUI(status) {
 
 // Pro 기능 제한 적용
 function applyFeatureRestrictions(status) {
-    const recordingCard = document.querySelector('.recording-card');
-    const recordingList = document.getElementById('recordingList')?.closest('.settings-card');
-    const meetingNavItem = document.querySelector('.nav-item[data-section="meeting"]');
+    const isFreeVersion = status.type === 'free';
+
+    // Activity Bar 메뉴 요소 (Free 버전 제한 대상)
+    const meetingActivityIcon = document.querySelector('.activity-icon[data-section="meeting"]');
+    const llmActivityIcon = document.querySelector('.activity-icon[data-section="llm"]');
+    const messengerActivityIcon = document.querySelector('.activity-icon[data-section="messenger"]');
+
+    // 섹션 요소
     const meetingSection = document.getElementById('meeting');
+    const llmSection = document.getElementById('llm');
+    const messengerSection = document.getElementById('messenger');
+
+    // 설정 내 네비게이션 및 카테고리 (Free 버전 제한 대상)
+    const speechSettingsNav = document.querySelector('.settings-nav-item[data-category="speech"]');
+    const aiSettingsNav = document.querySelector('.settings-nav-item[data-category="ai"]');
+    const speechSettingsCategory = document.getElementById('settings-speech');
+    const aiSettingsCategory = document.getElementById('settings-ai');
+
+    // 기타 관련 요소
+    const recordingCard = document.querySelector('.recording-card');
     const whisperSettingsCard = document.getElementById('whisperStatusSettings')?.closest('.settings-card');
     const aiModelSettingsCard = document.getElementById('aiModelStatusSettings')?.closest('.settings-card');
-
-    // 스마트 어시스트(LLM) 관련 요소
-    const llmNavItem = document.querySelector('.nav-item[data-section="llm"]');
-    const llmSection = document.getElementById('llm');
     const rightPanelLlmTab = document.querySelector('.panel-tab[data-panel-tab="llm-chat"]');
     const rightPanelLlmContent = document.getElementById('panelLlmChat');
 
+    // Free 버전 제한: meeting, llm, messenger 메뉴 숨김 + 설정 내 speech, ai 숨김
+    if (isFreeVersion) {
+        // Activity Bar 메뉴 숨김
+        if (meetingActivityIcon) meetingActivityIcon.style.display = 'none';
+        if (llmActivityIcon) llmActivityIcon.style.display = 'none';
+        if (messengerActivityIcon) messengerActivityIcon.style.display = 'none';
+
+        // 섹션 숨김
+        if (meetingSection) meetingSection.style.display = 'none';
+        if (llmSection) llmSection.style.display = 'none';
+        if (messengerSection) messengerSection.style.display = 'none';
+
+        // 설정 내 음성 인식/AI 설정 숨김
+        if (speechSettingsNav) speechSettingsNav.style.display = 'none';
+        if (aiSettingsNav) aiSettingsNav.style.display = 'none';
+        if (speechSettingsCategory) speechSettingsCategory.style.display = 'none';
+        if (aiSettingsCategory) aiSettingsCategory.style.display = 'none';
+
+        // 기타 관련 요소 숨김
+        if (recordingCard) recordingCard.classList.add('feature-locked');
+        if (whisperSettingsCard) whisperSettingsCard.style.display = 'none';
+        if (aiModelSettingsCard) aiModelSettingsCard.style.display = 'none';
+        if (rightPanelLlmTab) rightPanelLlmTab.style.display = 'none';
+        if (rightPanelLlmContent) rightPanelLlmContent.style.display = 'none';
+
+        return; // Free 버전은 개별 feature 체크 불필요
+    }
+
+    // Pro/Trial 버전: 개별 feature 기반 제한
     if (!status.features.meetingTranscription) {
         // 회의 녹음 기능 제한 - 메뉴 숨김
-        if (meetingNavItem) {
-            meetingNavItem.style.display = 'none';
-        }
-        if (meetingSection) {
-            meetingSection.style.display = 'none';
-        }
-        if (recordingCard) {
-            recordingCard.classList.add('feature-locked');
-        }
-        // 음성 인식 설정 숨김
-        if (whisperSettingsCard) {
-            whisperSettingsCard.style.display = 'none';
-        }
+        if (meetingActivityIcon) meetingActivityIcon.style.display = 'none';
+        if (meetingSection) meetingSection.style.display = 'none';
+        if (recordingCard) recordingCard.classList.add('feature-locked');
+        if (whisperSettingsCard) whisperSettingsCard.style.display = 'none';
+        // 설정 내 음성 인식 숨김
+        if (speechSettingsNav) speechSettingsNav.style.display = 'none';
+        if (speechSettingsCategory) speechSettingsCategory.style.display = 'none';
     } else {
         // 기능 활성화 - 메뉴 표시
-        if (meetingNavItem) {
-            meetingNavItem.style.display = '';
-        }
-        if (meetingSection) {
-            meetingSection.style.display = '';
-        }
-        if (recordingCard) {
-            recordingCard.classList.remove('feature-locked');
-        }
-        if (whisperSettingsCard) {
-            whisperSettingsCard.style.display = '';
-        }
+        if (meetingActivityIcon) meetingActivityIcon.style.display = '';
+        if (meetingSection) meetingSection.style.display = '';
+        if (recordingCard) recordingCard.classList.remove('feature-locked');
+        if (whisperSettingsCard) whisperSettingsCard.style.display = '';
+        if (speechSettingsNav) speechSettingsNav.style.display = '';
+        if (speechSettingsCategory) speechSettingsCategory.style.display = '';
     }
 
     if (!status.features.aiSummary) {
         // AI 요약 기능 제한 - 설정 숨김
-        if (aiModelSettingsCard) {
-            aiModelSettingsCard.style.display = 'none';
-        }
+        if (aiModelSettingsCard) aiModelSettingsCard.style.display = 'none';
         // 스마트 어시스트 메뉴 및 섹션 숨김
-        if (llmNavItem) {
-            llmNavItem.style.display = 'none';
-        }
-        if (llmSection) {
-            llmSection.style.display = 'none';
-        }
+        if (llmActivityIcon) llmActivityIcon.style.display = 'none';
+        if (llmSection) llmSection.style.display = 'none';
         // 우측 패널 스마트 어시스트 탭 숨김
-        if (rightPanelLlmTab) {
-            rightPanelLlmTab.style.display = 'none';
-        }
-        if (rightPanelLlmContent) {
-            rightPanelLlmContent.style.display = 'none';
-        }
+        if (rightPanelLlmTab) rightPanelLlmTab.style.display = 'none';
+        if (rightPanelLlmContent) rightPanelLlmContent.style.display = 'none';
+        // 설정 내 AI 설정 숨김
+        if (aiSettingsNav) aiSettingsNav.style.display = 'none';
+        if (aiSettingsCategory) aiSettingsCategory.style.display = 'none';
     } else {
-        if (aiModelSettingsCard) {
-            aiModelSettingsCard.style.display = '';
-        }
+        if (aiModelSettingsCard) aiModelSettingsCard.style.display = '';
         // 스마트 어시스트 표시
-        if (llmNavItem) {
-            llmNavItem.style.display = '';
-        }
-        if (llmSection) {
-            llmSection.style.display = '';
-        }
-        if (rightPanelLlmTab) {
-            rightPanelLlmTab.style.display = '';
-        }
-        if (rightPanelLlmContent) {
-            rightPanelLlmContent.style.display = '';
-        }
+        if (llmActivityIcon) llmActivityIcon.style.display = '';
+        if (llmSection) llmSection.style.display = '';
+        if (rightPanelLlmTab) rightPanelLlmTab.style.display = '';
+        if (rightPanelLlmContent) rightPanelLlmContent.style.display = '';
+        if (aiSettingsNav) aiSettingsNav.style.display = '';
+        if (aiSettingsCategory) aiSettingsCategory.style.display = '';
     }
+
+    // 메신저는 Pro/Trial에서 항상 표시
+    if (messengerActivityIcon) messengerActivityIcon.style.display = '';
+    if (messengerSection) messengerSection.style.display = '';
 }
 
 // 기기 ID 로드

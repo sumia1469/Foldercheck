@@ -8729,13 +8729,29 @@ function requireAppEnvironment(callback, featureName = '이 기능') {
 }
 
 // 라이선스 상태 로드
-async function loadLicenseStatus() {
+async function loadLicenseStatus(refreshExtensions = false) {
     try {
         const res = await fetch('/api/license/status');
         const status = await res.json();
         currentLicenseStatus = status;
         updateLicenseUI(status);
         applyFeatureRestrictions(status);
+
+        // 라이선스 변경 시 ExtensionManager와 확장 목록 새로고침
+        if (refreshExtensions) {
+            // ExtensionManager에 라이선스 변경 알림 (Electron 환경)
+            if (window.extensionAPI && typeof window.extensionAPI.updateLicense === 'function') {
+                await window.extensionAPI.updateLicense();
+            }
+            // 확장 목록 새로고침
+            if (typeof loadExtensions === 'function') {
+                await loadExtensions();
+            }
+            if (typeof updateExtensionMenus === 'function') {
+                updateExtensionMenus();
+            }
+        }
+
         return status;
     } catch (e) {
         console.error('라이선스 상태 로드 실패:', e);
@@ -8938,7 +8954,7 @@ async function activateOnline() {
 
         if (result.success) {
             alert('라이선스가 활성화되었습니다!');
-            loadLicenseStatus();
+            loadLicenseStatus(true); // 확장 목록도 새로고침
         } else {
             alert('활성화 실패: ' + (result.error || '알 수 없는 오류'));
         }
@@ -8968,7 +8984,7 @@ async function activateOffline() {
 
         if (result.success) {
             alert('오프라인 라이선스가 활성화되었습니다!');
-            loadLicenseStatus();
+            loadLicenseStatus(true); // 확장 목록도 새로고침
         } else {
             alert('활성화 실패: ' + (result.error || '알 수 없는 오류'));
         }

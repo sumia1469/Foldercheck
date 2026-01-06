@@ -1338,6 +1338,15 @@ ipcMain.handle('extensions:setSettings', (event, id, settings) => {
     return { success: true };
 });
 
+// 라이선스 변경 시 ExtensionManager 업데이트
+ipcMain.handle('extensions:updateLicense', () => {
+    if (!extensionManager) return { success: false };
+    const licenseStatus = license.getLicenseStatus();
+    extensionManager.setLicenseType(licenseStatus.type);
+    console.log(`[Extensions] 라이선스 타입 업데이트: ${licenseStatus.type}`);
+    return { success: true, licenseType: licenseStatus.type };
+});
+
 // 명령어 목록 조회
 ipcMain.handle('extensions:getCommands', () => {
     if (!extensionAPI) return [];

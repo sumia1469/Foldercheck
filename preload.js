@@ -65,6 +65,9 @@ contextBridge.exposeInMainWorld('extensionAPI', {
     // 확장 설정 저장
     setSettings: (id, settings) => ipcRenderer.invoke('extensions:setSettings', id, settings),
 
+    // 라이선스 변경 시 ExtensionManager 업데이트
+    updateLicense: () => ipcRenderer.invoke('extensions:updateLicense'),
+
     // 명령어 목록 조회
     getCommands: () => ipcRenderer.invoke('extensions:getCommands'),
 

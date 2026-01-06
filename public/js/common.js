@@ -3154,6 +3154,14 @@ function renderMessengerSidebar(container) {
 
         <!-- 하단 액션 -->
         <div style="border-top: 1px solid var(--border-color); margin-top: auto;">
+            <button class="quick-action-btn" onclick="openChatWindow()" style="background: var(--primary-color);">
+                <span class="btn-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    채팅 윈도우 열기
+                </span>
+            </button>
             <button class="quick-action-btn" onclick="window.p2pAPI.openDownloads()">
                 <span class="btn-label">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -12036,6 +12044,21 @@ const messengerState = {
     users: [],
     messages: []
 };
+
+// 채팅 윈도우 열기
+async function openChatWindow() {
+    try {
+        if (window.p2pAPI && window.p2pAPI.openChatWindow) {
+            await window.p2pAPI.openChatWindow();
+        } else {
+            console.error('채팅 윈도우 API를 찾을 수 없습니다');
+            showToast('채팅 윈도우를 열 수 없습니다', 'error');
+        }
+    } catch (err) {
+        console.error('채팅 윈도우 열기 실패:', err);
+        showToast('채팅 윈도우 열기 실패: ' + err.message, 'error');
+    }
+}
 
 // 메신저 UI 초기화
 function initMessengerUI() {

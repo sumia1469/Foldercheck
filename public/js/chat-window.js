@@ -1,0 +1,851 @@
+/**
+ * P2P 메신저 채팅 윈도우 - 카카오톡 스타일
+ */
+
+// 상태 관리
+const state = {
+    mode: 'offline', // offline, host, guest
+    nickname: '',
+    myContactId: null, // 내 연락처 ID
+    rooms: [],       // 채팅방 목록
+    currentRoom: null,
+    users: [],       // 사용자 목록
+    messages: [],    // 현재 방 메시지
+    contacts: [],    // 연락처 목록
+    groups: []       // 그룹 목록
+};
+
+// DOM 요소
+const elements = {
+    // 상태
+    statusDot: document.getElementById('statusDot'),
+    statusText: document.getElementById('statusText'),
+
+    // 연결 폼
+    hostForm: document.getElementById('hostForm'),
+    guestForm: document.getElementById('guestForm'),
+    hostNickname: document.getElementById('hostNickname'),
+    hostPort: document.getElementById('hostPort'),
+    guestNickname: document.getElementById('guestNickname'),
+    hostIP: document.getElementById('hostIP'),
+    guestPort: document.getElementById('guestPort'),
+    startHostBtn: document.getElementById('startHostBtn'),
+    connectBtn: document.getElementById('connectBtn'),
+    disconnectBtn: document.getElementById('disconnectBtn'),
+
+    // 채팅
+    roomList: document.getElementById('roomList'),
+    emptyState: document.getElementById('emptyState'),
+    chatView: document.getElementById('chatView'),
+    chatAvatar: document.getElementById('chatAvatar'),
+    chatName: document.getElementById('chatName'),
+    chatStatus: document.getElementById('chatStatus'),
+    messagesContainer: document.getElementById('messagesContainer'),
+    messageInput: document.getElementById('messageInput'),
+    sendBtn: document.getElementById('sendBtn'),
+    attachBtn: document.getElementById('attachBtn'),
+
+    // 사용자
+    usersPanel: document.getElementById('usersPanel'),
+    usersBtn: document.getElementById('usersBtn'),
+    usersList: document.getElementById('usersList'),
+    userCount: document.getElementById('userCount'),
+
+    // 타이핑
+    typingIndicator: document.getElementById('typingIndicator'),
+    typingText: document.getElementById('typingText')
+};
+
+// 초기화
+document.addEventListener('DOMContentLoaded', async () => {
+    initTitlebar();
+    initTabs();
+    initConnection();
+    initChat();
+    initP2PListeners();
+
+    // 데이터 로드
+    await loadMyProfile();
+    await loadContacts();
+    await loadGroups();
+    await loadRooms();
+
+    // 현재 P2P 상태 확인
+    await checkP2PStatus();
+});
+
+// 내 프로필 로드
+async function loadMyProfile() {
+    try {
+        if (window.messengerDB) {
+            const myProfile = await window.messengerDB.getSetting('myProfile', null);
+            if (myProfile) {
+                state.myContactId = myProfile.id;
+                state.nickname = myProfile.nickname;
+            }
+        }
+    } catch (err) {
+        console.error('프로필 로드 실패:', err);
+    }
+}
+
+// 내 프로필 저장
+async function saveMyProfile(profile) {
+    try {
+        if (window.messengerDB) {
+            await window.messengerDB.setSetting('myProfile', profile);
+            state.myContactId = profile.id;
+            state.nickname = profile.nickname;
+        }
+    } catch (err) {
+        console.error('프로필 저장 실패:', err);
+    }
+}
+
+// 현재 P2P 상태 확인
+async function checkP2PStatus() {
+    try {
+        if (window.p2pAPI) {
+            const status = await window.p2pAPI.getStatus();
+            if (status.mode !== 'offline') {
+                state.mode = status.mode;
+                state.nickname = status.nickname || state.nickname;
+                updateConnectionUI(true);
+                showChatView();
+
+                // 사용자 목록 가져오기
+                const users = await window.p2pAPI.getUsers();
+                state.users = users;
+                updateUsersList();
+                updateChatStatus();
+            }
+        }
+    } catch (err) {
+        console.error('P2P 상태 확인 실패:', err);
+    }
+}
+
+// 타이틀바 컨트롤
+function initTitlebar() {
+    document.getElementById('minimizeBtn').addEventListener('click', () => {
+        window.chatAPI?.minimize();
+    });
+
+    document.getElementById('maximizeBtn').addEventListener('click', () => {
+        window.chatAPI?.maximize();
+    });
+
+    document.getElementById('closeBtn').addEventListener('click', () => {
+        window.chatAPI?.close();
+    });
+}
+
+// 탭 전환
+function initTabs() {
+    document.querySelectorAll('.connect-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const mode = tab.dataset.mode;
+
+            document.querySelectorAll('.connect-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            elements.hostForm.classList.toggle('active', mode === 'host');
+            elements.guestForm.classList.toggle('active', mode === 'guest');
+        });
+    });
+}
+
+// 연결 관리
+function initConnection() {
+    // 호스트 시작
+    elements.startHostBtn.addEventListener('click', async () => {
+        const nickname = elements.hostNickname.value.trim() || 'Host';
+        const port = parseInt(elements.hostPort.value) || 9900;
+
+        try {
+            elements.startHostBtn.disabled = true;
+            elements.startHostBtn.textContent = '시작 중...';
+
+            await window.p2pAPI.startHost(port, nickname);
+
+            state.mode = 'host';
+            state.nickname = nickname;
+
+            // 프로필 저장
+            const myId = `host_${Date.now()}`;
+            state.myContactId = myId;
+            await saveMyProfile({ id: myId, nickname: nickname });
+
+            updateConnectionUI(true);
+            showChatView();
+
+            // 기본 채팅방 생성 (DB에도 저장)
+            const roomId = 'main_' + Date.now();
+            if (window.messengerDB) {
+                await window.messengerDB.createRoom({
+                    id: roomId,
+                    type: 'group',
+                    name: 'P2P 채팅방'
+                });
+                await window.messengerDB.addRoomParticipant(roomId, myId, nickname);
+            }
+
+            addRoom({
+                id: roomId,
+                name: 'P2P 채팅방',
+                type: 'group',
+                unread: 0
+            });
+
+        } catch (err) {
+            alert('호스트 시작 실패: ' + err.message);
+        } finally {
+            elements.startHostBtn.disabled = false;
+            elements.startHostBtn.textContent = '호스트 시작';
+        }
+    });
+
+    // 게스트 연결
+    elements.connectBtn.addEventListener('click', async () => {
+        const nickname = elements.guestNickname.value.trim() || 'Guest';
+        const host = elements.hostIP.value.trim();
+        const port = parseInt(elements.guestPort.value) || 9900;
+
+        if (!host) {
+            alert('호스트 IP를 입력하세요.');
+            return;
+        }
+
+        try {
+            elements.connectBtn.disabled = true;
+            elements.connectBtn.textContent = '연결 중...';
+
+            await window.p2pAPI.connect(host, port, nickname);
+
+            state.mode = 'guest';
+            state.nickname = nickname;
+
+            // 프로필 저장
+            const myId = `guest_${Date.now()}`;
+            state.myContactId = myId;
+            await saveMyProfile({ id: myId, nickname: nickname });
+
+            updateConnectionUI(true);
+            showChatView();
+
+            // 채팅방 추가 (DB에도 저장)
+            const roomId = 'room_' + host.replace(/\./g, '_') + '_' + port;
+            if (window.messengerDB) {
+                await window.messengerDB.createRoom({
+                    id: roomId,
+                    type: 'group',
+                    name: `${host}:${port}`
+                });
+                await window.messengerDB.addRoomParticipant(roomId, myId, nickname);
+            }
+
+            addRoom({
+                id: roomId,
+                name: `${host}:${port}`,
+                type: 'group',
+                unread: 0
+            });
+
+        } catch (err) {
+            alert('연결 실패: ' + err.message);
+        } finally {
+            elements.connectBtn.disabled = false;
+            elements.connectBtn.textContent = '연결';
+        }
+    });
+
+    // 연결 해제
+    elements.disconnectBtn.addEventListener('click', async () => {
+        try {
+            if (state.mode === 'host') {
+                await window.p2pAPI.stopHost();
+            } else {
+                await window.p2pAPI.disconnect();
+            }
+
+            state.mode = 'offline';
+            state.nickname = '';
+            state.rooms = [];
+            state.messages = [];
+
+            updateConnectionUI(false);
+            hideChatView();
+            elements.roomList.innerHTML = '';
+
+        } catch (err) {
+            console.error('연결 해제 실패:', err);
+        }
+    });
+}
+
+// 연결 UI 업데이트
+function updateConnectionUI(connected) {
+    elements.statusDot.classList.toggle('connected', connected);
+    elements.statusText.textContent = connected ?
+        (state.mode === 'host' ? '호스트 중' : '연결됨') : '연결 안됨';
+
+    // 폼/버튼 표시 전환
+    elements.hostForm.style.display = connected ? 'none' : '';
+    elements.guestForm.style.display = connected ? 'none' : '';
+    document.querySelector('.connect-tabs').style.display = connected ? 'none' : '';
+    elements.disconnectBtn.style.display = connected ? 'block' : 'none';
+}
+
+// 채팅 초기화
+function initChat() {
+    // 메시지 입력
+    elements.messageInput.addEventListener('input', () => {
+        elements.sendBtn.disabled = !elements.messageInput.value.trim();
+        autoResize(elements.messageInput);
+    });
+
+    elements.messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // 전송 버튼
+    elements.sendBtn.addEventListener('click', sendMessage);
+
+    // 파일 첨부
+    elements.attachBtn.addEventListener('click', attachFile);
+
+    // 사용자 패널 토글
+    elements.usersBtn.addEventListener('click', () => {
+        elements.usersPanel.classList.toggle('visible');
+    });
+}
+
+// 메시지 전송
+async function sendMessage() {
+    const content = elements.messageInput.value.trim();
+    if (!content || state.mode === 'offline') return;
+
+    try {
+        await window.p2pAPI.sendMessage(content);
+        elements.messageInput.value = '';
+        elements.sendBtn.disabled = true;
+        autoResize(elements.messageInput);
+    } catch (err) {
+        console.error('메시지 전송 실패:', err);
+    }
+}
+
+// 파일 첨부
+async function attachFile() {
+    if (state.mode === 'offline') {
+        alert('먼저 연결하세요.');
+        return;
+    }
+
+    try {
+        const result = await window.p2pAPI.selectFile();
+        if (result.success && result.filePath) {
+            await window.p2pAPI.sendFile(result.filePath);
+        }
+    } catch (err) {
+        console.error('파일 첨부 실패:', err);
+        alert('파일 전송 실패: ' + err.message);
+    }
+}
+
+// P2P 이벤트 리스너
+function initP2PListeners() {
+    if (!window.p2pAPI) {
+        console.warn('p2pAPI를 사용할 수 없습니다.');
+        return;
+    }
+
+    // 상태 변경
+    window.p2pAPI.onStatus((data) => {
+        console.log('P2P 상태:', data);
+        if (data.mode === 'offline') {
+            state.mode = 'offline';
+            updateConnectionUI(false);
+        }
+    });
+
+    // 메시지 수신
+    window.p2pAPI.onMessage((data) => {
+        console.log('메시지 수신:', data);
+        addMessage(data);
+    });
+
+    // 사용자 목록 업데이트
+    window.p2pAPI.onUserList((users) => {
+        console.log('사용자 목록:', users);
+        state.users = users;
+        updateUsersList();
+        updateChatStatus();
+    });
+
+    // 사용자 입장
+    window.p2pAPI.onUserJoin((data) => {
+        console.log('사용자 입장:', data);
+        addSystemMessage(`${data.nickname}님이 입장했습니다.`);
+    });
+
+    // 사용자 퇴장
+    window.p2pAPI.onUserLeave((data) => {
+        console.log('사용자 퇴장:', data);
+        addSystemMessage(`${data.nickname}님이 퇴장했습니다.`);
+    });
+
+    // 파일 수신
+    window.p2pAPI.onFileReceived((data) => {
+        console.log('파일 수신:', data);
+        addFileMessage(data);
+    });
+
+    // 연결 끊김
+    window.p2pAPI.onDisconnected((data) => {
+        console.log('연결 끊김:', data);
+        state.mode = 'offline';
+        updateConnectionUI(false);
+        addSystemMessage('연결이 끊어졌습니다.');
+    });
+}
+
+// 채팅방 추가
+function addRoom(room) {
+    if (state.rooms.find(r => r.id === room.id)) return;
+
+    state.rooms.push(room);
+    state.currentRoom = room.id;
+    renderRoomList();
+}
+
+// 채팅방 목록 렌더링
+function renderRoomList() {
+    elements.roomList.innerHTML = state.rooms.map(room => `
+        <div class="room-item ${room.id === state.currentRoom ? 'active' : ''}"
+             data-room-id="${room.id}" onclick="selectRoom('${room.id}')">
+            <div class="room-avatar">${room.name.charAt(0).toUpperCase()}</div>
+            <div class="room-info">
+                <div class="room-name">${escapeHtml(room.name)}</div>
+                <div class="room-preview">${room.lastMessage || '새 채팅방'}</div>
+            </div>
+            <div class="room-meta">
+                <div class="room-time">${room.lastTime || ''}</div>
+                ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// 채팅방 선택
+function selectRoom(roomId) {
+    state.currentRoom = roomId;
+    renderRoomList();
+    loadRoomMessages(roomId);
+}
+
+// 채팅 뷰 표시
+function showChatView() {
+    elements.emptyState.style.display = 'none';
+    elements.chatView.style.display = 'flex';
+}
+
+// 채팅 뷰 숨김
+function hideChatView() {
+    elements.emptyState.style.display = 'flex';
+    elements.chatView.style.display = 'none';
+}
+
+// 메시지 추가
+async function addMessage(data) {
+    const isOwn = data.nickname === state.nickname;
+    const message = {
+        id: data.id || Date.now(),
+        type: 'text',
+        sender: data.nickname,
+        content: data.content,
+        timestamp: data.timestamp || Date.now(),
+        isOwn
+    };
+
+    state.messages.push(message);
+    renderMessage(message);
+    scrollToBottom();
+
+    // DB에 메시지 저장
+    if (state.currentRoom && window.messengerDB) {
+        try {
+            await window.messengerDB.saveMessage({
+                roomId: state.currentRoom,
+                senderId: isOwn ? state.myContactId : `remote_${data.nickname}`,
+                type: 'text',
+                content: data.content
+            });
+        } catch (err) {
+            console.error('메시지 저장 실패:', err);
+        }
+    }
+
+    // 알림 (자신의 메시지가 아닌 경우)
+    if (!isOwn && document.hidden) {
+        showNotification(data.nickname, data.content);
+    }
+}
+
+// 시스템 메시지 추가
+function addSystemMessage(text) {
+    const el = document.createElement('div');
+    el.className = 'system-message';
+    el.textContent = text;
+    elements.messagesContainer.appendChild(el);
+    scrollToBottom();
+}
+
+// 파일 메시지 추가
+async function addFileMessage(data) {
+    const isOwn = data.nickname === state.nickname;
+    const message = {
+        id: data.transferId || Date.now(),
+        type: 'file',
+        sender: data.nickname,
+        filename: data.filename,
+        fileSize: data.size,
+        filePath: data.savedPath,
+        timestamp: data.timestamp || Date.now(),
+        isOwn
+    };
+
+    state.messages.push(message);
+    renderMessage(message);
+    scrollToBottom();
+
+    // DB에 파일 메시지 저장
+    if (state.currentRoom && window.messengerDB) {
+        try {
+            await window.messengerDB.saveMessage({
+                roomId: state.currentRoom,
+                senderId: isOwn ? state.myContactId : `remote_${data.nickname}`,
+                type: 'file',
+                content: data.filename,
+                fileName: data.filename,
+                fileSize: data.size,
+                filePath: data.savedPath
+            });
+        } catch (err) {
+            console.error('파일 메시지 저장 실패:', err);
+        }
+    }
+}
+
+// 메시지 렌더링
+function renderMessage(msg) {
+    const el = document.createElement('div');
+    el.className = `message ${msg.isOwn ? 'own' : ''}`;
+
+    const time = new Date(msg.timestamp).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    const initial = msg.sender ? msg.sender.charAt(0).toUpperCase() : '?';
+
+    if (msg.type === 'file') {
+        el.innerHTML = `
+            <div class="message-avatar">${initial}</div>
+            <div class="message-content">
+                <div class="message-sender">${escapeHtml(msg.sender)}</div>
+                <div class="message-file" onclick="openFile('${escapeHtml(msg.filePath || '')}')">
+                    <div class="file-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                        </svg>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">${escapeHtml(msg.filename)}</div>
+                        <div class="file-size">${formatFileSize(msg.fileSize)}</div>
+                    </div>
+                </div>
+                <div class="message-meta">
+                    <span class="message-time">${time}</span>
+                </div>
+            </div>
+        `;
+    } else {
+        el.innerHTML = `
+            <div class="message-avatar">${initial}</div>
+            <div class="message-content">
+                <div class="message-sender">${escapeHtml(msg.sender)}</div>
+                <div class="message-bubble">${escapeHtml(msg.content)}</div>
+                <div class="message-meta">
+                    <span class="message-time">${time}</span>
+                    ${msg.isOwn ? '<span class="message-read">읽음</span>' : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    elements.messagesContainer.appendChild(el);
+}
+
+// 사용자 목록 업데이트
+function updateUsersList() {
+    elements.userCount.textContent = state.users.length;
+    elements.usersList.innerHTML = state.users.map(user => `
+        <div class="user-item">
+            <div class="user-avatar">${user.nickname.charAt(0).toUpperCase()}</div>
+            <div>
+                <div class="user-name">${escapeHtml(user.nickname)}</div>
+                ${user.isHost ? '<div class="user-host">호스트</div>' : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// 채팅 상태 업데이트
+function updateChatStatus() {
+    elements.chatStatus.textContent = `${state.users.length}명 참여중`;
+}
+
+// 스크롤 하단으로
+function scrollToBottom() {
+    elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+}
+
+// 텍스트영역 자동 크기 조절
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+}
+
+// 파일 열기
+function openFile(filePath) {
+    if (filePath && window.chatAPI?.openFile) {
+        window.chatAPI.openFile(filePath);
+    }
+}
+
+// 연락처 로드
+async function loadContacts() {
+    try {
+        if (window.messengerDB) {
+            state.contacts = await window.messengerDB.getContacts();
+            console.log('연락처 로드 완료:', state.contacts.length);
+        }
+    } catch (err) {
+        console.error('연락처 로드 실패:', err);
+        state.contacts = [];
+    }
+}
+
+// 그룹 로드
+async function loadGroups() {
+    try {
+        if (window.messengerDB) {
+            state.groups = await window.messengerDB.getGroups();
+            console.log('그룹 로드 완료:', state.groups.length);
+        }
+    } catch (err) {
+        console.error('그룹 로드 실패:', err);
+        state.groups = [];
+    }
+}
+
+// 채팅방 목록 로드
+async function loadRooms() {
+    try {
+        if (window.messengerDB) {
+            const rooms = await window.messengerDB.getRooms();
+            state.rooms = rooms.map(r => ({
+                id: r.id,
+                name: r.name || '채팅방',
+                type: r.type,
+                lastMessage: r.last_message,
+                lastTime: r.last_message_at ? formatTime(new Date(r.last_message_at)) : '',
+                unread: r.unread_count || 0,
+                pinned: r.pinned === 1,
+                muted: r.muted === 1
+            }));
+            renderRoomList();
+        }
+    } catch (err) {
+        console.error('채팅방 로드 실패:', err);
+    }
+}
+
+// 방 메시지 로드
+async function loadRoomMessages(roomId) {
+    try {
+        elements.messagesContainer.innerHTML = '';
+
+        if (window.messengerDB) {
+            const messages = await window.messengerDB.getRoomMessages(roomId, 50, 0);
+            state.messages = [];
+
+            messages.forEach(msg => {
+                const isOwn = msg.sender_id === state.myContactId;
+                const message = {
+                    id: msg.id,
+                    type: msg.type || 'text',
+                    sender: msg.sender_name || msg.sender_id,
+                    content: msg.content,
+                    filename: msg.file_name,
+                    fileSize: msg.file_size,
+                    filePath: msg.file_path,
+                    timestamp: new Date(msg.created_at).getTime(),
+                    isOwn
+                };
+
+                state.messages.push(message);
+                renderMessage(message);
+            });
+
+            scrollToBottom();
+
+            // 읽음 처리
+            if (state.myContactId) {
+                await window.messengerDB.markAsRead(roomId, state.myContactId);
+            }
+        }
+    } catch (err) {
+        console.error('메시지 로드 실패:', err);
+    }
+}
+
+// 메시지 저장 (DB)
+async function saveMessageToDB(roomId, message) {
+    try {
+        if (window.messengerDB) {
+            await window.messengerDB.saveMessage({
+                roomId: roomId,
+                senderId: message.senderId || state.myContactId,
+                type: message.type || 'text',
+                content: message.content,
+                fileName: message.fileName,
+                fileSize: message.fileSize,
+                filePath: message.filePath
+            });
+        }
+    } catch (err) {
+        console.error('메시지 저장 실패:', err);
+    }
+}
+
+// 연락처 추가
+async function addContact(contact) {
+    try {
+        if (window.messengerDB) {
+            const result = await window.messengerDB.addContact(contact);
+            await loadContacts();
+            return result;
+        }
+    } catch (err) {
+        console.error('연락처 추가 실패:', err);
+        throw err;
+    }
+}
+
+// 그룹 생성
+async function createGroup(group) {
+    try {
+        if (window.messengerDB) {
+            const result = await window.messengerDB.createGroup(group);
+            await loadGroups();
+            return result;
+        }
+    } catch (err) {
+        console.error('그룹 생성 실패:', err);
+        throw err;
+    }
+}
+
+// 채팅방 생성
+async function createRoom(room) {
+    try {
+        if (window.messengerDB) {
+            const result = await window.messengerDB.createRoom(room);
+            await loadRooms();
+            return result;
+        }
+    } catch (err) {
+        console.error('채팅방 생성 실패:', err);
+        throw err;
+    }
+}
+
+// 채팅방 나가기
+async function leaveRoom(roomId) {
+    try {
+        if (window.messengerDB && state.myContactId) {
+            await window.messengerDB.leaveRoom(roomId, state.myContactId);
+            await loadRooms();
+
+            if (state.currentRoom === roomId) {
+                state.currentRoom = null;
+                hideChatView();
+            }
+        }
+    } catch (err) {
+        console.error('채팅방 나가기 실패:', err);
+        throw err;
+    }
+}
+
+// 메시지 검색
+async function searchMessages(query, roomId = null) {
+    try {
+        if (window.messengerDB) {
+            return await window.messengerDB.searchMessages(query, roomId);
+        }
+        return [];
+    } catch (err) {
+        console.error('메시지 검색 실패:', err);
+        return [];
+    }
+}
+
+// 시간 포맷
+function formatTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (days === 0) {
+        return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    } else if (days === 1) {
+        return '어제';
+    } else if (days < 7) {
+        const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+        return weekdays[date.getDay()] + '요일';
+    } else {
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
+}
+
+// 알림 표시
+function showNotification(title, body) {
+    if (window.chatAPI?.showNotification) {
+        window.chatAPI.showNotification(title, body);
+    }
+}
+
+// 유틸리티
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+}
+
+// 전역 함수 노출
+window.selectRoom = selectRoom;
+window.openFile = openFile;

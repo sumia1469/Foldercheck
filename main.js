@@ -24,6 +24,7 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow;
+let chatWindow = null; // P2P 채팅 윈도우
 let tray;
 let ollamaProcess = null; // 내장 Ollama 프로세스
 const PORT = 4400;
@@ -41,7 +42,9 @@ let extensionAPI = null;
 
 // P2P Messenger System
 const P2PMessenger = require('./p2p-messenger');
+const MessengerDB = require('./messenger-db');
 let p2pMessenger = null;
+let messengerDB = null;
 
 // 패키징 여부 확인 (asar 내부인지 체크 - app.isPackaged보다 먼저 사용 가능)
 const isPackaged = __dirname.includes('app.asar');
@@ -1620,6 +1623,254 @@ ipcMain.handle('p2p:openDownloads', () => {
     require('electron').shell.openPath(downloadsDir);
 });
 
+// ========================================
+// P2P 채팅 윈도우
+// ========================================
+
+/**
+ * 채팅 윈도우 생성
+ */
+function createChatWindow() {
+    if (chatWindow) {
+        chatWindow.focus();
+        return chatWindow;
+    }
+
+    const iconPath = process.platform === 'win32'
+        ? path.join(__dirname, 'build', 'icons', 'icon.ico')
+        : path.join(__dirname, 'build', 'icons', 'icon.png');
+
+    chatWindow = new BrowserWindow({
+        width: 900,
+        height: 650,
+        minWidth: 700,
+        minHeight: 500,
+        title: 'P2P 메신저',
+        icon: iconPath,
+        frame: false,
+        backgroundColor: '#1a1a1a',
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload-chat.js')
+        },
+        show: false
+    });
+
+    // HTML 파일 로드
+    chatWindow.loadFile(path.join(__dirname, 'public', 'chat-window.html'));
+
+    chatWindow.once('ready-to-show', () => {
+        chatWindow.show();
+    });
+
+    chatWindow.on('closed', () => {
+        chatWindow = null;
+    });
+
+    return chatWindow;
+}
+
+// 채팅 윈도우 열기
+ipcMain.handle('p2p:openChatWindow', () => {
+    createChatWindow();
+    return { success: true };
+});
+
+// 채팅 윈도우 컨트롤
+ipcMain.handle('chat:minimize', () => {
+    if (chatWindow) chatWindow.minimize();
+});
+
+ipcMain.handle('chat:maximize', () => {
+    if (chatWindow) {
+        if (chatWindow.isMaximized()) {
+            chatWindow.unmaximize();
+        } else {
+            chatWindow.maximize();
+        }
+    }
+});
+
+ipcMain.handle('chat:close', () => {
+    if (chatWindow) chatWindow.close();
+});
+
+// 알림 표시
+ipcMain.handle('chat:showNotification', (event, title, body) => {
+    const { Notification } = require('electron');
+    if (Notification.isSupported()) {
+        const notification = new Notification({
+            title: title,
+            body: body,
+            icon: path.join(__dirname, 'build', 'icons', 'icon.png'),
+            silent: false
+        });
+        notification.show();
+
+        notification.on('click', () => {
+            if (chatWindow) {
+                chatWindow.show();
+                chatWindow.focus();
+            }
+        });
+    }
+    return { success: true };
+});
+
+// 파일 열기
+ipcMain.handle('chat:openFile', (event, filePath) => {
+    if (filePath && fs.existsSync(filePath)) {
+        shell.openPath(filePath);
+        return { success: true };
+    }
+    return { success: false, error: '파일을 찾을 수 없습니다' };
+});
+
+// ========================================
+// 메신저 데이터베이스 IPC 핸들러
+// ========================================
+
+/**
+ * MessengerDB 초기화
+ */
+async function initializeMessengerDB() {
+    if (messengerDB) return messengerDB;
+
+    messengerDB = new MessengerDB();
+    await messengerDB.initialize();
+    console.log('[MessengerDB] 초기화 완료');
+    return messengerDB;
+}
+
+// 연락처 관리
+ipcMain.handle('messenger:getContacts', async () => {
+    await initializeMessengerDB();
+    return messengerDB.getAllContacts();
+});
+
+ipcMain.handle('messenger:addContact', async (event, contact) => {
+    await initializeMessengerDB();
+    const id = messengerDB.addContact(contact);
+    return { success: true, id };
+});
+
+ipcMain.handle('messenger:deleteContact', async (event, id) => {
+    await initializeMessengerDB();
+    messengerDB.deleteContact(id);
+    return { success: true };
+});
+
+ipcMain.handle('messenger:updateContactStatus', async (event, id, status) => {
+    await initializeMessengerDB();
+    messengerDB.updateContactStatus(id, status);
+    return { success: true };
+});
+
+// 그룹 관리
+ipcMain.handle('messenger:getGroups', async () => {
+    await initializeMessengerDB();
+    return messengerDB.getAllGroups();
+});
+
+ipcMain.handle('messenger:createGroup', async (event, group) => {
+    await initializeMessengerDB();
+    const id = messengerDB.createGroup(group);
+    return { success: true, id };
+});
+
+ipcMain.handle('messenger:getGroupMembers', async (event, groupId) => {
+    await initializeMessengerDB();
+    return messengerDB.getGroupMembers(groupId);
+});
+
+ipcMain.handle('messenger:addGroupMember', async (event, groupId, contactId, role) => {
+    await initializeMessengerDB();
+    messengerDB.addGroupMember(groupId, contactId, role);
+    return { success: true };
+});
+
+ipcMain.handle('messenger:deleteGroup', async (event, id) => {
+    await initializeMessengerDB();
+    messengerDB.deleteGroup(id);
+    return { success: true };
+});
+
+// 채팅방 관리
+ipcMain.handle('messenger:getRooms', async () => {
+    await initializeMessengerDB();
+    return messengerDB.getAllRooms();
+});
+
+ipcMain.handle('messenger:createRoom', async (event, room) => {
+    await initializeMessengerDB();
+    const id = messengerDB.createRoom(room);
+    return { success: true, id };
+});
+
+ipcMain.handle('messenger:getRoom', async (event, id) => {
+    await initializeMessengerDB();
+    return messengerDB.getRoom(id);
+});
+
+ipcMain.handle('messenger:getRoomParticipants', async (event, roomId) => {
+    await initializeMessengerDB();
+    return messengerDB.getRoomParticipants(roomId);
+});
+
+ipcMain.handle('messenger:addRoomParticipant', async (event, roomId, contactId, nickname) => {
+    await initializeMessengerDB();
+    messengerDB.addRoomParticipant(roomId, contactId, nickname);
+    return { success: true };
+});
+
+ipcMain.handle('messenger:leaveRoom', async (event, roomId, contactId) => {
+    await initializeMessengerDB();
+    messengerDB.leaveRoom(roomId, contactId);
+    return { success: true };
+});
+
+ipcMain.handle('messenger:updateRoom', async (event, id, updates) => {
+    await initializeMessengerDB();
+    messengerDB.updateRoom(id, updates);
+    return { success: true };
+});
+
+// 메시지 관리
+ipcMain.handle('messenger:saveMessage', async (event, message) => {
+    await initializeMessengerDB();
+    const id = messengerDB.saveMessage(message);
+    return { success: true, id };
+});
+
+ipcMain.handle('messenger:getRoomMessages', async (event, roomId, limit, offset) => {
+    await initializeMessengerDB();
+    return messengerDB.getRoomMessages(roomId, limit, offset);
+});
+
+ipcMain.handle('messenger:markAsRead', async (event, roomId, contactId) => {
+    await initializeMessengerDB();
+    messengerDB.markMessagesAsRead(roomId, contactId);
+    return { success: true };
+});
+
+ipcMain.handle('messenger:searchMessages', async (event, query, roomId) => {
+    await initializeMessengerDB();
+    return messengerDB.searchMessages(query, roomId);
+});
+
+// 설정 관리
+ipcMain.handle('messenger:getSetting', async (event, key, defaultValue) => {
+    await initializeMessengerDB();
+    return messengerDB.getSetting(key, defaultValue);
+});
+
+ipcMain.handle('messenger:setSetting', async (event, key, value) => {
+    await initializeMessengerDB();
+    messengerDB.setSetting(key, value);
+    return { success: true };
+});
+
 // 앱 종료 시 확장 시스템 정리
 app.on('before-quit', async () => {
     if (extensionManager) {
@@ -1635,5 +1886,9 @@ app.on('before-quit', async () => {
         } else if (p2pMessenger.mode === 'guest') {
             await p2pMessenger.disconnect();
         }
+    }
+    // MessengerDB 정리
+    if (messengerDB) {
+        messengerDB.close();
     }
 });

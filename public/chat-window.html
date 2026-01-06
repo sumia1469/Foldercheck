@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P 메신저</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d2d;
+            --bg-chat: #0d1117;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --text-muted: #6e6e6e;
+            --accent: #4a9eff;
+            --accent-hover: #3d8ae0;
+            --border: #3c3c3c;
+            --message-own: #3b82f6;
+            --message-other: #374151;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 타이틀바 (드래그 가능) */
+        .titlebar {
+            height: 32px;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            -webkit-app-region: drag;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .titlebar-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .titlebar-buttons {
+            display: flex;
+            gap: 4px;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .titlebar-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .titlebar-btn.close:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* 메인 레이아웃 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 사이드바 (채팅방 목록) */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+        }
+
+        .room-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .room-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .room-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .room-item.active {
+            background: var(--accent);
+        }
+
+        .room-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .room-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .room-name {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .room-preview {
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .room-meta {
+            text-align: right;
+        }
+
+        .room-time {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .room-unread {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background: var(--danger);
+            border-radius: 9px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        /* 연결 패널 */
+        .connect-panel {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .connect-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+
+        .connect-tab {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .connect-tab.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .connect-form {
+            display: none;
+        }
+
+        .connect-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* 채팅 영역 */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-chat);
+        }
+
+        .chat-header {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-header-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .chat-header-name {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .chat-header-status {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .chat-header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* 메시지 영역 */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .message {
+            display: flex;
+            gap: 8px;
+            max-width: 70%;
+        }
+
+        .message.own {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .message.own .message-avatar {
+            display: none;
+        }
+
+        .message-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .message.own .message-content {
+            align-items: flex-end;
+        }
+
+        .message-sender {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .message.own .message-sender {
+            display: none;
+        }
+
+        .message-bubble {
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .message:not(.own) .message-bubble {
+            background: var(--message-other);
+            border-top-left-radius: 4px;
+        }
+
+        .message.own .message-bubble {
+            background: var(--message-own);
+            border-top-right-radius: 4px;
+        }
+
+        .message-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .message-time {
+            font-size: 10px;
+        }
+
+        .message-read {
+            color: var(--accent);
+        }
+
+        /* 파일 메시지 */
+        .message-file {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            min-width: 200px;
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-size {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        /* 시스템 메시지 */
+        .system-message {
+            text-align: center;
+            padding: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* 날짜 구분선 */
+        .date-separator {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        .date-separator::before,
+        .date-separator::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .date-separator span {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* 입력 영역 */
+        .input-area {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+        }
+
+        .input-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 20px;
+            padding: 8px 16px;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .input-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .input-btn:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .message-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 13px;
+            resize: none;
+            max-height: 100px;
+            line-height: 1.4;
+        }
+
+        .message-input:focus {
+            outline: none;
+        }
+
+        .message-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .send-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--accent);
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover {
+            background: var(--accent-hover);
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 빈 상태 */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .empty-desc {
+            font-size: 13px;
+        }
+
+        /* 사용자 목록 */
+        .users-panel {
+            width: 200px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            padding: 16px;
+            display: none;
+        }
+
+        .users-panel.visible {
+            display: block;
+        }
+
+        .users-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .user-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .user-name {
+            font-size: 12px;
+        }
+
+        .user-host {
+            font-size: 10px;
+            color: var(--warning);
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* 타이핑 인디케이터 */
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .typing-indicator.visible {
+            display: flex;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 타이틀바 -->
+    <div class="titlebar">
+        <div class="titlebar-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            </svg>
+            <span>P2P 메신저</span>
+        </div>
+        <div class="titlebar-buttons">
+            <button class="titlebar-btn" id="minimizeBtn" title="최소화">
+                <svg width="12" height="12" viewBox="0 0 12 12"><path fill="currentColor" d="M2 6h8v1H2z"/></svg>
+            </button>
+            <button class="titlebar-btn" id="maximizeBtn" title="최대화">
+                <svg width="12" height="12" viewBox="0 0 12 12"><path fill="none" stroke="currentColor" d="M2.5 2.5h7v7h-7z"/></svg>
+            </button>
+            <button class="titlebar-btn close" id="closeBtn" title="닫기">
+                <svg width="12" height="12" viewBox="0 0 12 12"><path fill="currentColor" d="M6 5.293l2.646-2.647.708.708L6.707 6l2.647 2.646-.708.708L6 6.707 3.354 9.354l-.708-.708L5.293 6 2.646 3.354l.708-.708z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 메인 컨테이너 -->
+    <div class="main-container">
+        <!-- 사이드바 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">채팅</div>
+                <div class="connection-status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">연결 안됨</span>
+                </div>
+            </div>
+
+            <div class="room-list" id="roomList">
+                <!-- 채팅방 목록이 여기에 동적으로 추가됨 -->
+            </div>
+
+            <!-- 연결 패널 -->
+            <div class="connect-panel">
+                <div class="connect-tabs">
+                    <button class="connect-tab active" data-mode="host">호스트</button>
+                    <button class="connect-tab" data-mode="guest">참가</button>
+                </div>
+
+                <!-- 호스트 폼 -->
+                <div class="connect-form active" id="hostForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>닉네임</label>
+                            <input type="text" id="hostNickname" value="Host" placeholder="닉네임">
+                        </div>
+                        <div class="form-group" style="flex: 0.6;">
+                            <label>포트</label>
+                            <input type="number" id="hostPort" value="9900" placeholder="9900">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="startHostBtn">호스트 시작</button>
+                </div>
+
+                <!-- 참가 폼 -->
+                <div class="connect-form" id="guestForm">
+                    <div class="form-group">
+                        <label>닉네임</label>
+                        <input type="text" id="guestNickname" value="Guest" placeholder="닉네임">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>호스트 IP</label>
+                            <input type="text" id="hostIP" placeholder="192.168.0.1">
+                        </div>
+                        <div class="form-group" style="flex: 0.6;">
+                            <label>포트</label>
+                            <input type="number" id="guestPort" value="9900" placeholder="9900">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="connectBtn">연결</button>
+                </div>
+
+                <!-- 연결 해제 버튼 (연결 시 표시) -->
+                <button class="btn btn-danger" id="disconnectBtn" style="display: none;">연결 해제</button>
+            </div>
+        </div>
+
+        <!-- 채팅 영역 -->
+        <div class="chat-area">
+            <!-- 빈 상태 (연결 전) -->
+            <div class="empty-state" id="emptyState">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                </svg>
+                <div class="empty-title">채팅을 시작하세요</div>
+                <div class="empty-desc">호스트를 시작하거나 기존 호스트에 참가하세요</div>
+            </div>
+
+            <!-- 채팅 화면 (연결 후) -->
+            <div id="chatView" style="display: none; flex: 1; display: none; flex-direction: column;">
+                <div class="chat-header">
+                    <div class="chat-header-info">
+                        <div class="chat-header-avatar" id="chatAvatar">P</div>
+                        <div>
+                            <div class="chat-header-name" id="chatName">P2P 채팅방</div>
+                            <div class="chat-header-status" id="chatStatus">0명 참여중</div>
+                        </div>
+                    </div>
+                    <div class="chat-header-actions">
+                        <button class="header-btn" id="usersBtn" title="참여자 목록">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                            </svg>
+                        </button>
+                        <button class="header-btn" id="settingsBtn" title="설정">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="messages-container" id="messagesContainer">
+                    <!-- 메시지가 여기에 동적으로 추가됨 -->
+                </div>
+
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span id="typingText">누군가 입력 중...</span>
+                </div>
+
+                <div class="input-area">
+                    <div class="input-container">
+                        <div class="input-actions">
+                            <button class="input-btn" id="attachBtn" title="파일 첨부">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
+                                </svg>
+                            </button>
+                            <button class="input-btn" id="emojiBtn" title="이모티콘">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <textarea class="message-input" id="messageInput" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+                        <button class="send-btn" id="sendBtn" disabled title="전송">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 사용자 목록 패널 -->
+        <div class="users-panel" id="usersPanel">
+            <div class="users-title">참여자 (<span id="userCount">0</span>)</div>
+            <div id="usersList">
+                <!-- 사용자 목록이 여기에 동적으로 추가됨 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/chat-window.js"></script>
+</body>
+</html>

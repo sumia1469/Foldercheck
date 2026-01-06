@@ -219,6 +219,18 @@ function registerCommands() {
             });
         }
     });
+
+    // 채팅 윈도우 열기
+    docwatch.commands.register('p2p-messenger.openChatWindow', async () => {
+        try {
+            await docwatch.ipc.invoke('p2p:openChatWindow');
+        } catch (err) {
+            docwatch.ui.showNotification({
+                type: 'error',
+                message: `채팅 윈도우 열기 실패: ${err.message}`
+            });
+        }
+    });
 }
 
 /**

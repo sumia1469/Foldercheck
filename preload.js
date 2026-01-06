@@ -114,6 +114,9 @@ contextBridge.exposeInMainWorld('p2pAPI', {
     sendFile: (filePath) => ipcRenderer.invoke('p2p:sendFile', filePath),
     openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
 
+    // 채팅 윈도우 열기
+    openChatWindow: () => ipcRenderer.invoke('p2p:openChatWindow'),
+
     // 상태
     getStatus: () => ipcRenderer.invoke('p2p:getStatus'),
     getUsers: () => ipcRenderer.invoke('p2p:getUsers'),

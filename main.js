@@ -651,11 +651,23 @@ function createWindow() {
 function createTray() {
     let trayIcon;
     if (process.platform === 'darwin') {
-        trayIcon = nativeImage.createEmpty();
+        // Mac: Template 이미지 사용 (메뉴바에 맞게 자동 색상 조정)
+        const trayPath = path.join(__dirname, 'build', 'icons', 'tray', 'trayTemplate-22.png');
+        if (fs.existsSync(trayPath)) {
+            trayIcon = nativeImage.createFromPath(trayPath);
+            trayIcon.setTemplateImage(true);
+        } else {
+            trayIcon = nativeImage.createEmpty();
+        }
     } else {
-        const iconPath = path.join(__dirname, 'build', 'icons', 'icon.ico');
-        if (fs.existsSync(iconPath)) {
-            trayIcon = nativeImage.createFromPath(iconPath);
+        // Windows: 전용 트레이 ICO 사용 (여백 없이 크게)
+        const trayIcoPath = path.join(__dirname, 'build', 'icons', 'tray', 'tray.ico');
+        const fallbackPath = path.join(__dirname, 'build', 'icons', 'icon.ico');
+
+        if (fs.existsSync(trayIcoPath)) {
+            trayIcon = nativeImage.createFromPath(trayIcoPath);
+        } else if (fs.existsSync(fallbackPath)) {
+            trayIcon = nativeImage.createFromPath(fallbackPath);
         } else {
             trayIcon = nativeImage.createEmpty();
         }

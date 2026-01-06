@@ -2692,6 +2692,16 @@ function switchDetailTab(tabName) {
 
 // 메인 패널에서 확장 토글
 async function toggleExtensionFromMain(extId, enabled) {
+    // 활성화 시도 전에 라이선스 체크
+    if (enabled) {
+        const ext = extensionsData.find(e => e.id === extId);
+        if (ext && ext.licenseLocked) {
+            const extName = ext.manifest?.displayName || ext.manifest?.name || extId;
+            showLicenseUpgradeModal(extName);
+            return;
+        }
+    }
+
     try {
         await window.extensionAPI.toggle(extId, enabled);
         showToast(`확장이 ${enabled ? '활성화' : '비활성화'}되었습니다.`, 'success');
@@ -2705,7 +2715,14 @@ async function toggleExtensionFromMain(extId, enabled) {
         // 메뉴 업데이트
         updateExtensionMenus();
     } catch (err) {
-        showToast('확장 상태 변경에 실패했습니다.', 'error');
+        // 라이선스 오류인 경우 모달로 안내
+        if (err.message && (err.message.includes('라이선스') || err.message.includes('license') || err.message.includes('Pro'))) {
+            const ext = extensionsData.find(e => e.id === extId);
+            const extName = ext?.manifest?.displayName || ext?.manifest?.name || extId;
+            showLicenseUpgradeModal(extName);
+        } else {
+            showToast('확장 상태 변경에 실패했습니다.', 'error');
+        }
     }
 }
 
@@ -10963,13 +10980,30 @@ function getExtensionStateText(state) {
 
 // 확장 활성화/비활성화 토글
 async function toggleExtension(extId, enabled) {
+    // 활성화 시도 전에 라이선스 체크
+    if (enabled) {
+        const ext = extensionsData.find(e => e.id === extId);
+        if (ext && ext.licenseLocked) {
+            const extName = ext.manifest?.displayName || ext.manifest?.name || extId;
+            showLicenseUpgradeModal(extName);
+            return;
+        }
+    }
+
     try {
         await window.extensionAPI.toggle(extId, enabled);
         // UI 업데이트
         await loadExtensions();
     } catch (err) {
         console.error('확장 토글 실패:', err);
-        alert(`확장 ${enabled ? '활성화' : '비활성화'} 실패: ${err.message}`);
+        // 라이선스 오류인 경우 모달로 안내
+        if (err.message && (err.message.includes('라이선스') || err.message.includes('license') || err.message.includes('Pro'))) {
+            const ext = extensionsData.find(e => e.id === extId);
+            const extName = ext?.manifest?.displayName || ext?.manifest?.name || extId;
+            showLicenseUpgradeModal(extName);
+        } else {
+            alert(`확장 ${enabled ? '활성화' : '비활성화'} 실패: ${err.message}`);
+        }
     }
 }
 
@@ -11226,6 +11260,17 @@ function closeExtensionModal() {
 
 // 모달에서 확장 활성화/비활성화
 async function toggleExtensionFromModal(extId, enabled) {
+    // 활성화 시도 전에 라이선스 체크
+    if (enabled) {
+        const ext = extensionsData.find(e => e.id === extId);
+        if (ext && ext.licenseLocked) {
+            const extName = ext.manifest?.displayName || ext.manifest?.name || extId;
+            closeExtensionModal();
+            showLicenseUpgradeModal(extName);
+            return;
+        }
+    }
+
     try {
         await window.extensionAPI.toggle(extId, enabled);
         // 모달 닫고 목록 새로고침
@@ -11235,7 +11280,15 @@ async function toggleExtensionFromModal(extId, enabled) {
         showToast(enabled ? '확장이 활성화되었습니다.' : '확장이 비활성화되었습니다.', 'success');
     } catch (err) {
         console.error('확장 토글 실패:', err);
-        showToast('확장 상태 변경 실패: ' + err.message, 'error');
+        // 라이선스 오류인 경우 모달로 안내
+        if (err.message && (err.message.includes('라이선스') || err.message.includes('license') || err.message.includes('Pro'))) {
+            const ext = extensionsData.find(e => e.id === extId);
+            const extName = ext?.manifest?.displayName || ext?.manifest?.name || extId;
+            closeExtensionModal();
+            showLicenseUpgradeModal(extName);
+        } else {
+            showToast('확장 상태 변경 실패: ' + err.message, 'error');
+        }
     }
 }
 

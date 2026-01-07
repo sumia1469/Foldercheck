@@ -159,6 +159,7 @@ class MessengerDB {
                 unread_count INTEGER DEFAULT 0,
                 pinned INTEGER DEFAULT 0,
                 muted INTEGER DEFAULT 0,
+                notification TEXT DEFAULT 'all', -- all, mention, none
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -208,6 +209,38 @@ class MessengerDB {
             this.saveToFile();
         } else {
             this.db.exec(tables);
+        }
+
+        // 마이그레이션: notification 컬럼 추가 (기존 DB 호환)
+        this._migrateAddNotificationColumn();
+    }
+
+    /**
+     * 마이그레이션: rooms 테이블에 notification 컬럼 추가
+     */
+    _migrateAddNotificationColumn() {
+        try {
+            const checkSql = "SELECT notification FROM rooms LIMIT 1";
+            if (this.isSqlJs) {
+                this.db.exec(checkSql);
+            } else {
+                this.db.prepare(checkSql).get();
+            }
+        } catch (e) {
+            // 컬럼이 없으면 추가
+            console.log('[MessengerDB] notification 컬럼 추가 마이그레이션 실행');
+            const alterSql = "ALTER TABLE rooms ADD COLUMN notification TEXT DEFAULT 'all'";
+            try {
+                if (this.isSqlJs) {
+                    this.db.run(alterSql);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql);
+                }
+                console.log('[MessengerDB] notification 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] notification 컬럼 추가 실패:', alterErr.message);
+            }
         }
     }
 
@@ -606,6 +639,14 @@ class MessengerDB {
         const fields = [];
         const values = [];
 
+        if (updates.name !== undefined) {
+            fields.push('name = ?');
+            values.push(updates.name);
+        }
+        if (updates.notification !== undefined) {
+            fields.push('notification = ?');
+            values.push(updates.notification);
+        }
         if (updates.lastMessage !== undefined) {
             fields.push('last_message = ?');
             values.push(updates.lastMessage);

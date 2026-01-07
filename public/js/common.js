@@ -13255,6 +13255,48 @@ function setupP2PEventListeners() {
         showFileTransferProgress(data.fileName, 100);
         addServerLog('system', `파일 전송 완료: ${data.fileName}`);
     });
+
+    // 메신저 데이터 변경 이벤트 리스너 설정
+    setupMessengerDataEventListeners();
+}
+
+// 메신저 데이터 변경 이벤트 리스너 설정
+function setupMessengerDataEventListeners() {
+    if (!window.messengerDB) return;
+
+    // 채팅방 변경 이벤트
+    window.messengerDB.onRoomChanged((data) => {
+        console.log('채팅방 변경 이벤트:', data);
+        // 사이드바 채팅방 목록 새로고침
+        loadMessengerRooms();
+        // 서버 로그에 기록
+        if (data.action === 'created') {
+            addServerLog('system', `채팅방 생성: ${data.room?.name || data.room?.type || 'ID:' + data.roomId}`);
+        } else if (data.action === 'deleted') {
+            addServerLog('system', `채팅방 삭제 (ID: ${data.roomId})`);
+        } else if (data.action === 'updated') {
+            addServerLog('system', `채팅방 업데이트 (ID: ${data.roomId})`);
+        }
+    });
+
+    // 그룹 변경 이벤트
+    window.messengerDB.onGroupChanged((data) => {
+        console.log('그룹 변경 이벤트:', data);
+        // 사이드바 팀 목록 새로고침
+        loadMessengerTeams();
+        // 서버 로그에 기록
+        if (data.action === 'created') {
+            addServerLog('system', `팀 생성: ${data.group?.name || 'ID:' + data.groupId}`);
+        } else if (data.action === 'deleted') {
+            addServerLog('system', `팀 삭제 (ID: ${data.groupId})`);
+        }
+    });
+
+    // 연락처 변경 이벤트
+    window.messengerDB.onContactChanged((data) => {
+        console.log('연락처 변경 이벤트:', data);
+        // 필요시 연락처 목록 업데이트
+    });
 }
 
 // 파일 크기 포맷

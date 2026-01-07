@@ -1438,6 +1438,39 @@ function initChatAPIListeners() {
             });
         }
     }
+
+    // 메신저 데이터 변경 이벤트 리스너 설정
+    if (window.messengerDB) {
+        // 채팅방 변경 이벤트 (다른 윈도우에서 변경 시)
+        if (window.messengerDB.onRoomChanged) {
+            window.messengerDB.onRoomChanged(async (data) => {
+                console.log('채팅방 변경 이벤트 (채팅윈도우):', data);
+                // 채팅방 목록 새로고침
+                await loadRooms();
+                renderRoomList();
+            });
+        }
+
+        // 그룹 변경 이벤트 (다른 윈도우에서 변경 시)
+        if (window.messengerDB.onGroupChanged) {
+            window.messengerDB.onGroupChanged(async (data) => {
+                console.log('그룹 변경 이벤트 (채팅윈도우):', data);
+                // 그룹 목록 새로고침
+                await loadGroups();
+                renderGroupList();
+            });
+        }
+
+        // 연락처 변경 이벤트 (다른 윈도우에서 변경 시)
+        if (window.messengerDB.onContactChanged) {
+            window.messengerDB.onContactChanged(async (data) => {
+                console.log('연락처 변경 이벤트 (채팅윈도우):', data);
+                // 연락처 목록 새로고침
+                await loadContacts();
+                renderContactList();
+            });
+        }
+    }
 }
 
 // 전역 함수 노출

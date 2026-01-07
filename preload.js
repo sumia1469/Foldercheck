@@ -95,6 +95,59 @@ contextBridge.exposeInMainWorld('extensionAPI', {
     sendInputBoxResult: (id, value) => ipcRenderer.send('inputbox:result', { id, value })
 });
 
+// Messenger Database API (메인 패널에서도 사용)
+contextBridge.exposeInMainWorld('messengerDB', {
+    // 연락처 관리
+    getContacts: () => ipcRenderer.invoke('messenger:getContacts'),
+    addContact: (contact) => ipcRenderer.invoke('messenger:addContact', contact),
+    deleteContact: (id) => ipcRenderer.invoke('messenger:deleteContact', id),
+    updateContactStatus: (id, status) => ipcRenderer.invoke('messenger:updateContactStatus', id, status),
+
+    // 그룹 관리
+    getGroups: () => ipcRenderer.invoke('messenger:getGroups'),
+    createGroup: (group) => ipcRenderer.invoke('messenger:createGroup', group),
+    getGroupMembers: (groupId) => ipcRenderer.invoke('messenger:getGroupMembers', groupId),
+    addGroupMember: (groupId, contactId, role) => ipcRenderer.invoke('messenger:addGroupMember', groupId, contactId, role),
+    deleteGroup: (id) => ipcRenderer.invoke('messenger:deleteGroup', id),
+
+    // 채팅방 관리
+    getRooms: () => ipcRenderer.invoke('messenger:getRooms'),
+    createRoom: (room) => ipcRenderer.invoke('messenger:createRoom', room),
+    getRoom: (id) => ipcRenderer.invoke('messenger:getRoom', id),
+    getRoomParticipants: (roomId) => ipcRenderer.invoke('messenger:getRoomParticipants', roomId),
+    addRoomParticipant: (roomId, contactId, nickname) => ipcRenderer.invoke('messenger:addRoomParticipant', roomId, contactId, nickname),
+    leaveRoom: (roomId, contactId) => ipcRenderer.invoke('messenger:leaveRoom', roomId, contactId),
+    updateRoom: (id, updates) => ipcRenderer.invoke('messenger:updateRoom', id, updates),
+    deleteRoom: (id) => ipcRenderer.invoke('messenger:deleteRoom', id),
+
+    // 메시지 관리
+    saveMessage: (message) => ipcRenderer.invoke('messenger:saveMessage', message),
+    getRoomMessages: (roomId, limit, offset) => ipcRenderer.invoke('messenger:getRoomMessages', roomId, limit, offset),
+    markAsRead: (roomId, contactId) => ipcRenderer.invoke('messenger:markAsRead', roomId, contactId),
+    searchMessages: (query, roomId) => ipcRenderer.invoke('messenger:searchMessages', query, roomId),
+
+    // 설정 관리
+    getSetting: (key, defaultValue) => ipcRenderer.invoke('messenger:getSetting', key, defaultValue),
+    setSetting: (key, value) => ipcRenderer.invoke('messenger:setSetting', key, value),
+
+    // 데이터 변경 이벤트 수신
+    onRoomChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:roomChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:roomChanged', handler);
+    },
+    onGroupChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:groupChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:groupChanged', handler);
+    },
+    onContactChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:contactChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:contactChanged', handler);
+    }
+});
+
 // P2P Messenger API
 contextBridge.exposeInMainWorld('p2pAPI', {
     // 호스트 모드

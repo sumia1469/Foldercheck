@@ -46,6 +46,16 @@ const MessengerDB = require('./messenger-db');
 let p2pMessenger = null;
 let messengerDB = null;
 
+// 모든 윈도우에 이벤트 브로드캐스트 (전역 헬퍼 함수)
+function broadcastToAllWindows(channel, data) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, data);
+    }
+    if (chatWindow && !chatWindow.isDestroyed()) {
+        chatWindow.webContents.send(channel, data);
+    }
+}
+
 // 패키징 여부 확인 (asar 내부인지 체크 - app.isPackaged보다 먼저 사용 가능)
 const isPackaged = __dirname.includes('app.asar');
 
@@ -1776,6 +1786,8 @@ ipcMain.handle('messenger:addContact', async (event, contact) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     const id = db.addContact(contact);
+    // 모든 윈도우에 연락처 추가 이벤트 전송
+    broadcastToAllWindows('messenger:contactChanged', { action: 'added', contactId: id, contact: { ...contact, id } });
     return { success: true, id };
 });
 
@@ -1783,6 +1795,8 @@ ipcMain.handle('messenger:deleteContact', async (event, id) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     db.deleteContact(id);
+    // 모든 윈도우에 연락처 삭제 이벤트 전송
+    broadcastToAllWindows('messenger:contactChanged', { action: 'deleted', contactId: id });
     return { success: true };
 });
 
@@ -1804,6 +1818,9 @@ ipcMain.handle('messenger:createGroup', async (event, group) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     const id = db.createGroup(group);
+    // 모든 윈도우에 그룹 생성 이벤트 전송
+    broadcastToAllWindows('messenger:groupChanged', { action: 'created', groupId: id, group: { ...group, id } });
+    console.log(`[Messenger] 그룹 생성: ${group.name} (ID: ${id})`);
     return { success: true, id };
 });
 
@@ -1824,6 +1841,9 @@ ipcMain.handle('messenger:deleteGroup', async (event, id) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     db.deleteGroup(id);
+    // 모든 윈도우에 그룹 삭제 이벤트 전송
+    broadcastToAllWindows('messenger:groupChanged', { action: 'deleted', groupId: id });
+    console.log(`[Messenger] 그룹 삭제 (ID: ${id})`);
     return { success: true };
 });
 
@@ -1838,6 +1858,9 @@ ipcMain.handle('messenger:createRoom', async (event, room) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     const id = db.createRoom(room);
+    // 모든 윈도우에 채팅방 생성 이벤트 전송
+    broadcastToAllWindows('messenger:roomChanged', { action: 'created', roomId: id, room: { ...room, id } });
+    console.log(`[Messenger] 채팅방 생성: ${room.name || room.type} (ID: ${id})`);
     return { success: true, id };
 });
 
@@ -1871,6 +1894,8 @@ ipcMain.handle('messenger:updateRoom', async (event, id, updates) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     db.updateRoom(id, updates);
+    // 모든 윈도우에 채팅방 업데이트 이벤트 전송
+    broadcastToAllWindows('messenger:roomChanged', { action: 'updated', roomId: id, updates });
     return { success: true };
 });
 
@@ -1878,6 +1903,9 @@ ipcMain.handle('messenger:deleteRoom', async (event, id) => {
     const db = await initializeMessengerDB();
     if (!db) return { success: false, error: 'DB 초기화 실패' };
     db.deleteRoom(id);
+    // 모든 윈도우에 채팅방 삭제 이벤트 전송
+    broadcastToAllWindows('messenger:roomChanged', { action: 'deleted', roomId: id });
+    console.log(`[Messenger] 채팅방 삭제 (ID: ${id})`);
     return { success: true };
 });
 

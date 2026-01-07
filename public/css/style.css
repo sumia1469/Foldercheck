@@ -8345,56 +8345,48 @@ body.resizing-bottom-panel * {
     color: var(--text-secondary);
 }
 
-/* 채팅 섹션 */
-.server-chat-section {
+/* 채팅 윈도우 열기 액션 */
+.open-chat-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
     background: var(--bg-tertiary);
     border-radius: 10px;
     border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    min-height: 250px;
-    max-height: 350px;
+    text-align: center;
 }
 
-.server-chat-section .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-hover);
-}
-
-.server-chat-section .section-header h4 {
+.open-chat-action .btn-lg {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0;
-    font-size: 13px;
+    gap: 10px;
+    padding: 14px 28px;
+    font-size: 15px;
     font-weight: 600;
-    color: var(--text-primary);
 }
 
-.server-chat-section .section-header h4 svg {
-    width: 16px;
-    height: 16px;
-    stroke: var(--accent-primary);
+.open-chat-action .btn-lg svg {
+    width: 20px;
+    height: 20px;
 }
 
-.server-chat-section .chat-messages {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-}
-
-.server-chat-section .chat-input-area {
-    border-top: 1px solid var(--border-color);
+.open-chat-action .action-hint {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
 }
 
 /* 버튼 스타일 추가 */
 .btn-sm {
     padding: 6px 12px;
     font-size: 12px;
+}
+
+.btn-lg {
+    padding: 14px 28px;
+    font-size: 15px;
 }
 
 .btn-ghost {
@@ -8406,17 +8398,6 @@ body.resizing-bottom-panel * {
 .btn-ghost:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-}
-
-#openChatWindowBtn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-#openChatWindowBtn svg {
-    width: 14px;
-    height: 14px;
 }
 
 /* 반응형 */

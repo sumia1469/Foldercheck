@@ -66,7 +66,24 @@ contextBridge.exposeInMainWorld('messengerDB', {
 
     // 설정 관리
     getSetting: (key, defaultValue) => ipcRenderer.invoke('messenger:getSetting', key, defaultValue),
-    setSetting: (key, value) => ipcRenderer.invoke('messenger:setSetting', key, value)
+    setSetting: (key, value) => ipcRenderer.invoke('messenger:setSetting', key, value),
+
+    // 데이터 변경 이벤트 수신
+    onRoomChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:roomChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:roomChanged', handler);
+    },
+    onGroupChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:groupChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:groupChanged', handler);
+    },
+    onContactChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:contactChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:contactChanged', handler);
+    }
 });
 
 // P2P Messenger API (메인 윈도우와 동일)

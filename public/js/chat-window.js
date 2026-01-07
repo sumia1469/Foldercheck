@@ -648,6 +648,16 @@ function renderMessage(msg) {
             </div>
         `;
     } else {
+        // 읽음 상태 아이콘 (카카오톡 스타일 - 더블 체크)
+        const readIcon = msg.isOwn ? `
+            <span class="message-read" title="읽음">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="1 12 5 16 12 9"></polyline>
+                    <polyline points="8 12 12 16 20 7"></polyline>
+                </svg>
+            </span>
+        ` : '';
+
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
@@ -655,7 +665,7 @@ function renderMessage(msg) {
                 <div class="message-bubble">${escapeHtml(msg.content)}</div>
                 <div class="message-meta">
                     <span class="message-time">${time}</span>
-                    ${msg.isOwn ? '<span class="message-read">읽음</span>' : ''}
+                    ${readIcon}
                 </div>
             </div>
         `;
@@ -1659,15 +1669,40 @@ function initUsersPanelClose() {
 
 // 사이드바 토글 기능 초기화
 function initSidebarToggle() {
-    const toggleBtn = document.getElementById('sidebarToggle');
+    const headerToggleBtn = document.getElementById('sidebarHeaderToggle');
+    const floatingToggleBtn = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
 
-    if (!toggleBtn || !sidebar) return;
+    if (!sidebar) return;
 
-    toggleBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-        toggleBtn.classList.toggle('collapsed');
-    });
+    // 사이드바 숨기기/보이기 함수
+    const toggleSidebar = (collapse) => {
+        if (collapse === undefined) {
+            collapse = !sidebar.classList.contains('collapsed');
+        }
+
+        if (collapse) {
+            sidebar.classList.add('collapsed');
+            if (floatingToggleBtn) floatingToggleBtn.classList.add('visible');
+        } else {
+            sidebar.classList.remove('collapsed');
+            if (floatingToggleBtn) floatingToggleBtn.classList.remove('visible');
+        }
+    };
+
+    // 헤더 토글 버튼 (사이드바 내부) - 숨기기
+    if (headerToggleBtn) {
+        headerToggleBtn.addEventListener('click', () => {
+            toggleSidebar(true);
+        });
+    }
+
+    // 플로팅 토글 버튼 (채팅 영역) - 보이기
+    if (floatingToggleBtn) {
+        floatingToggleBtn.addEventListener('click', () => {
+            toggleSidebar(false);
+        });
+    }
 }
 
 // 사이드바 리사이즈 기능 초기화

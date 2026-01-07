@@ -1690,55 +1690,25 @@ function initUsersPanelClose() {
 
 // 사이드바 토글 기능 초기화
 function initSidebarToggle() {
-    const floatingToggleBtn = document.getElementById('sidebarToggle');
     const titlebarToggleBtn = document.getElementById('titlebarPanelToggle');
     const sidebar = document.getElementById('sidebar');
 
     if (!sidebar) return;
 
-    // 타이틀바 토글 버튼 상태 업데이트 함수
-    const updateTitlebarToggle = (isOpen) => {
-        if (titlebarToggleBtn) {
-            if (isOpen) {
-                titlebarToggleBtn.classList.add('active');
-            } else {
-                titlebarToggleBtn.classList.remove('active');
-            }
-        }
-    };
-
     // 사이드바 숨기기/보이기 함수
-    const toggleSidebar = (collapse) => {
-        if (collapse === undefined) {
-            collapse = !sidebar.classList.contains('collapsed');
-        }
+    const toggleSidebar = () => {
+        const isCollapsed = sidebar.classList.contains('collapsed');
 
-        if (collapse) {
-            sidebar.classList.add('collapsed');
-            if (floatingToggleBtn) floatingToggleBtn.classList.add('visible');
-            updateTitlebarToggle(false);
-        } else {
+        if (isCollapsed) {
             sidebar.classList.remove('collapsed');
-            if (floatingToggleBtn) floatingToggleBtn.classList.remove('visible');
-            updateTitlebarToggle(true);
+        } else {
+            sidebar.classList.add('collapsed');
         }
     };
 
-    // 초기 상태 설정 (사이드바가 열려있으면 active)
-    updateTitlebarToggle(!sidebar.classList.contains('collapsed'));
-
-    // 타이틀바 토글 버튼 - 토글
+    // 타이틀바 토글 버튼 클릭 이벤트
     if (titlebarToggleBtn) {
-        titlebarToggleBtn.addEventListener('click', () => {
-            toggleSidebar();
-        });
-    }
-
-    // 플로팅 토글 버튼 (채팅 영역) - 보이기
-    if (floatingToggleBtn) {
-        floatingToggleBtn.addEventListener('click', () => {
-            toggleSidebar(false);
-        });
+        titlebarToggleBtn.addEventListener('click', toggleSidebar);
     }
 }
 

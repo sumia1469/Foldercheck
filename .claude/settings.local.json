@@ -105,7 +105,11 @@
       "Bash(cmd /c \"dir %APPDATA%\\\\docwatch\\\\meetings\")",
       "Bash(powershell -Command:*)",
       "Bash(node scripts/generate-icons.js:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(node:*)",
+      "Bash(codesign:*)",
+      "Bash(xattr:*)",
+      "Bash(/tmp/test-electron-app/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /tmp/test-electron-app)"
     ]
   }
 }

@@ -1424,6 +1424,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initSidebarToggle(); // 좌측 사이드바 토글
     initSidebarResize(); // 좌측 사이드바 리사이즈
     initEmojiPicker(); // 이모지 피커
+    initCloudTabButtons(); // 클라우드 탭 버튼 이벤트
+    initCloudEventListeners(); // 클라우드 이벤트 리스너
+    addToastStyles(); // 토스트 스타일 추가
 
     // 데이터 로드
     await loadMyProfile();
@@ -1438,6 +1441,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 현재 P2P 상태 확인 및 동기화
     await checkP2PStatus();
+
+    // 클라우드 데이터 로드
+    await loadCloudData();
 });
 
 // 메인 윈도우 API 이벤트 리스너
@@ -1869,6 +1875,318 @@ function initEmojiPicker() {
     }
 }
 
+// ============================================
+// 클라우드 파일 서버 기능
+// ============================================
+
+// 클라우드 상태 및 파일 목록 로드
+async function loadCloudData() {
+    try {
+        if (!window.p2pAPI) return;
+
+        // 클라우드 상태 조회
+        const status = await window.p2pAPI.getCloudStatus();
+        state.cloudStatus = status;
+        updateCloudStatusUI();
+
+        // 파일 목록 조회
+        if (status.status === 'running') {
+            const files = await window.p2pAPI.getCloudFiles();
+            state.cloudFiles = files || [];
+            renderCloudFileList();
+        }
+    } catch (err) {
+        console.error('클라우드 데이터 로드 실패:', err);
+    }
+}
+
+// 클라우드 상태 UI 업데이트
+function updateCloudStatusUI() {
+    const statusDot = document.getElementById('cloudStatusDot');
+    const statusText = document.getElementById('cloudStatusText');
+    const storageInfo = document.getElementById('cloudStorageInfo');
+    const uploadBtn = document.getElementById('uploadToCloudBtn');
+
+    if (!statusDot || !statusText) return;
+
+    const isRunning = state.cloudStatus.status === 'running';
+
+    statusDot.className = 'status-dot ' + (isRunning ? 'online' : 'offline');
+    statusText.textContent = isRunning
+        ? `클라우드 서버 활성 (포트: ${state.cloudStatus.port})`
+        : '클라우드 서버 비활성';
+
+    if (storageInfo) {
+        storageInfo.textContent = isRunning
+            ? `${state.cloudStatus.fileCount || 0}개 파일 / ${state.cloudStatus.totalSizeFormatted || '0 B'}`
+            : '0개 파일 / 0 B';
+    }
+
+    if (uploadBtn) {
+        uploadBtn.disabled = !isRunning;
+        uploadBtn.style.opacity = isRunning ? '1' : '0.5';
+    }
+}
+
+// 클라우드 파일 목록 렌더링
+function renderCloudFileList() {
+    const fileList = document.getElementById('cloudFileList');
+    const fileCount = document.getElementById('cloudFileCount');
+
+    if (!fileList) return;
+
+    if (fileCount) {
+        fileCount.textContent = state.cloudFiles.length;
+    }
+
+    if (state.cloudFiles.length === 0) {
+        fileList.innerHTML = `
+            <div class="cloud-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="opacity: 0.3">
+                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                </svg>
+                <div>공유된 파일이 없습니다</div>
+                <div style="font-size: 11px; margin-top: 4px;">호스트 모드에서 파일을 업로드하세요</div>
+            </div>
+        `;
+        return;
+    }
+
+    fileList.innerHTML = state.cloudFiles.map(file => `
+        <div class="cloud-file-item" data-file-id="${file.id}">
+            <div class="cloud-file-icon">
+                ${getFileIcon(file.originalName)}
+            </div>
+            <div class="cloud-file-info">
+                <div class="cloud-file-name" title="${file.originalName}">${file.originalName}</div>
+                <div class="cloud-file-meta">
+                    ${formatFileSize(file.size)} · ${file.uploadedBy} · 다운로드 ${file.downloadCount || 0}회
+                </div>
+            </div>
+            <div class="cloud-file-actions">
+                <button class="cloud-file-action-btn" onclick="downloadCloudFile('${file.id}')" title="다운로드">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </button>
+                <button class="cloud-file-action-btn delete" onclick="deleteCloudFile('${file.id}')" title="삭제">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 파일 아이콘 반환
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+
+    // 이미지
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
+        return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+    }
+    // 문서
+    if (['doc', 'docx', 'txt', 'rtf', 'odt'].includes(ext)) {
+        return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>';
+    }
+    // PDF
+    if (ext === 'pdf') {
+        return '<svg viewBox="0 0 24 24" fill="#e74c3c"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>';
+    }
+    // 엑셀
+    if (['xls', 'xlsx', 'csv'].includes(ext)) {
+        return '<svg viewBox="0 0 24 24" fill="#27ae60"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>';
+    }
+    // 압축
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+        return '<svg viewBox="0 0 24 24" fill="#f39c12"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 6h-2v2h2v2h-2v2h-2v-2h2v-2h-2v-2h2v-2h-2V8h2v2h2v2z"/></svg>';
+    }
+    // 비디오
+    if (['mp4', 'avi', 'mov', 'mkv', 'wmv', 'webm'].includes(ext)) {
+        return '<svg viewBox="0 0 24 24" fill="#9b59b6"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>';
+    }
+    // 오디오
+    if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) {
+        return '<svg viewBox="0 0 24 24" fill="#3498db"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>';
+    }
+    // 기본
+    return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>';
+}
+
+// 파일 크기 포맷
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+}
+
+// 클라우드에 파일 업로드
+async function uploadToCloud() {
+    try {
+        if (!window.p2pAPI) return;
+
+        const result = await window.p2pAPI.selectAndUploadToCloud();
+        if (result.success) {
+            showToast(`파일 업로드 완료: ${result.filename}`);
+            await loadCloudData();
+        }
+    } catch (err) {
+        console.error('파일 업로드 실패:', err);
+        showToast('파일 업로드에 실패했습니다', 'error');
+    }
+}
+
+// 클라우드 파일 다운로드
+async function downloadCloudFile(fileId) {
+    try {
+        const file = state.cloudFiles.find(f => f.id === fileId);
+        if (!file) return;
+
+        // 클라우드 서버 URL 구성
+        const status = await window.p2pAPI.getCloudStatus();
+        if (status.status !== 'running') {
+            showToast('클라우드 서버가 실행 중이 아닙니다', 'error');
+            return;
+        }
+
+        // 다운로드 URL 열기
+        const downloadUrl = `http://localhost:${status.port}/files/${fileId}/${encodeURIComponent(file.originalName)}`;
+        window.open(downloadUrl, '_blank');
+
+        showToast(`다운로드 시작: ${file.originalName}`);
+
+        // 잠시 후 목록 새로고침 (다운로드 카운트 업데이트)
+        setTimeout(() => loadCloudData(), 1000);
+    } catch (err) {
+        console.error('파일 다운로드 실패:', err);
+        showToast('파일 다운로드에 실패했습니다', 'error');
+    }
+}
+
+// 클라우드 파일 삭제
+async function deleteCloudFile(fileId) {
+    try {
+        const file = state.cloudFiles.find(f => f.id === fileId);
+        if (!file) return;
+
+        if (!confirm(`"${file.originalName}" 파일을 삭제하시겠습니까?`)) return;
+
+        await window.p2pAPI.deleteFromCloud(fileId);
+        showToast(`파일 삭제됨: ${file.originalName}`);
+        await loadCloudData();
+    } catch (err) {
+        console.error('파일 삭제 실패:', err);
+        showToast('파일 삭제에 실패했습니다', 'error');
+    }
+}
+
+// 클라우드 스토리지 폴더 열기
+function openCloudStorage() {
+    if (window.p2pAPI) {
+        window.p2pAPI.openCloudStorage();
+    }
+}
+
+// 토스트 메시지 표시
+function showToast(message, type = 'success') {
+    const existingToast = document.querySelector('.toast-message');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast-message toast-${type}`;
+    toast.innerHTML = `
+        <span>${message}</span>
+    `;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'error' ? '#e74c3c' : '#27ae60'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: toastFadeIn 0.3s ease;
+    `;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'toastFadeOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// 클라우드 이벤트 리스너 초기화
+function initCloudEventListeners() {
+    if (!window.p2pAPI) return;
+
+    // 파일 업로드 완료 이벤트
+    window.p2pAPI.onCloudFileUploaded((data) => {
+        console.log('클라우드 파일 업로드됨:', data);
+        loadCloudData();
+    });
+
+    // 파일 삭제 이벤트
+    window.p2pAPI.onCloudFileDeleted((data) => {
+        console.log('클라우드 파일 삭제됨:', data);
+        loadCloudData();
+    });
+
+    // P2P 상태 변경 시 클라우드 상태도 업데이트
+    window.p2pAPI.onStatus((status) => {
+        if (status.mode === 'host') {
+            // 호스트 모드 시작 시 클라우드 데이터 로드
+            setTimeout(() => loadCloudData(), 500);
+        } else if (status.mode === 'offline') {
+            // 오프라인 시 클라우드 상태 초기화
+            state.cloudStatus = { status: 'stopped' };
+            state.cloudFiles = [];
+            updateCloudStatusUI();
+            renderCloudFileList();
+        }
+    });
+}
+
+// 클라우드 탭 버튼 이벤트 초기화
+function initCloudTabButtons() {
+    const uploadBtn = document.getElementById('uploadToCloudBtn');
+    const openStorageBtn = document.getElementById('openCloudStorageBtn');
+
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', uploadToCloud);
+    }
+
+    if (openStorageBtn) {
+        openStorageBtn.addEventListener('click', openCloudStorage);
+    }
+}
+
+// 토스트 애니메이션 스타일 추가
+function addToastStyles() {
+    if (document.getElementById('toast-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'toast-styles';
+    style.textContent = `
+        @keyframes toastFadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes toastFadeOut {
+            from { opacity: 1; transform: translateX(-50%) translateY(0); }
+            to { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 // 전역 함수 노출
 window.selectRoom = selectRoom;
 window.openFile = openFile;
@@ -1890,3 +2208,7 @@ window.saveSettings = saveSettings;
 window.openInviteModal = openInviteModal;
 window.inviteSelectedUsers = inviteSelectedUsers;
 window.closeUsersPanel = closeUsersPanel;
+window.uploadToCloud = uploadToCloud;
+window.downloadCloudFile = downloadCloudFile;
+window.deleteCloudFile = deleteCloudFile;
+window.openCloudStorage = openCloudStorage;

@@ -6,7 +6,8 @@ const os = require('os');
 const http = require('http');
 const { execSync, spawn } = require('child_process');
 const net = require('net');
-const { autoUpdater } = require('electron-updater');
+// autoUpdater는 app ready 이후에 동적으로 로드
+let autoUpdater = null;
 
 // Windows 콘솔 UTF-8 인코딩 설정
 if (process.platform === 'win32') {
@@ -714,6 +715,11 @@ function setupAutoUpdater() {
         return;
     }
 
+    // autoUpdater 동적 로드 (app ready 이후에만 사용 가능)
+    if (!autoUpdater) {
+        autoUpdater = require('electron-updater').autoUpdater;
+    }
+
     // 로깅 활성화
     autoUpdater.logger = {
         info: (msg) => console.log('[AutoUpdater] INFO:', msg),
@@ -831,6 +837,10 @@ ipcMain.handle('check-for-updates', async () => {
         return { status: 'dev-mode', message: '개발 모드에서는 업데이트를 확인할 수 없습니다.' };
     }
     try {
+        // autoUpdater가 아직 로드되지 않았으면 로드
+        if (!autoUpdater) {
+            autoUpdater = require('electron-updater').autoUpdater;
+        }
         const result = await autoUpdater.checkForUpdates();
         return { status: 'success', data: result };
     } catch (err) {

@@ -333,6 +333,18 @@ function initP2PListeners() {
         addFileMessage(data);
     });
 
+    // 파일 전송 완료
+    window.p2pAPI.onFileSent((data) => {
+        console.log('파일 전송 완료:', data);
+        // 내가 보낸 파일을 채팅방에 표시
+        addFileMessage({
+            filename: data.filename,
+            size: data.size,
+            from: state.nickname, // 내 닉네임
+            savedPath: null // 로컬 파일 경로 없음 (전송한 파일)
+        });
+    });
+
     // 연결 끊김
     window.p2pAPI.onDisconnected((data) => {
         console.log('연결 끊김:', data);
@@ -1409,6 +1421,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initUsersPanelResize(); // 참여자 패널 리사이즈
     initSidebarToggle(); // 좌측 사이드바 토글
     initSidebarResize(); // 좌측 사이드바 리사이즈
+    initEmojiPicker(); // 이모지 피커
 
     // 데이터 로드
     await loadMyProfile();
@@ -1743,6 +1756,115 @@ function initSidebarResize() {
             resizeHandle.classList.remove('resizing');
         }
     });
+}
+
+// ============================================
+// 이모지 피커 기능
+// ============================================
+
+// 이모지 데이터
+const emojiData = {
+    smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐'],
+    gestures: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄'],
+    hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💌', '💋', '😻', '😽', '🥰', '😍', '🤩', '😘', '💑', '👩‍❤️‍👨', '👨‍❤️‍👨', '👩‍❤️‍👩'],
+    animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐻‍❄️', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🦟', '🦗', '🕷️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊'],
+    food: ['🍔', '🍕', '🌭', '🍟', '🥨', '🥯', '🥞', '🧇', '🧀', '🍖', '🍗', '🥩', '🥓', '🍳', '🍲', '🥘', '🍜', '🍝', '🍛', '🍣', '🍱', '🍤', '🍙', '🍚', '🍘', '🥟', '🥠', '🥡', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼', '☕', '🍵', '🧃', '🥤', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧊', '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝'],
+    activities: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🏋️', '🤸', '🤺', '🤾', '🏌️', '🏇', '⛹️', '🏊', '🚴', '🚵', '🧗', '🤼', '🎮', '🎲', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻'],
+    objects: ['💡', '🔦', '🏮', '📱', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎬', '📺', '📻', '🎙️', '🎚️', '🎛️', '⏰', '⏱️', '⏲️', '🕰️', '📡', '🔋', '🔌', '💰', '💵', '💴', '💶', '💷', '💳', '💎', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🔩', '⚙️', '🔗', '📎', '🖇️', '📌', '📍', '✂️', '📝', '✏️', '🖊️', '🖋️', '📚', '📖', '📰', '📃', '📜', '📄', '📑', '🔖', '🏷️'],
+    symbols: ['✅', '❌', '⭕', '❓', '❗', '‼️', '⁉️', '💯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '🔶', '🔷', '🔸', '🔹', '🔺', '🔻', '💠', '🔘', '🔳', '🔲', '🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '⬛', '⬜', '◼️', '◻️', '◾', '◽', '▪️', '▫️', '🔈', '🔇', '🔉', '🔊', '🔔', '🔕', '📣', '📢', '💬', '💭', '🗯️', '♠️', '♣️', '♥️', '♦️', '🃏', '🎴', '🀄', '⏸️', '⏹️', '⏺️', '⏭️', '⏮️', '⏩', '⏪', '🔀', '🔁', '🔂', '▶️', '⏯️']
+};
+
+// 이모지 피커 초기화
+function initEmojiPicker() {
+    const emojiBtn = document.getElementById('emojiBtn');
+    const emojiPicker = document.getElementById('emojiPicker');
+    const emojiContent = document.getElementById('emojiContent');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    if (!emojiBtn || !emojiPicker || !emojiContent) return;
+
+    // 이모지 버튼 클릭 시 피커 토글
+    emojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPicker.classList.toggle('visible');
+        if (emojiPicker.classList.contains('visible')) {
+            // 기본 카테고리(smileys) 로드
+            loadEmojiCategory('smileys');
+        }
+    });
+
+    // 피커 외부 클릭 시 닫기
+    document.addEventListener('click', (e) => {
+        if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+            emojiPicker.classList.remove('visible');
+        }
+    });
+
+    // 카테고리 버튼 클릭
+    document.querySelectorAll('.emoji-category-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const category = btn.dataset.category;
+
+            // 활성 버튼 변경
+            document.querySelectorAll('.emoji-category-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // 해당 카테고리 이모지 로드
+            loadEmojiCategory(category);
+        });
+    });
+
+    // 이모지 카테고리 로드
+    function loadEmojiCategory(category) {
+        const emojis = emojiData[category] || [];
+        const categoryNames = {
+            smileys: '표정',
+            gestures: '제스처',
+            hearts: '하트',
+            animals: '동물',
+            food: '음식',
+            activities: '활동',
+            objects: '사물',
+            symbols: '기호'
+        };
+
+        emojiContent.innerHTML = `
+            <div class="emoji-category-title">${categoryNames[category] || category}</div>
+            <div class="emoji-grid">
+                ${emojis.map(emoji => `
+                    <button class="emoji-item" data-emoji="${emoji}">${emoji}</button>
+                `).join('')}
+            </div>
+        `;
+
+        // 이모지 클릭 이벤트
+        emojiContent.querySelectorAll('.emoji-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const emoji = item.dataset.emoji;
+                insertEmoji(emoji);
+            });
+        });
+    }
+
+    // 이모지 삽입
+    function insertEmoji(emoji) {
+        const cursorPos = messageInput.selectionStart;
+        const textBefore = messageInput.value.substring(0, cursorPos);
+        const textAfter = messageInput.value.substring(cursorPos);
+
+        messageInput.value = textBefore + emoji + textAfter;
+        messageInput.focus();
+
+        // 커서 위치 업데이트
+        const newCursorPos = cursorPos + emoji.length;
+        messageInput.setSelectionRange(newCursorPos, newCursorPos);
+
+        // 전송 버튼 활성화
+        sendBtn.disabled = !messageInput.value.trim();
+    }
 }
 
 // 전역 함수 노출

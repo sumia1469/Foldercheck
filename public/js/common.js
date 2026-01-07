@@ -13212,28 +13212,28 @@ function setupP2PEventListeners() {
 
     // 파일 전송 진행
     window.p2pAPI.onFileProgress((data) => {
-        showFileTransferProgress(data.fileName, data.progress);
+        showFileTransferProgress(data.filename, data.progress);
     });
 
     // 파일 수신 완료
     window.p2pAPI.onFileReceived((data) => {
         console.log('파일 수신 완료:', data);
-        showFileTransferProgress(data.fileName, 100);
+        showFileTransferProgress(data.filename, 100);
         addChatMessage({
             type: 'file',
             sender: data.from,
-            fileName: data.fileName,
+            fileName: data.filename,
             fileSize: data.size,
             timestamp: new Date().toISOString()
         });
-        addServerLog('system', `파일 수신 완료: ${data.fileName}`);
+        addServerLog('system', `파일 수신 완료: ${data.filename}`);
     });
 
     // 파일 전송 완료
     window.p2pAPI.onFileSent((data) => {
         console.log('파일 전송 완료:', data);
-        showFileTransferProgress(data.fileName, 100);
-        addServerLog('system', `파일 전송 완료: ${data.fileName}`);
+        showFileTransferProgress(data.filename, 100);
+        addServerLog('system', `파일 전송 완료: ${data.filename}`);
     });
 
     // 메신저 데이터 변경 이벤트 리스너 설정

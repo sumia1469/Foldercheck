@@ -1690,7 +1690,6 @@ function initUsersPanelClose() {
 
 // 사이드바 토글 기능 초기화
 function initSidebarToggle() {
-    const headerToggleBtn = document.getElementById('sidebarHeaderToggle');
     const floatingToggleBtn = document.getElementById('sidebarToggle');
     const titlebarToggleBtn = document.getElementById('titlebarPanelToggle');
     const sidebar = document.getElementById('sidebar');
@@ -1732,13 +1731,6 @@ function initSidebarToggle() {
     if (titlebarToggleBtn) {
         titlebarToggleBtn.addEventListener('click', () => {
             toggleSidebar();
-        });
-    }
-
-    // 헤더 토글 버튼 (사이드바 내부) - 숨기기
-    if (headerToggleBtn) {
-        headerToggleBtn.addEventListener('click', () => {
-            toggleSidebar(true);
         });
     }
 

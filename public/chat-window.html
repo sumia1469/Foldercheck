@@ -279,6 +279,149 @@
             background: rgba(74, 158, 255, 0.1);
         }
 
+        .add-btn.secondary {
+            margin-top: 0;
+        }
+
+        /* 클라우드 상태 */
+        .cloud-status {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            margin: 8px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .cloud-status-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-dot.online {
+            background: var(--success);
+        }
+
+        .status-dot.offline {
+            background: var(--danger);
+        }
+
+        #cloudStatusText {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .cloud-storage-info {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* 클라우드 파일 목록 */
+        .cloud-file-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .cloud-file-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .cloud-file-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .cloud-file-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .cloud-file-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .cloud-file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cloud-file-name {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cloud-file-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 8px;
+        }
+
+        .cloud-file-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .cloud-file-item:hover .cloud-file-actions {
+            opacity: 1;
+        }
+
+        .cloud-file-action-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cloud-file-action-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .cloud-file-action-btn.delete:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .cloud-empty {
+            padding: 32px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
         /* 연락처/그룹 아이템 */
         .contact-item, .group-item {
             display: flex;
@@ -1396,6 +1539,12 @@
                     </svg>
                     그룹
                 </button>
+                <button class="sidebar-tab" data-tab="cloud">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                    </svg>
+                    클라우드
+                </button>
             </div>
 
             <!-- 채팅 탭 -->
@@ -1447,6 +1596,35 @@
                 </button>
                 <div class="group-list" id="groupList">
                     <!-- 그룹 목록이 여기에 동적으로 추가됨 -->
+                </div>
+            </div>
+
+            <!-- 클라우드 탭 -->
+            <div class="tab-content" id="cloudTab">
+                <div class="cloud-status" id="cloudStatus">
+                    <div class="cloud-status-info">
+                        <span class="status-dot offline" id="cloudStatusDot"></span>
+                        <span id="cloudStatusText">클라우드 서버 비활성</span>
+                    </div>
+                    <span class="cloud-storage-info" id="cloudStorageInfo">0개 파일 / 0 B</span>
+                </div>
+                <button class="add-btn" id="uploadToCloudBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                    </svg>
+                    파일 업로드
+                </button>
+                <button class="add-btn secondary" id="openCloudStorageBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+                    </svg>
+                    저장소 열기
+                </button>
+                <div class="section-header" style="padding: 8px 16px; font-size: 11px; color: var(--text-secondary); font-weight: 600; margin-top: 8px;">
+                    공유된 파일 (<span id="cloudFileCount">0</span>)
+                </div>
+                <div class="cloud-file-list" id="cloudFileList">
+                    <!-- 클라우드 파일 목록 -->
                 </div>
             </div>
 

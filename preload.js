@@ -180,6 +180,26 @@ contextBridge.exposeInMainWorld('p2pAPI', {
     getStatus: () => ipcRenderer.invoke('p2p:getStatus'),
     getUsers: () => ipcRenderer.invoke('p2p:getUsers'),
 
+    // 클라우드 서버 API
+    getCloudStatus: () => ipcRenderer.invoke('cloud:getStatus'),
+    getCloudFiles: () => ipcRenderer.invoke('cloud:getFiles'),
+    uploadToCloud: (filePath) => ipcRenderer.invoke('cloud:uploadFile', filePath),
+    deleteFromCloud: (fileId) => ipcRenderer.invoke('cloud:deleteFile', fileId),
+    selectAndUploadToCloud: () => ipcRenderer.invoke('cloud:selectAndUpload'),
+    openCloudStorage: () => ipcRenderer.invoke('cloud:openStorage'),
+
+    // 클라우드 이벤트
+    onCloudFileUploaded: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('cloud:file-uploaded', handler);
+        return () => ipcRenderer.removeListener('cloud:file-uploaded', handler);
+    },
+    onCloudFileDeleted: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('cloud:file-deleted', handler);
+        return () => ipcRenderer.removeListener('cloud:file-deleted', handler);
+    },
+
     // 이벤트 리스너
     onStatus: (callback) => {
         const handler = (event, data) => callback(data);

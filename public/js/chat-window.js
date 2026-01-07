@@ -12,7 +12,9 @@ const state = {
     users: [],       // 사용자 목록
     messages: [],    // 현재 방 메시지
     contacts: [],    // 연락처 목록
-    groups: []       // 그룹 목록
+    groups: [],      // 그룹 목록
+    cloudFiles: [],  // 클라우드 파일 목록
+    cloudStatus: { status: 'stopped' } // 클라우드 서버 상태
 };
 
 // DOM 요소

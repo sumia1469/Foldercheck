@@ -6,6 +6,7 @@
  */
 
 const net = require('net');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -24,6 +25,12 @@ class P2PMessenger extends EventEmitter {
         this.messageHistory = [];
         this.fileTransfers = new Map(); // transferId -> { filename, chunks, received }
         this.pendingFiles = new Map(); // transferId -> { filename, data, totalSize }
+
+        // 클라우드 파일 서버
+        this.httpServer = null;
+        this.cloudPort = 9901; // HTTP 파일 서버 포트
+        this.cloudFiles = new Map(); // fileId -> { filename, originalName, size, uploadedBy, uploadedAt, downloadCount }
+        this.cloudStoragePath = null; // 파일 저장 경로
     }
 
     /**
@@ -49,14 +56,23 @@ class P2PMessenger extends EventEmitter {
                 reject(err);
             });
 
-            this.server.listen(port, '0.0.0.0', () => {
+            this.server.listen(port, '0.0.0.0', async () => {
                 this.mode = 'host';
                 // 호스트 자신을 사용자 목록에 추가
                 this.users.set('host', { nickname: this.nickname, isHost: true });
                 console.log(`[P2P] 호스트 시작: 포트 ${port}`);
-                this.emit('status', { mode: 'host', port });
+
+                // 클라우드 파일 서버 시작
+                try {
+                    await this._startCloudServer(port + 1);
+                    console.log(`[P2P] 클라우드 파일 서버 시작: 포트 ${this.cloudPort}`);
+                } catch (cloudErr) {
+                    console.error('[P2P] 클라우드 서버 시작 실패:', cloudErr.message);
+                }
+
+                this.emit('status', { mode: 'host', port, cloudPort: this.cloudPort });
                 this.emit('user_list', this.getUsers());
-                resolve({ success: true, port });
+                resolve({ success: true, port, cloudPort: this.cloudPort });
             });
         });
     }
@@ -83,6 +99,13 @@ class P2PMessenger extends EventEmitter {
             }
             this.clients.clear();
             this.users.clear();
+
+            // 클라우드 서버 종료
+            if (this.httpServer) {
+                this.httpServer.close();
+                this.httpServer = null;
+                console.log('[P2P] 클라우드 파일 서버 중지됨');
+            }
 
             // 서버 종료
             if (this.server) {
@@ -614,6 +637,493 @@ class P2PMessenger extends EventEmitter {
         if (this.clientSocket) {
             this.clientSocket.write(JSON.stringify(msg) + '\n');
         }
+    }
+
+    // ========== 클라우드 파일 서버 ==========
+
+    /**
+     * 클라우드 파일 서버 시작
+     */
+    _startCloudServer(port) {
+        return new Promise((resolve, reject) => {
+            this.cloudPort = port;
+
+            // 저장 경로 설정
+            const { app } = require('electron');
+            this.cloudStoragePath = path.join(app.getPath('userData'), 'cloud-files');
+
+            // 저장 폴더 생성
+            if (!fs.existsSync(this.cloudStoragePath)) {
+                fs.mkdirSync(this.cloudStoragePath, { recursive: true });
+            }
+
+            // 메타데이터 파일 로드
+            this._loadCloudMetadata();
+
+            this.httpServer = http.createServer((req, res) => {
+                this._handleCloudRequest(req, res);
+            });
+
+            this.httpServer.on('error', (err) => {
+                console.error('[Cloud] HTTP 서버 에러:', err.message);
+                reject(err);
+            });
+
+            this.httpServer.listen(port, '0.0.0.0', () => {
+                resolve({ port });
+            });
+        });
+    }
+
+    /**
+     * 클라우드 메타데이터 로드
+     */
+    _loadCloudMetadata() {
+        const metaPath = path.join(this.cloudStoragePath, 'metadata.json');
+        if (fs.existsSync(metaPath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+                this.cloudFiles = new Map(Object.entries(data));
+                console.log(`[Cloud] ${this.cloudFiles.size}개 파일 메타데이터 로드됨`);
+            } catch (e) {
+                console.error('[Cloud] 메타데이터 로드 실패:', e.message);
+            }
+        }
+    }
+
+    /**
+     * 클라우드 메타데이터 저장
+     */
+    _saveCloudMetadata() {
+        const metaPath = path.join(this.cloudStoragePath, 'metadata.json');
+        const data = Object.fromEntries(this.cloudFiles);
+        fs.writeFileSync(metaPath, JSON.stringify(data, null, 2));
+    }
+
+    /**
+     * HTTP 요청 처리
+     */
+    _handleCloudRequest(req, res) {
+        // CORS 헤더
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+            res.writeHead(200);
+            res.end();
+            return;
+        }
+
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const pathname = url.pathname;
+
+        // 라우팅
+        if (req.method === 'GET' && pathname === '/files') {
+            this._handleListFiles(req, res);
+        } else if (req.method === 'GET' && pathname.startsWith('/files/')) {
+            this._handleDownloadFile(req, res, pathname);
+        } else if (req.method === 'POST' && pathname === '/upload') {
+            this._handleUploadFile(req, res);
+        } else if (req.method === 'DELETE' && pathname.startsWith('/files/')) {
+            this._handleDeleteFile(req, res, pathname);
+        } else if (req.method === 'GET' && pathname === '/status') {
+            this._handleServerStatus(req, res);
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Not found' }));
+        }
+    }
+
+    /**
+     * 파일 목록 조회
+     */
+    _handleListFiles(req, res) {
+        const files = Array.from(this.cloudFiles.entries()).map(([id, file]) => ({
+            id,
+            ...file,
+            downloadUrl: `/files/${id}/${encodeURIComponent(file.originalName)}`
+        }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ files, total: files.length }));
+    }
+
+    /**
+     * 파일 다운로드
+     */
+    _handleDownloadFile(req, res, pathname) {
+        // /files/{fileId}/{filename} 형식
+        const parts = pathname.split('/');
+        const fileId = parts[2];
+        const fileInfo = this.cloudFiles.get(fileId);
+
+        if (!fileInfo) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'File not found' }));
+            return;
+        }
+
+        const filePath = path.join(this.cloudStoragePath, fileInfo.filename);
+        if (!fs.existsSync(filePath)) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'File not found on disk' }));
+            return;
+        }
+
+        // 다운로드 카운트 증가
+        fileInfo.downloadCount = (fileInfo.downloadCount || 0) + 1;
+        this._saveCloudMetadata();
+
+        // 파일 스트리밍
+        const stat = fs.statSync(filePath);
+        res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileInfo.originalName)}`,
+            'Content-Length': stat.size
+        });
+
+        fs.createReadStream(filePath).pipe(res);
+    }
+
+    /**
+     * 파일 업로드
+     */
+    _handleUploadFile(req, res) {
+        const contentType = req.headers['content-type'] || '';
+
+        // multipart/form-data 처리
+        if (contentType.includes('multipart/form-data')) {
+            this._handleMultipartUpload(req, res, contentType);
+        } else {
+            // 단순 바이너리 업로드
+            this._handleBinaryUpload(req, res);
+        }
+    }
+
+    /**
+     * Multipart 파일 업로드 처리
+     */
+    _handleMultipartUpload(req, res, contentType) {
+        const boundary = contentType.split('boundary=')[1];
+        if (!boundary) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid multipart request' }));
+            return;
+        }
+
+        let body = Buffer.alloc(0);
+
+        req.on('data', (chunk) => {
+            body = Buffer.concat([body, chunk]);
+        });
+
+        req.on('end', () => {
+            try {
+                const result = this._parseMultipart(body, boundary);
+                if (!result || !result.file) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'No file found in request' }));
+                    return;
+                }
+
+                const fileId = crypto.randomUUID();
+                const ext = path.extname(result.filename);
+                const storedFilename = `${fileId}${ext}`;
+                const filePath = path.join(this.cloudStoragePath, storedFilename);
+
+                fs.writeFileSync(filePath, result.file);
+
+                const fileInfo = {
+                    filename: storedFilename,
+                    originalName: result.filename,
+                    size: result.file.length,
+                    uploadedBy: result.uploadedBy || this.nickname,
+                    uploadedAt: new Date().toISOString(),
+                    downloadCount: 0
+                };
+
+                this.cloudFiles.set(fileId, fileInfo);
+                this._saveCloudMetadata();
+
+                console.log(`[Cloud] 파일 업로드: ${result.filename} (${this._formatSize(result.file.length)})`);
+
+                this.emit('cloud_file_uploaded', {
+                    fileId,
+                    ...fileInfo
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    fileId,
+                    filename: result.filename,
+                    size: result.file.length,
+                    downloadUrl: `/files/${fileId}/${encodeURIComponent(result.filename)}`
+                }));
+            } catch (e) {
+                console.error('[Cloud] 업로드 처리 에러:', e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+    }
+
+    /**
+     * 바이너리 파일 업로드 처리
+     */
+    _handleBinaryUpload(req, res) {
+        const filename = req.headers['x-filename'] || 'uploaded_file';
+        const uploadedBy = req.headers['x-uploaded-by'] || this.nickname;
+
+        let body = Buffer.alloc(0);
+
+        req.on('data', (chunk) => {
+            body = Buffer.concat([body, chunk]);
+        });
+
+        req.on('end', () => {
+            try {
+                const fileId = crypto.randomUUID();
+                const ext = path.extname(filename);
+                const storedFilename = `${fileId}${ext}`;
+                const filePath = path.join(this.cloudStoragePath, storedFilename);
+
+                fs.writeFileSync(filePath, body);
+
+                const fileInfo = {
+                    filename: storedFilename,
+                    originalName: filename,
+                    size: body.length,
+                    uploadedBy,
+                    uploadedAt: new Date().toISOString(),
+                    downloadCount: 0
+                };
+
+                this.cloudFiles.set(fileId, fileInfo);
+                this._saveCloudMetadata();
+
+                console.log(`[Cloud] 파일 업로드: ${filename} (${this._formatSize(body.length)})`);
+
+                this.emit('cloud_file_uploaded', {
+                    fileId,
+                    ...fileInfo
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    fileId,
+                    filename,
+                    size: body.length,
+                    downloadUrl: `/files/${fileId}/${encodeURIComponent(filename)}`
+                }));
+            } catch (e) {
+                console.error('[Cloud] 업로드 처리 에러:', e.message);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+    }
+
+    /**
+     * Multipart 데이터 파싱
+     */
+    _parseMultipart(body, boundary) {
+        const boundaryBuffer = Buffer.from(`--${boundary}`);
+        const parts = [];
+        let start = 0;
+
+        while (true) {
+            const idx = body.indexOf(boundaryBuffer, start);
+            if (idx === -1) break;
+
+            if (start > 0) {
+                parts.push(body.slice(start, idx - 2)); // -2 for \r\n
+            }
+            start = idx + boundaryBuffer.length + 2; // +2 for \r\n
+        }
+
+        for (const part of parts) {
+            const headerEnd = part.indexOf('\r\n\r\n');
+            if (headerEnd === -1) continue;
+
+            const header = part.slice(0, headerEnd).toString();
+            const content = part.slice(headerEnd + 4);
+
+            const filenameMatch = header.match(/filename="([^"]+)"/);
+            const nameMatch = header.match(/name="([^"]+)"/);
+
+            if (filenameMatch) {
+                const uploadedByMatch = header.match(/x-uploaded-by:\s*([^\r\n]+)/i);
+                return {
+                    filename: filenameMatch[1],
+                    file: content,
+                    uploadedBy: uploadedByMatch ? uploadedByMatch[1] : null
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 파일 삭제
+     */
+    _handleDeleteFile(req, res, pathname) {
+        const parts = pathname.split('/');
+        const fileId = parts[2];
+        const fileInfo = this.cloudFiles.get(fileId);
+
+        if (!fileInfo) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'File not found' }));
+            return;
+        }
+
+        // 파일 삭제
+        const filePath = path.join(this.cloudStoragePath, fileInfo.filename);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        this.cloudFiles.delete(fileId);
+        this._saveCloudMetadata();
+
+        console.log(`[Cloud] 파일 삭제: ${fileInfo.originalName}`);
+
+        this.emit('cloud_file_deleted', { fileId, filename: fileInfo.originalName });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+    }
+
+    /**
+     * 서버 상태 조회
+     */
+    _handleServerStatus(req, res) {
+        const totalSize = Array.from(this.cloudFiles.values())
+            .reduce((sum, f) => sum + f.size, 0);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            status: 'running',
+            port: this.cloudPort,
+            fileCount: this.cloudFiles.size,
+            totalSize,
+            totalSizeFormatted: this._formatSize(totalSize)
+        }));
+    }
+
+    /**
+     * 파일 크기 포맷
+     */
+    _formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+    }
+
+    // ========== 클라우드 공개 API ==========
+
+    /**
+     * 클라우드 파일 목록 조회
+     */
+    getCloudFiles() {
+        return Array.from(this.cloudFiles.entries()).map(([id, file]) => ({
+            id,
+            ...file,
+            downloadUrl: `/files/${id}/${encodeURIComponent(file.originalName)}`
+        }));
+    }
+
+    /**
+     * 클라우드 서버 상태 조회
+     */
+    getCloudStatus() {
+        if (!this.httpServer) {
+            return { status: 'stopped' };
+        }
+
+        const totalSize = Array.from(this.cloudFiles.values())
+            .reduce((sum, f) => sum + f.size, 0);
+
+        return {
+            status: 'running',
+            port: this.cloudPort,
+            fileCount: this.cloudFiles.size,
+            totalSize,
+            totalSizeFormatted: this._formatSize(totalSize)
+        };
+    }
+
+    /**
+     * 파일을 클라우드에 업로드 (로컬 파일 경로 기반)
+     */
+    async uploadToCloud(filePath) {
+        if (!this.httpServer && this.mode !== 'host') {
+            throw new Error('클라우드 서버가 실행 중이 아닙니다.');
+        }
+
+        const stats = fs.statSync(filePath);
+        const originalName = path.basename(filePath);
+        const fileData = fs.readFileSync(filePath);
+
+        const fileId = crypto.randomUUID();
+        const ext = path.extname(originalName);
+        const storedFilename = `${fileId}${ext}`;
+        const storagePath = path.join(this.cloudStoragePath, storedFilename);
+
+        fs.writeFileSync(storagePath, fileData);
+
+        const fileInfo = {
+            filename: storedFilename,
+            originalName,
+            size: stats.size,
+            uploadedBy: this.nickname,
+            uploadedAt: new Date().toISOString(),
+            downloadCount: 0
+        };
+
+        this.cloudFiles.set(fileId, fileInfo);
+        this._saveCloudMetadata();
+
+        console.log(`[Cloud] 파일 업로드: ${originalName} (${this._formatSize(stats.size)})`);
+
+        this.emit('cloud_file_uploaded', {
+            fileId,
+            ...fileInfo
+        });
+
+        return {
+            fileId,
+            filename: originalName,
+            size: stats.size,
+            downloadUrl: `/files/${fileId}/${encodeURIComponent(originalName)}`
+        };
+    }
+
+    /**
+     * 클라우드에서 파일 삭제
+     */
+    deleteFromCloud(fileId) {
+        const fileInfo = this.cloudFiles.get(fileId);
+        if (!fileInfo) {
+            throw new Error('파일을 찾을 수 없습니다.');
+        }
+
+        const filePath = path.join(this.cloudStoragePath, fileInfo.filename);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        this.cloudFiles.delete(fileId);
+        this._saveCloudMetadata();
+
+        this.emit('cloud_file_deleted', { fileId, filename: fileInfo.originalName });
+
+        return { success: true };
     }
 }
 

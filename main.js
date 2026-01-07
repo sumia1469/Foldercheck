@@ -1531,6 +1531,15 @@ function initializeP2PMessenger() {
         sendToAllWindows('p2p:file-sent', data);
     });
 
+    // 클라우드 파일 이벤트
+    p2pMessenger.on('cloud_file_uploaded', (data) => {
+        sendToAllWindows('cloud:file-uploaded', data);
+    });
+
+    p2pMessenger.on('cloud_file_deleted', (data) => {
+        sendToAllWindows('cloud:file-deleted', data);
+    });
+
     console.log('[P2P] 메신저 시스템 초기화 완료');
 }
 
@@ -1609,6 +1618,63 @@ ipcMain.handle('p2p:openDownloads', () => {
         fs.mkdirSync(downloadsDir, { recursive: true });
     }
     require('electron').shell.openPath(downloadsDir);
+});
+
+// ========================================
+// 클라우드 파일 서버 API
+// ========================================
+
+// 클라우드 상태 조회
+ipcMain.handle('cloud:getStatus', () => {
+    if (!p2pMessenger) return { status: 'stopped' };
+    return p2pMessenger.getCloudStatus();
+});
+
+// 클라우드 파일 목록 조회
+ipcMain.handle('cloud:getFiles', () => {
+    if (!p2pMessenger) return [];
+    return p2pMessenger.getCloudFiles();
+});
+
+// 클라우드에 파일 업로드
+ipcMain.handle('cloud:uploadFile', async (event, filePath) => {
+    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+    return await p2pMessenger.uploadToCloud(filePath);
+});
+
+// 클라우드에서 파일 삭제
+ipcMain.handle('cloud:deleteFile', (event, fileId) => {
+    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+    return p2pMessenger.deleteFromCloud(fileId);
+});
+
+// 클라우드 파일 선택 및 업로드
+ipcMain.handle('cloud:selectAndUpload', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        title: '클라우드에 업로드할 파일 선택'
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+        return { success: false };
+    }
+
+    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+    const uploadResult = await p2pMessenger.uploadToCloud(result.filePaths[0]);
+    return { success: true, ...uploadResult };
+});
+
+// 클라우드 스토리지 폴더 열기
+ipcMain.handle('cloud:openStorage', () => {
+    if (!p2pMessenger || !p2pMessenger.cloudStoragePath) {
+        const cloudDir = path.join(getUserDataDir(), 'cloud-files');
+        if (!fs.existsSync(cloudDir)) {
+            fs.mkdirSync(cloudDir, { recursive: true });
+        }
+        require('electron').shell.openPath(cloudDir);
+    } else {
+        require('electron').shell.openPath(p2pMessenger.cloudStoragePath);
+    }
 });
 
 // ========================================

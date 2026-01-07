@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('messengerDB', {
     addRoomParticipant: (roomId, contactId, nickname) => ipcRenderer.invoke('messenger:addRoomParticipant', roomId, contactId, nickname),
     leaveRoom: (roomId, contactId) => ipcRenderer.invoke('messenger:leaveRoom', roomId, contactId),
     updateRoom: (id, updates) => ipcRenderer.invoke('messenger:updateRoom', id, updates),
+    deleteRoom: (id) => ipcRenderer.invoke('messenger:deleteRoom', id),
 
     // 메시지 관리
     saveMessage: (message) => ipcRenderer.invoke('messenger:saveMessage', message),

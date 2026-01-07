@@ -1021,6 +1021,28 @@ async function leaveRoom(roomId) {
     }
 }
 
+// 채팅방 삭제
+async function deleteRoom(roomId) {
+    try {
+        if (window.messengerDB) {
+            await window.messengerDB.deleteRoom(roomId);
+            await loadRooms();
+
+            if (state.currentRoom === roomId) {
+                state.currentRoom = null;
+                if (state.rooms.length === 0) {
+                    showEmptyRoomMessage();
+                } else {
+                    hideChatView();
+                }
+            }
+        }
+    } catch (err) {
+        console.error('채팅방 삭제 실패:', err);
+        throw err;
+    }
+}
+
 // 메시지 검색
 async function searchMessages(query, roomId = null) {
     try {
@@ -1372,20 +1394,26 @@ function createNewRoom() {
     openModal('roomModal');
 }
 
-// 현재 채팅방 나가기
+// 현재 채팅방 나가기 (삭제)
 async function leaveCurrentRoom() {
     if (!state.currentRoom) return;
 
-    if (!confirm('이 채팅방을 나가시겠습니까?')) return;
+    if (!confirm('이 채팅방을 삭제하시겠습니까?')) return;
 
     try {
-        await leaveRoom(state.currentRoom);
+        await deleteRoom(state.currentRoom);
         state.currentRoom = null;
-        hideChatView();
         elements.messagesContainer.innerHTML = '';
+
+        // 채팅방이 없으면 안내 메시지 표시
+        if (state.rooms.length === 0) {
+            showEmptyRoomMessage();
+        } else {
+            hideChatView();
+        }
     } catch (err) {
-        console.error('채팅방 나가기 실패:', err);
-        alert('채팅방 나가기 실패: ' + err.message);
+        console.error('채팅방 삭제 실패:', err);
+        alert('채팅방 삭제 실패: ' + err.message);
     }
 }
 
@@ -1496,3 +1524,4 @@ window.saveRoom = saveRoom;
 window.startDirectChat = startDirectChat;
 window.leaveCurrentRoom = leaveCurrentRoom;
 window.createNewRoom = createNewRoom;
+window.deleteRoom = deleteRoom;

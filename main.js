@@ -1874,6 +1874,13 @@ ipcMain.handle('messenger:updateRoom', async (event, id, updates) => {
     return { success: true };
 });
 
+ipcMain.handle('messenger:deleteRoom', async (event, id) => {
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.deleteRoom(id);
+    return { success: true };
+});
+
 // 메시지 관리
 ipcMain.handle('messenger:saveMessage', async (event, message) => {
     const db = await initializeMessengerDB();

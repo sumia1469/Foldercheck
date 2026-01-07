@@ -1531,7 +1531,9 @@ function initializeP2PMessenger() {
             filename: data.filename,
             size: data.size,
             from: data.from,
-            savedPath: savePath
+            savedPath: savePath,
+            cloudFileId: data.cloudFileId || '',
+            cloudUrl: data.cloudUrl || ''
         };
 
         sendToAllWindows('p2p:file-received', eventData);
@@ -1584,9 +1586,9 @@ ipcMain.handle('p2p:sendMessage', (event, content) => {
 });
 
 // 파일 전송
-ipcMain.handle('p2p:sendFile', async (event, filePath) => {
+ipcMain.handle('p2p:sendFile', async (event, filePath, cloudInfo) => {
     if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-    return await p2pMessenger.sendFile(filePath);
+    return await p2pMessenger.sendFile(filePath, cloudInfo);
 });
 
 // 상태 조회

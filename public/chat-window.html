@@ -904,6 +904,40 @@
             color: var(--text-secondary);
         }
 
+        /* 파일 액션 버튼 */
+        .file-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+        }
+
+        .file-action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file-action-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .file-action-btn.download-btn {
+            background: rgba(46, 204, 113, 0.3);
+        }
+
+        .file-action-btn.download-btn:hover {
+            background: rgba(46, 204, 113, 0.5);
+        }
+
         /* 시스템 메시지 */
         .system-message {
             text-align: center;

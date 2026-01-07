@@ -234,8 +234,12 @@ class P2PMessenger extends EventEmitter {
 
     /**
      * 파일 전송 시작
+     * @param {string} filePath - 파일 경로
+     * @param {Object} cloudInfo - 클라우드 업로드 정보 (선택)
+     * @param {string} cloudInfo.cloudFileId - 클라우드 파일 ID
+     * @param {string} cloudInfo.cloudUrl - 클라우드 다운로드 URL
      */
-    async sendFile(filePath) {
+    async sendFile(filePath, cloudInfo = null) {
         if (this.mode === 'offline') {
             throw new Error('연결되지 않았습니다.');
         }
@@ -251,7 +255,10 @@ class P2PMessenger extends EventEmitter {
             filename,
             size: stats.size,
             nickname: this.nickname,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            // 클라우드 정보 추가
+            cloudFileId: cloudInfo?.cloudFileId || '',
+            cloudUrl: cloudInfo?.cloudUrl || ''
         };
 
         // 파일 정보 전송
@@ -293,17 +300,30 @@ class P2PMessenger extends EventEmitter {
             type: 'file_complete',
             transferId,
             filename,
-            nickname: this.nickname
+            nickname: this.nickname,
+            cloudFileId: cloudInfo?.cloudFileId || '',
+            cloudUrl: cloudInfo?.cloudUrl || ''
         };
 
         if (this.mode === 'host') {
             this._broadcast(completeMsg);
-            this.emit('file_sent', { filename, size: stats.size });
+            this.emit('file_sent', {
+                filename,
+                size: stats.size,
+                cloudFileId: cloudInfo?.cloudFileId || '',
+                cloudUrl: cloudInfo?.cloudUrl || ''
+            });
         } else {
             this._sendToServer(completeMsg);
         }
 
-        return { transferId, filename, size: stats.size };
+        return {
+            transferId,
+            filename,
+            size: stats.size,
+            cloudFileId: cloudInfo?.cloudFileId || '',
+            cloudUrl: cloudInfo?.cloudUrl || ''
+        };
     }
 
     /**
@@ -541,14 +561,19 @@ class P2PMessenger extends EventEmitter {
             size: msg.size,
             nickname: msg.nickname,
             chunks: [],
-            totalChunks: Math.ceil(msg.size / (64 * 1024))
+            totalChunks: Math.ceil(msg.size / (64 * 1024)),
+            // 클라우드 정보 저장
+            cloudFileId: msg.cloudFileId || '',
+            cloudUrl: msg.cloudUrl || ''
         });
 
         this.emit('file_start', {
             transferId: msg.transferId,
             filename: msg.filename,
             size: msg.size,
-            from: msg.nickname
+            from: msg.nickname,
+            cloudFileId: msg.cloudFileId || '',
+            cloudUrl: msg.cloudUrl || ''
         });
     }
 
@@ -585,7 +610,10 @@ class P2PMessenger extends EventEmitter {
             filename: transfer.filename,
             size: fileData.length,
             data: fileData,
-            from: transfer.nickname
+            from: transfer.nickname,
+            // 클라우드 정보 전달
+            cloudFileId: transfer.cloudFileId || msg.cloudFileId || '',
+            cloudUrl: transfer.cloudUrl || msg.cloudUrl || ''
         });
 
         this.fileTransfers.delete(msg.transferId);

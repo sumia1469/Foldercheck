@@ -281,7 +281,7 @@ async function sendMessage() {
     }
 }
 
-// 파일 첨부
+// 파일 첨부 (클라우드 업로드 + P2P 전송)
 async function attachFile() {
     if (state.mode === 'offline') {
         alert('먼저 연결하세요.');
@@ -291,7 +291,25 @@ async function attachFile() {
     try {
         const result = await window.p2pAPI.selectFile();
         if (result.success && result.filePath) {
-            await window.p2pAPI.sendFile(result.filePath);
+            // 호스트 모드인 경우 클라우드에 업로드
+            if (state.mode === 'host') {
+                try {
+                    const cloudResult = await window.p2pAPI.uploadToCloud(result.filePath);
+                    console.log('클라우드 업로드 완료:', cloudResult);
+
+                    // P2P로 파일 정보 전송 (클라우드 URL 포함)
+                    await window.p2pAPI.sendFile(result.filePath, {
+                        cloudFileId: cloudResult.fileId,
+                        cloudUrl: cloudResult.downloadUrl
+                    });
+                } catch (cloudErr) {
+                    console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
+                    await window.p2pAPI.sendFile(result.filePath);
+                }
+            } else {
+                // 게스트 모드: P2P로만 전송
+                await window.p2pAPI.sendFile(result.filePath);
+            }
         }
     } catch (err) {
         console.error('파일 첨부 실패:', err);
@@ -362,7 +380,9 @@ function initP2PListeners() {
             filename: data.filename,
             size: data.size,
             from: state.nickname, // 내 닉네임
-            savedPath: null // 로컬 파일 경로 없음 (전송한 파일)
+            savedPath: null, // 로컬 파일 경로 없음 (전송한 파일)
+            cloudFileId: data.cloudFileId || '',
+            cloudUrl: data.cloudUrl || ''
         });
     });
 
@@ -622,6 +642,8 @@ async function addFileMessage(data) {
         filename: data.filename,
         fileSize: data.size,
         filePath: data.savedPath,
+        cloudFileId: data.cloudFileId || '',
+        cloudUrl: data.cloudUrl || '',
         timestamp: data.timestamp || Date.now(),
         isOwn
     };
@@ -641,7 +663,9 @@ async function addFileMessage(data) {
                 content: data.filename,
                 fileName: data.filename,
                 fileSize: data.size,
-                filePath: data.savedPath
+                filePath: data.savedPath,
+                cloudFileId: data.cloudFileId || '',
+                cloudUrl: data.cloudUrl || ''
             });
         } catch (err) {
             console.error('파일 메시지 저장 실패:', err);
@@ -662,11 +686,19 @@ function renderMessage(msg) {
     const initial = msg.sender ? msg.sender.charAt(0).toUpperCase() : '?';
 
     if (msg.type === 'file') {
+        // 파일 데이터 준비 (JSON으로 인코딩하여 onclick에서 사용)
+        const fileData = JSON.stringify({
+            filePath: msg.filePath || '',
+            cloudFileId: msg.cloudFileId || '',
+            cloudUrl: msg.cloudUrl || '',
+            filename: msg.filename
+        }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="message-file" onclick="openFile('${escapeHtml(msg.filePath || '')}')">
+                <div class="message-file" data-file='${fileData}'>
                     <div class="file-icon">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                             <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
@@ -675,6 +707,18 @@ function renderMessage(msg) {
                     <div class="file-info">
                         <div class="file-name">${escapeHtml(msg.filename)}</div>
                         <div class="file-size">${formatFileSize(msg.fileSize)}</div>
+                    </div>
+                    <div class="file-actions">
+                        ${msg.filePath ? `<button class="file-action-btn" onclick="openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                            </svg>
+                        </button>` : ''}
+                        ${msg.cloudUrl || msg.cloudFileId ? `<button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                        </button>` : ''}
                     </div>
                 </div>
                 <div class="message-meta">
@@ -820,10 +864,69 @@ function autoResize(textarea) {
     textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
 }
 
-// 파일 열기
+// 파일 열기 (기존 호환성 유지)
 function openFile(filePath) {
     if (filePath && window.chatAPI?.openFile) {
         window.chatAPI.openFile(filePath);
+    }
+}
+
+// 로컬 파일 열기
+function openLocalFile(filePath) {
+    if (!filePath) {
+        alert('파일 경로가 없습니다.');
+        return;
+    }
+    if (window.chatAPI?.openFile) {
+        window.chatAPI.openFile(filePath);
+    } else {
+        alert('파일을 열 수 없습니다.');
+    }
+}
+
+// 클라우드 파일 다운로드
+async function downloadCloudFile(fileId, filename) {
+    if (!fileId) {
+        alert('클라우드 파일 ID가 없습니다.');
+        return;
+    }
+
+    try {
+        // 클라우드 상태 확인
+        const cloudStatus = await window.p2pAPI.getCloudStatus();
+        if (cloudStatus.status !== 'running') {
+            alert('클라우드 서버가 실행 중이 아닙니다. 호스트에게 문의하세요.');
+            return;
+        }
+
+        // 다운로드 URL 구성 (호스트 IP와 클라우드 포트 사용)
+        const status = await window.p2pAPI.getStatus();
+        let downloadUrl;
+
+        if (status.mode === 'host') {
+            // 호스트인 경우 localhost 사용
+            downloadUrl = `http://localhost:${cloudStatus.port}/files/${fileId}/${encodeURIComponent(filename)}`;
+        } else if (status.mode === 'guest' && status.host) {
+            // 게스트인 경우 호스트 IP 사용
+            downloadUrl = `http://${status.host}:${status.cloudPort || (parseInt(status.port) + 1)}/files/${fileId}/${encodeURIComponent(filename)}`;
+        } else {
+            alert('연결 상태를 확인할 수 없습니다.');
+            return;
+        }
+
+        // 브라우저에서 다운로드 트리거
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        console.log('다운로드 시작:', downloadUrl);
+    } catch (err) {
+        console.error('다운로드 실패:', err);
+        alert('다운로드 실패: ' + err.message);
     }
 }
 
@@ -2214,6 +2317,8 @@ function addToastStyles() {
 // 전역 함수 노출
 window.selectRoom = selectRoom;
 window.openFile = openFile;
+window.openLocalFile = openLocalFile;
+window.downloadCloudFile = downloadCloudFile;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.saveContact = saveContact;

@@ -1734,140 +1734,186 @@ ipcMain.handle('chat:openFile', (event, filePath) => {
 /**
  * MessengerDB 초기화
  */
-async function initializeMessengerDB() {
-    if (messengerDB) return messengerDB;
+let messengerDBInitializing = null; // 초기화 진행 중 Promise
 
-    messengerDB = new MessengerDB();
-    await messengerDB.initialize();
-    console.log('[MessengerDB] 초기화 완료');
-    return messengerDB;
+async function initializeMessengerDB() {
+    // 이미 초기화 완료된 경우
+    if (messengerDB && messengerDB.db) return messengerDB;
+
+    // 초기화 진행 중인 경우 기존 Promise 반환
+    if (messengerDBInitializing) return messengerDBInitializing;
+
+    // 새로운 초기화 시작
+    messengerDBInitializing = (async () => {
+        try {
+            const db = new MessengerDB();
+            const success = await db.initialize();
+            if (success && db.db) {
+                messengerDB = db;
+                console.log('[MessengerDB] 초기화 완료');
+                return messengerDB;
+            } else {
+                console.error('[MessengerDB] 초기화 실패: DB 객체가 null');
+                return null;
+            }
+        } catch (err) {
+            console.error('[MessengerDB] 초기화 오류:', err);
+            return null;
+        } finally {
+            messengerDBInitializing = null;
+        }
+    })();
+
+    return messengerDBInitializing;
 }
 
 // 연락처 관리
 ipcMain.handle('messenger:getContacts', async () => {
-    await initializeMessengerDB();
-    return messengerDB.getAllContacts();
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.getAllContacts();
 });
 
 ipcMain.handle('messenger:addContact', async (event, contact) => {
-    await initializeMessengerDB();
-    const id = messengerDB.addContact(contact);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    const id = db.addContact(contact);
     return { success: true, id };
 });
 
 ipcMain.handle('messenger:deleteContact', async (event, id) => {
-    await initializeMessengerDB();
-    messengerDB.deleteContact(id);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.deleteContact(id);
     return { success: true };
 });
 
 ipcMain.handle('messenger:updateContactStatus', async (event, id, status) => {
-    await initializeMessengerDB();
-    messengerDB.updateContactStatus(id, status);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.updateContactStatus(id, status);
     return { success: true };
 });
 
 // 그룹 관리
 ipcMain.handle('messenger:getGroups', async () => {
-    await initializeMessengerDB();
-    return messengerDB.getAllGroups();
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.getAllGroups();
 });
 
 ipcMain.handle('messenger:createGroup', async (event, group) => {
-    await initializeMessengerDB();
-    const id = messengerDB.createGroup(group);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    const id = db.createGroup(group);
     return { success: true, id };
 });
 
 ipcMain.handle('messenger:getGroupMembers', async (event, groupId) => {
-    await initializeMessengerDB();
-    return messengerDB.getGroupMembers(groupId);
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.getGroupMembers(groupId);
 });
 
 ipcMain.handle('messenger:addGroupMember', async (event, groupId, contactId, role) => {
-    await initializeMessengerDB();
-    messengerDB.addGroupMember(groupId, contactId, role);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.addGroupMember(groupId, contactId, role);
     return { success: true };
 });
 
 ipcMain.handle('messenger:deleteGroup', async (event, id) => {
-    await initializeMessengerDB();
-    messengerDB.deleteGroup(id);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.deleteGroup(id);
     return { success: true };
 });
 
 // 채팅방 관리
 ipcMain.handle('messenger:getRooms', async () => {
-    await initializeMessengerDB();
-    return messengerDB.getAllRooms();
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.getAllRooms();
 });
 
 ipcMain.handle('messenger:createRoom', async (event, room) => {
-    await initializeMessengerDB();
-    const id = messengerDB.createRoom(room);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    const id = db.createRoom(room);
     return { success: true, id };
 });
 
 ipcMain.handle('messenger:getRoom', async (event, id) => {
-    await initializeMessengerDB();
-    return messengerDB.getRoom(id);
+    const db = await initializeMessengerDB();
+    if (!db) return null;
+    return db.getRoom(id);
 });
 
 ipcMain.handle('messenger:getRoomParticipants', async (event, roomId) => {
-    await initializeMessengerDB();
-    return messengerDB.getRoomParticipants(roomId);
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.getRoomParticipants(roomId);
 });
 
 ipcMain.handle('messenger:addRoomParticipant', async (event, roomId, contactId, nickname) => {
-    await initializeMessengerDB();
-    messengerDB.addRoomParticipant(roomId, contactId, nickname);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.addRoomParticipant(roomId, contactId, nickname);
     return { success: true };
 });
 
 ipcMain.handle('messenger:leaveRoom', async (event, roomId, contactId) => {
-    await initializeMessengerDB();
-    messengerDB.leaveRoom(roomId, contactId);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.leaveRoom(roomId, contactId);
     return { success: true };
 });
 
 ipcMain.handle('messenger:updateRoom', async (event, id, updates) => {
-    await initializeMessengerDB();
-    messengerDB.updateRoom(id, updates);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.updateRoom(id, updates);
     return { success: true };
 });
 
 // 메시지 관리
 ipcMain.handle('messenger:saveMessage', async (event, message) => {
-    await initializeMessengerDB();
-    const id = messengerDB.saveMessage(message);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    const id = db.saveMessage(message);
     return { success: true, id };
 });
 
 ipcMain.handle('messenger:getRoomMessages', async (event, roomId, limit, offset) => {
-    await initializeMessengerDB();
-    return messengerDB.getRoomMessages(roomId, limit, offset);
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.getRoomMessages(roomId, limit, offset);
 });
 
 ipcMain.handle('messenger:markAsRead', async (event, roomId, contactId) => {
-    await initializeMessengerDB();
-    messengerDB.markMessagesAsRead(roomId, contactId);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.markMessagesAsRead(roomId, contactId);
     return { success: true };
 });
 
 ipcMain.handle('messenger:searchMessages', async (event, query, roomId) => {
-    await initializeMessengerDB();
-    return messengerDB.searchMessages(query, roomId);
+    const db = await initializeMessengerDB();
+    if (!db) return [];
+    return db.searchMessages(query, roomId);
 });
 
 // 설정 관리
 ipcMain.handle('messenger:getSetting', async (event, key, defaultValue) => {
-    await initializeMessengerDB();
-    return messengerDB.getSetting(key, defaultValue);
+    const db = await initializeMessengerDB();
+    if (!db) return defaultValue;
+    return db.getSetting(key, defaultValue);
 });
 
 ipcMain.handle('messenger:setSetting', async (event, key, value) => {
-    await initializeMessengerDB();
-    messengerDB.setSetting(key, value);
+    const db = await initializeMessengerDB();
+    if (!db) return { success: false, error: 'DB 초기화 실패' };
+    db.setSetting(key, value);
     return { success: true };
 });
 

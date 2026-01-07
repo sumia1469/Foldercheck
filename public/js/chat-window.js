@@ -56,23 +56,7 @@ const elements = {
     typingText: document.getElementById('typingText')
 };
 
-// 초기화
-document.addEventListener('DOMContentLoaded', async () => {
-    initTitlebar();
-    initTabs();
-    initConnection();
-    initChat();
-    initP2PListeners();
-
-    // 데이터 로드
-    await loadMyProfile();
-    await loadContacts();
-    await loadGroups();
-    await loadRooms();
-
-    // 현재 P2P 상태 확인
-    await checkP2PStatus();
-});
+// 초기화는 파일 끝의 DOMContentLoaded에서 처리
 
 // 내 프로필 로드
 async function loadMyProfile() {
@@ -387,13 +371,13 @@ function initP2PListeners() {
     });
 
     // 사용자 입장
-    window.p2pAPI.onUserJoin((data) => {
+    window.p2pAPI.onUserJoined((data) => {
         console.log('사용자 입장:', data);
         addSystemMessage(`${data.nickname}님이 입장했습니다.`);
     });
 
     // 사용자 퇴장
-    window.p2pAPI.onUserLeave((data) => {
+    window.p2pAPI.onUserLeft((data) => {
         console.log('사용자 퇴장:', data);
         addSystemMessage(`${data.nickname}님이 퇴장했습니다.`);
     });
@@ -846,6 +830,370 @@ function formatFileSize(bytes) {
     return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 }
 
+// ============================================
+// 사이드바 탭 관리
+// ============================================
+
+function initSidebarTabs() {
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+
+            // 탭 버튼 활성화
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // 탭 컨텐츠 활성화
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        });
+    });
+
+    // 연락처 추가 버튼
+    document.getElementById('addContactBtn')?.addEventListener('click', () => {
+        openModal('contactModal');
+    });
+
+    // 그룹 생성 버튼
+    document.getElementById('createGroupBtn')?.addEventListener('click', () => {
+        openModal('groupModal');
+    });
+}
+
+// ============================================
+// 모달 관리
+// ============================================
+
+function openModal(modalId) {
+    document.getElementById(modalId).classList.add('visible');
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove('visible');
+
+    // 입력 필드 초기화
+    modal.querySelectorAll('input').forEach(input => {
+        if (input.type === 'number' && input.id === 'contactPort') {
+            input.value = '9900';
+        } else {
+            input.value = '';
+        }
+    });
+}
+
+// ============================================
+// 연락처 관리 UI
+// ============================================
+
+async function saveContact() {
+    const nickname = document.getElementById('contactNickname').value.trim();
+    const ip = document.getElementById('contactIP').value.trim();
+    const port = parseInt(document.getElementById('contactPort').value) || 9900;
+
+    if (!nickname) {
+        alert('닉네임을 입력하세요.');
+        return;
+    }
+
+    try {
+        if (window.messengerDB) {
+            const result = await window.messengerDB.addContact({
+                nickname: nickname,
+                ip: ip,
+                port: port,
+                status: 'offline'
+            });
+
+            if (result.success) {
+                closeModal('contactModal');
+                await loadContacts();
+                renderContactList();
+            } else {
+                alert('연락처 추가 실패: ' + (result.error || '알 수 없는 오류'));
+            }
+        }
+    } catch (err) {
+        console.error('연락처 추가 실패:', err);
+        alert('연락처 추가 실패: ' + err.message);
+    }
+}
+
+async function deleteContactById(id) {
+    if (!confirm('이 연락처를 삭제하시겠습니까?')) return;
+
+    try {
+        if (window.messengerDB) {
+            await window.messengerDB.deleteContact(id);
+            await loadContacts();
+            renderContactList();
+        }
+    } catch (err) {
+        console.error('연락처 삭제 실패:', err);
+        alert('연락처 삭제 실패: ' + err.message);
+    }
+}
+
+function renderContactList() {
+    const container = document.getElementById('contactList');
+    if (!container) return;
+
+    if (state.contacts.length === 0) {
+        container.innerHTML = `
+            <div class="empty-list">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                <div>연락처가 없습니다</div>
+                <div style="margin-top: 4px; font-size: 11px;">위의 버튼을 눌러 연락처를 추가하세요</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = state.contacts.map(contact => `
+        <div class="contact-item" data-id="${contact.id}">
+            <div class="contact-avatar">${(contact.nickname || '?').charAt(0).toUpperCase()}</div>
+            <div class="contact-info">
+                <div class="contact-name">${escapeHtml(contact.nickname)}</div>
+                <div class="contact-status ${contact.status === 'online' ? 'online' : ''}">${contact.status === 'online' ? '온라인' : '오프라인'}</div>
+            </div>
+            <div class="contact-actions">
+                <button class="action-btn" onclick="startChatWith('${contact.id}')" title="채팅 시작">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+                <button class="action-btn danger" onclick="deleteContactById('${contact.id}')" title="삭제">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 연락처와 채팅 시작
+async function startChatWith(contactId) {
+    const contact = state.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    // 해당 연락처와의 1:1 채팅방이 있는지 확인
+    if (window.messengerDB) {
+        const roomId = `dm_${contactId}`;
+
+        // 채팅방 생성 또는 조회
+        await window.messengerDB.createRoom({
+            id: roomId,
+            type: 'direct',
+            name: contact.nickname
+        });
+
+        // 참가자 추가
+        if (state.myContactId) {
+            await window.messengerDB.addRoomParticipant(roomId, state.myContactId, state.nickname);
+        }
+        await window.messengerDB.addRoomParticipant(roomId, contactId, contact.nickname);
+
+        // 채팅 탭으로 이동
+        document.querySelector('[data-tab="chats"]').click();
+        await loadRooms();
+        selectRoom(roomId);
+    }
+}
+
+// ============================================
+// 그룹 관리 UI
+// ============================================
+
+async function saveGroup() {
+    const name = document.getElementById('groupName').value.trim();
+    const description = document.getElementById('groupDescription').value.trim();
+
+    if (!name) {
+        alert('그룹 이름을 입력하세요.');
+        return;
+    }
+
+    try {
+        if (window.messengerDB) {
+            const result = await window.messengerDB.createGroup({
+                name: name,
+                description: description
+            });
+
+            if (result.success) {
+                closeModal('groupModal');
+                await loadGroups();
+                renderGroupList();
+            } else {
+                alert('그룹 생성 실패: ' + (result.error || '알 수 없는 오류'));
+            }
+        }
+    } catch (err) {
+        console.error('그룹 생성 실패:', err);
+        alert('그룹 생성 실패: ' + err.message);
+    }
+}
+
+async function deleteGroupById(id) {
+    if (!confirm('이 그룹을 삭제하시겠습니까?')) return;
+
+    try {
+        if (window.messengerDB) {
+            await window.messengerDB.deleteGroup(id);
+            await loadGroups();
+            renderGroupList();
+        }
+    } catch (err) {
+        console.error('그룹 삭제 실패:', err);
+        alert('그룹 삭제 실패: ' + err.message);
+    }
+}
+
+function renderGroupList() {
+    const container = document.getElementById('groupList');
+    if (!container) return;
+
+    if (state.groups.length === 0) {
+        container.innerHTML = `
+            <div class="empty-list">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+                <div>그룹이 없습니다</div>
+                <div style="margin-top: 4px; font-size: 11px;">위의 버튼을 눌러 그룹을 만드세요</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = state.groups.map(group => `
+        <div class="group-item" data-id="${group.id}">
+            <div class="group-avatar">${(group.name || '?').charAt(0).toUpperCase()}</div>
+            <div class="group-info">
+                <div class="group-name">${escapeHtml(group.name)}</div>
+                <div class="group-members">${group.member_count || 0}명</div>
+            </div>
+            <div class="group-actions">
+                <button class="action-btn" onclick="startGroupChat('${group.id}')" title="그룹 채팅">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+                <button class="action-btn danger" onclick="deleteGroupById('${group.id}')" title="삭제">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 그룹 채팅 시작
+async function startGroupChat(groupId) {
+    const group = state.groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    // 그룹 채팅방 생성
+    if (window.messengerDB) {
+        const roomId = `group_${groupId}`;
+
+        await window.messengerDB.createRoom({
+            id: roomId,
+            type: 'group',
+            name: group.name
+        });
+
+        // 내 참가자 추가
+        if (state.myContactId) {
+            await window.messengerDB.addRoomParticipant(roomId, state.myContactId, state.nickname);
+        }
+
+        // 채팅 탭으로 이동
+        document.querySelector('[data-tab="chats"]').click();
+        await loadRooms();
+        selectRoom(roomId);
+    }
+}
+
+// ============================================
+// 채팅방 관리 UI
+// ============================================
+
+async function saveRoom() {
+    const name = document.getElementById('roomName').value.trim();
+    const type = document.getElementById('roomType').value;
+
+    if (!name) {
+        alert('채팅방 이름을 입력하세요.');
+        return;
+    }
+
+    try {
+        if (window.messengerDB) {
+            const result = await window.messengerDB.createRoom({
+                name: name,
+                type: type
+            });
+
+            if (result.success) {
+                // 내 참가자 추가
+                if (state.myContactId) {
+                    await window.messengerDB.addRoomParticipant(result.id, state.myContactId, state.nickname);
+                }
+
+                closeModal('roomModal');
+                await loadRooms();
+            } else {
+                alert('채팅방 생성 실패: ' + (result.error || '알 수 없는 오류'));
+            }
+        }
+    } catch (err) {
+        console.error('채팅방 생성 실패:', err);
+        alert('채팅방 생성 실패: ' + err.message);
+    }
+}
+
+// ============================================
+// 초기화 업데이트
+// ============================================
+
+// DOMContentLoaded 이벤트에 사이드바 탭 초기화 추가
+const originalDOMContentLoaded = document.addEventListener;
+document.addEventListener('DOMContentLoaded', async () => {
+    initTitlebar();
+    initTabs();
+    initSidebarTabs(); // 새로 추가
+    initConnection();
+    initChat();
+    initP2PListeners();
+
+    // 데이터 로드
+    await loadMyProfile();
+    await loadContacts();
+    await loadGroups();
+    await loadRooms();
+
+    // UI 렌더링
+    renderContactList();
+    renderGroupList();
+
+    // 현재 P2P 상태 확인
+    await checkP2PStatus();
+});
+
 // 전역 함수 노출
 window.selectRoom = selectRoom;
 window.openFile = openFile;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.saveContact = saveContact;
+window.deleteContactById = deleteContactById;
+window.startChatWith = startChatWith;
+window.saveGroup = saveGroup;
+window.deleteGroupById = deleteGroupById;
+window.startGroupChat = startGroupChat;
+window.saveRoom = saveRoom;

@@ -310,15 +310,47 @@ function initChat() {
 // 메시지 전송
 async function sendMessage() {
     const content = elements.messageInput.value.trim();
-    if (!content || state.mode === 'offline') return;
+    if (!content) return;
+
+    // 현재 선택된 채팅방이 없으면 리턴
+    if (!state.currentRoom) {
+        console.warn('선택된 채팅방이 없습니다.');
+        return;
+    }
+
+    const room = state.rooms.find(r => r.id === state.currentRoom);
+    const isDirectChat = room && room.type === 'direct';
 
     try {
-        await window.p2pAPI.sendMessage(content);
+        // P2P 연결 상태에서 그룹 채팅인 경우 P2P로 전송
+        if (state.mode !== 'offline' && !isDirectChat) {
+            await window.p2pAPI.sendMessage(content);
+        } else {
+            // 오프라인이거나 1:1 채팅인 경우 로컬에만 저장하고 화면에 표시
+            const messageData = {
+                id: Date.now(),
+                nickname: state.nickname || '나',
+                content: content,
+                timestamp: Date.now()
+            };
+            addMessage(messageData);
+        }
+
         elements.messageInput.value = '';
         elements.sendBtn.disabled = true;
         autoResize(elements.messageInput);
     } catch (err) {
         console.error('메시지 전송 실패:', err);
+        // 에러 발생 시에도 로컬에 저장
+        const messageData = {
+            id: Date.now(),
+            nickname: state.nickname || '나',
+            content: content,
+            timestamp: Date.now()
+        };
+        addMessage(messageData);
+        elements.messageInput.value = '';
+        elements.sendBtn.disabled = true;
     }
 }
 
@@ -1384,6 +1416,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initConnection();
     initChat();
     initP2PListeners();
+    initChatAPIListeners(); // 메인 윈도우에서 보내는 이벤트 리스너
 
     // 데이터 로드
     await loadMyProfile();
@@ -1398,6 +1431,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 현재 P2P 상태 확인
     await checkP2PStatus();
 });
+
+// 메인 윈도우 API 이벤트 리스너
+function initChatAPIListeners() {
+    if (window.chatAPI && window.chatAPI.onStartDirectChat) {
+        window.chatAPI.onStartDirectChat((nickname) => {
+            console.log('1:1 채팅 요청 수신:', nickname);
+            startDirectChat(nickname);
+        });
+    }
+}
 
 // 전역 함수 노출
 window.selectRoom = selectRoom;

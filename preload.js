@@ -117,6 +117,9 @@ contextBridge.exposeInMainWorld('p2pAPI', {
     // 채팅 윈도우 열기
     openChatWindow: () => ipcRenderer.invoke('p2p:openChatWindow'),
 
+    // 채팅 윈도우에 1:1 채팅 시작 요청
+    startDirectChatWith: (nickname) => ipcRenderer.invoke('p2p:startDirectChatWith', nickname),
+
     // 상태
     getStatus: () => ipcRenderer.invoke('p2p:getStatus'),
     getUsers: () => ipcRenderer.invoke('p2p:getUsers'),

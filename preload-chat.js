@@ -15,6 +15,13 @@ contextBridge.exposeInMainWorld('chatAPI', {
     openFile: (filePath) => ipcRenderer.invoke('chat:openFile', filePath),
     openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
 
+    // 1:1 채팅 시작 이벤트 수신
+    onStartDirectChat: (callback) => {
+        const handler = (event, nickname) => callback(nickname);
+        ipcRenderer.on('chat:startDirectChat', handler);
+        return () => ipcRenderer.removeListener('chat:startDirectChat', handler);
+    },
+
     // Electron 환경 확인
     isElectron: true
 });

@@ -3087,9 +3087,19 @@ function renderMessengerSidebar(container) {
             <div class="sidebar-section-items" id="messengerUserList">
                 ${(messengerState.users && messengerState.users.length > 0) ?
                     messengerState.users.map(user => `
-                        <div class="sidebar-user-item">
-                            <span class="user-avatar">${user.nickname?.charAt(0) || '?'}</span>
-                            <span class="user-name">${user.nickname || '알 수 없음'}</span>
+                        <div class="sidebar-user-item" style="display: flex; align-items: center; padding: 8px 12px; cursor: pointer;" onclick="startSidebarDirectChat('${escapeHtml(user.nickname)}')">
+                            <span class="user-avatar" style="width: 28px; height: 28px; border-radius: 50%; background: ${user.isHost ? 'var(--warning)' : 'var(--success)'}; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 500; margin-right: 10px;">${user.nickname?.charAt(0)?.toUpperCase() || '?'}</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <span class="user-name" style="font-size: 13px;">${escapeHtml(user.nickname) || '알 수 없음'}${user.nickname === messengerState.nickname ? ' (나)' : ''}</span>
+                                ${user.isHost ? '<span style="margin-left: 6px; font-size: 10px; color: var(--warning);">(호스트)</span>' : ''}
+                            </div>
+                            ${user.nickname !== messengerState.nickname ? `
+                                <button class="explorer-action-btn" onclick="event.stopPropagation(); startSidebarDirectChat('${escapeHtml(user.nickname)}')" title="1:1 채팅" style="width: 24px; height: 24px;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                                    </svg>
+                                </button>
+                            ` : ''}
                         </div>
                     `).join('') :
                     '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">접속자 없음</div>'
@@ -12060,6 +12070,28 @@ async function openChatWindow() {
     }
 }
 
+// 사이드바에서 1:1 채팅 시작 (채팅 윈도우 열고 해당 사용자와 채팅)
+async function startSidebarDirectChat(nickname) {
+    if (!nickname || nickname === messengerState.nickname) return;
+
+    try {
+        // 먼저 채팅 윈도우를 열기
+        await openChatWindow();
+
+        // 채팅 윈도우에 1:1 채팅 시작 이벤트 전송 (약간의 딜레이 후)
+        setTimeout(() => {
+            if (window.p2pAPI && window.p2pAPI.startDirectChatWith) {
+                window.p2pAPI.startDirectChatWith(nickname);
+            }
+        }, 500);
+
+        showToast(`${nickname}님과 1:1 채팅을 시작합니다`, 'info');
+    } catch (err) {
+        console.error('1:1 채팅 시작 실패:', err);
+        showToast('1:1 채팅 시작 실패: ' + err.message, 'error');
+    }
+}
+
 // 메신저 UI 초기화
 function initMessengerUI() {
     console.log('P2P 메신저 UI 초기화');
@@ -12214,11 +12246,33 @@ async function sendChatMessage() {
     if (!content) return;
 
     try {
-        await window.p2pAPI.sendMessage(content);
+        // P2P 연결 상태인 경우 P2P로 전송
+        if (messengerState.mode !== 'offline') {
+            await window.p2pAPI.sendMessage(content);
+        } else {
+            // 오프라인인 경우 로컬에 저장하고 화면에 표시
+            const messageData = {
+                sender: messengerState.nickname || '나',
+                content: content,
+                timestamp: Date.now(),
+                type: 'text'
+            };
+            addChatMessage(messageData);
+        }
         input.value = '';
         input.style.height = 'auto';
     } catch (error) {
         console.error('메시지 전송 실패:', error);
+        // 에러 발생 시에도 로컬에 저장 시도
+        const messageData = {
+            sender: messengerState.nickname || '나',
+            content: content,
+            timestamp: Date.now(),
+            type: 'text'
+        };
+        addChatMessage(messageData);
+        input.value = '';
+        input.style.height = 'auto';
     }
 }
 

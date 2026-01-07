@@ -502,19 +502,19 @@ function updateChatHeader(room) {
 // 채팅 뷰 표시
 function showChatView() {
     elements.emptyState.style.display = 'none';
-    elements.chatView.style.display = 'flex';
+    elements.chatView.classList.add('active');
 }
 
 // 채팅 뷰 숨김
 function hideChatView() {
     elements.emptyState.style.display = 'flex';
-    elements.chatView.style.display = 'none';
+    elements.chatView.classList.remove('active');
 }
 
 // 채팅방 없음 안내 표시 (연결은 되어 있지만 채팅방이 없는 상태)
 function showEmptyRoomMessage() {
     elements.emptyState.style.display = 'none';
-    elements.chatView.style.display = 'flex';
+    elements.chatView.classList.add('active');
 
     // 메시지 영역에 안내 메시지 표시
     elements.messageList.innerHTML = `

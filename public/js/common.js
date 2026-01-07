@@ -12796,6 +12796,12 @@ async function initMessengerSidebarData() {
 function initMessengerUI() {
     console.log('P2P 메신저 UI 초기화');
 
+    // 헤더 채팅 윈도우 버튼
+    const openChatWindowBtn = document.getElementById('openChatWindowBtn');
+    if (openChatWindowBtn) {
+        openChatWindowBtn.addEventListener('click', openChatWindow);
+    }
+
     // 모드 탭 전환
     const modeTabs = document.querySelectorAll('.mode-tab');
     modeTabs.forEach(tab => {

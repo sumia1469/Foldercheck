@@ -31,6 +31,11 @@ class P2PMessenger extends EventEmitter {
         this.cloudPort = 9901; // HTTP 파일 서버 포트
         this.cloudFiles = new Map(); // fileId -> { filename, originalName, size, uploadedBy, uploadedAt, downloadCount }
         this.cloudStoragePath = null; // 파일 저장 경로
+
+        // 게스트 모드용 호스트 정보
+        this.hostIP = null;
+        this.hostPort = null;
+        this.hostCloudPort = null;
     }
 
     /**
@@ -137,6 +142,9 @@ class P2PMessenger extends EventEmitter {
 
             this.clientSocket = net.createConnection({ host, port }, () => {
                 this.mode = 'guest';
+                // 호스트 정보 저장 (다운로드용)
+                this.hostIP = host;
+                this.hostPort = port;
                 console.log(`[P2P] 서버 연결됨: ${host}:${port}`);
 
                 // 서버에 입장 알림
@@ -199,6 +207,11 @@ class P2PMessenger extends EventEmitter {
                 this.clientSocket.destroy();
                 this.clientSocket = null;
             }
+
+            // 호스트 정보 초기화
+            this.hostIP = null;
+            this.hostPort = null;
+            this.hostCloudPort = null;
 
             this.mode = 'offline';
             console.log('[P2P] 연결 해제됨');
@@ -330,7 +343,7 @@ class P2PMessenger extends EventEmitter {
      * 현재 상태 조회
      */
     getStatus() {
-        return {
+        const status = {
             mode: this.mode,
             nickname: this.nickname,
             port: this.hostPort,
@@ -339,6 +352,19 @@ class P2PMessenger extends EventEmitter {
                 [],
             userCount: this.users.size
         };
+
+        // 호스트 모드인 경우 클라우드 포트 추가
+        if (this.mode === 'host') {
+            status.cloudPort = this.cloudPort;
+        }
+        // 게스트 모드인 경우 호스트 정보 추가 (파일 다운로드용)
+        else if (this.mode === 'guest') {
+            status.host = this.hostIP;
+            status.port = this.hostPort;
+            status.cloudPort = this.hostCloudPort;
+        }
+
+        return status;
     }
 
     /**
@@ -446,7 +472,7 @@ class P2PMessenger extends EventEmitter {
                 this.emit('message', joinMsg);
                 this.emit('user_joined', { nickname: msg.nickname });
 
-                // 사용자 목록 전송 (호스트 포함)
+                // 사용자 목록 전송 (호스트 포함, cloudPort 포함)
                 const userList = Array.from(this.users.values()).map(u => ({
                     nickname: u.nickname,
                     isHost: u.isHost || false
@@ -454,7 +480,8 @@ class P2PMessenger extends EventEmitter {
                 this._sendToClient(clientId, {
                     type: 'user_list',
                     users: userList,
-                    hostNickname: this.nickname
+                    hostNickname: this.nickname,
+                    cloudPort: this.cloudPort  // 클라우드 서버 포트 정보 추가
                 });
 
                 // 호스트에게도 업데이트된 사용자 목록 알림
@@ -526,6 +553,11 @@ class P2PMessenger extends EventEmitter {
                 msg.users.forEach((u, i) => {
                     this.users.set(`user_${i}`, u);
                 });
+                // 호스트의 클라우드 포트 저장 (게스트가 다운로드할 때 필요)
+                if (msg.cloudPort) {
+                    this.hostCloudPort = msg.cloudPort;
+                    console.log(`[P2P] 호스트 클라우드 포트 저장: ${this.hostCloudPort}`);
+                }
                 this.emit('user_list', msg.users);
                 break;
 

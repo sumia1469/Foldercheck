@@ -892,25 +892,27 @@ async function downloadCloudFile(fileId, filename) {
     }
 
     try {
-        // 클라우드 상태 확인
-        const cloudStatus = await window.p2pAPI.getCloudStatus();
-        if (cloudStatus.status !== 'running') {
-            alert('클라우드 서버가 실행 중이 아닙니다. 호스트에게 문의하세요.');
-            return;
-        }
-
-        // 다운로드 URL 구성 (호스트 IP와 클라우드 포트 사용)
+        // P2P 상태 확인
         const status = await window.p2pAPI.getStatus();
         let downloadUrl;
 
         if (status.mode === 'host') {
-            // 호스트인 경우 localhost 사용
+            // 호스트인 경우 클라우드 서버 상태 확인
+            const cloudStatus = await window.p2pAPI.getCloudStatus();
+            if (cloudStatus.status !== 'running') {
+                alert('클라우드 서버가 실행 중이 아닙니다.');
+                return;
+            }
             downloadUrl = `http://localhost:${cloudStatus.port}/files/${fileId}/${encodeURIComponent(filename)}`;
+        } else if (status.mode === 'guest' && status.host && status.cloudPort) {
+            // 게스트인 경우 호스트 IP와 cloudPort 사용
+            downloadUrl = `http://${status.host}:${status.cloudPort}/files/${fileId}/${encodeURIComponent(filename)}`;
         } else if (status.mode === 'guest' && status.host) {
-            // 게스트인 경우 호스트 IP 사용
-            downloadUrl = `http://${status.host}:${status.cloudPort || (parseInt(status.port) + 1)}/files/${fileId}/${encodeURIComponent(filename)}`;
+            // cloudPort가 없는 경우 기본값 사용 (port + 1)
+            const cloudPort = parseInt(status.port) + 1;
+            downloadUrl = `http://${status.host}:${cloudPort}/files/${fileId}/${encodeURIComponent(filename)}`;
         } else {
-            alert('연결 상태를 확인할 수 없습니다.');
+            alert('연결 상태를 확인할 수 없습니다. P2P 연결을 확인하세요.');
             return;
         }
 

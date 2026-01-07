@@ -164,7 +164,7 @@ contextBridge.exposeInMainWorld('p2pAPI', {
 
     // 파일 전송
     selectFile: () => ipcRenderer.invoke('p2p:selectFile'),
-    sendFile: (filePath) => ipcRenderer.invoke('p2p:sendFile', filePath),
+    sendFile: (filePath, cloudInfo) => ipcRenderer.invoke('p2p:sendFile', filePath, cloudInfo),
     openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
 
     // 채팅 윈도우 열기

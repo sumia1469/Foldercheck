@@ -1227,7 +1227,7 @@ async function initializeExtensions() {
                         break;
                     case 'p2p:sendFile':
                         if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-                        result = await p2pMessenger.sendFile(args[0]);
+                        result = await p2pMessenger.sendFile(args[0], args[1]); // args[1] = cloudInfo
                         break;
                     case 'p2p:getStatus':
                         result = p2pMessenger ? p2pMessenger.getStatus() :

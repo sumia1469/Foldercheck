@@ -1397,6 +1397,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     initSettingsBtn(); // 설정 버튼 이벤트 리스너
     initUsersPanelClose(); // 참여자 패널 닫기 버튼
     initUsersPanelResize(); // 참여자 패널 리사이즈
+    initSidebarToggle(); // 좌측 사이드바 토글
+    initSidebarResize(); // 좌측 사이드바 리사이즈
 
     // 데이터 로드
     await loadMyProfile();
@@ -1653,6 +1655,59 @@ function initUsersPanelClose() {
     if (closeBtn) {
         closeBtn.addEventListener('click', closeUsersPanel);
     }
+}
+
+// 사이드바 토글 기능 초기화
+function initSidebarToggle() {
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
+
+    if (!toggleBtn || !sidebar) return;
+
+    toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        toggleBtn.classList.toggle('collapsed');
+    });
+}
+
+// 사이드바 리사이즈 기능 초기화
+function initSidebarResize() {
+    const sidebar = document.getElementById('sidebar');
+    const resizeHandle = document.getElementById('sidebarResize');
+
+    if (!resizeHandle || !sidebar) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+        if (sidebar.classList.contains('collapsed')) return;
+
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        resizeHandle.classList.add('resizing');
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const diff = e.clientX - startX;
+        const newWidth = Math.min(Math.max(startWidth + diff, 200), 400);
+        sidebar.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            resizeHandle.classList.remove('resizing');
+        }
+    });
 }
 
 // 전역 함수 노출

@@ -97,10 +97,73 @@
         /* 사이드바 (채팅방 목록) */
         .sidebar {
             width: 280px;
+            min-width: 200px;
+            max-width: 400px;
             background: var(--bg-secondary);
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
+            position: relative;
+            transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            overflow: hidden;
+            border-right: none;
+        }
+
+        .sidebar-resize {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 10;
+        }
+
+        .sidebar-resize:hover,
+        .sidebar-resize.resizing {
+            background: var(--accent);
+        }
+
+        /* 사이드바 토글 버튼 */
+        .sidebar-toggle {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 60px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            z-index: 100;
+            transition: all 0.2s;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .sidebar-toggle svg {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.2s;
+        }
+
+        .sidebar-toggle.collapsed svg {
+            transform: rotate(180deg);
         }
 
         .sidebar-header {
@@ -1153,7 +1216,9 @@
     <!-- 메인 컨테이너 -->
     <div class="main-container">
         <!-- 사이드바 -->
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
+            <!-- 사이드바 리사이즈 핸들 -->
+            <div class="sidebar-resize" id="sidebarResize"></div>
             <div class="sidebar-header">
                 <div class="sidebar-title">P2P 메신저</div>
                 <div class="connection-status">
@@ -1246,6 +1311,13 @@
         </div>
 
         <!-- 채팅 영역 -->
+        <!-- 사이드바 토글 버튼 -->
+        <button class="sidebar-toggle" id="sidebarToggle" title="사이드바 토글">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+
         <div class="chat-area">
             <!-- 빈 상태 -->
             <div class="empty-state" id="emptyState">

@@ -12994,9 +12994,25 @@ async function attachFile() {
 }
 
 // 채팅 메시지 추가
+// 최근 메시지 추적 (중복 방지용)
+const recentMessages = new Map();
 function addChatMessage(data) {
     const container = document.getElementById('chatMessages');
     if (!container) return;
+
+    // 중복 메시지 방지
+    const msgKey = `${data.sender}_${data.type}_${data.type === 'file' ? data.fileName : data.content}`;
+    const now = Date.now();
+    const lastTime = recentMessages.get(msgKey);
+    if (lastTime && (now - lastTime) < 2000) {
+        console.log('중복 메시지 무시:', msgKey);
+        return;
+    }
+    recentMessages.set(msgKey, now);
+    // 오래된 항목 정리 (5분 이상)
+    for (const [key, time] of recentMessages) {
+        if (now - time > 300000) recentMessages.delete(key);
+    }
 
     // 환영 메시지 제거
     const welcome = container.querySelector('.chat-welcome');

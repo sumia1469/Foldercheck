@@ -320,15 +320,17 @@ class P2PMessenger extends EventEmitter {
 
         if (this.mode === 'host') {
             this._broadcast(completeMsg);
-            this.emit('file_sent', {
-                filename,
-                size: stats.size,
-                cloudFileId: cloudInfo?.cloudFileId || '',
-                cloudUrl: cloudInfo?.cloudUrl || ''
-            });
         } else {
             this._sendToServer(completeMsg);
         }
+
+        // 호스트/게스트 모두 파일 전송 완료 이벤트 발생
+        this.emit('file_sent', {
+            filename,
+            size: stats.size,
+            cloudFileId: cloudInfo?.cloudFileId || '',
+            cloudUrl: cloudInfo?.cloudUrl || ''
+        });
 
         return {
             transferId,

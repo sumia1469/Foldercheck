@@ -635,6 +635,22 @@ async function addFileMessage(data) {
     // from 또는 nickname 필드 사용 (main.js에서는 from으로 전송)
     const sender = data.from || data.nickname || '알 수 없음';
     const isOwn = sender === state.nickname;
+
+    // 중복 메시지 방지: 같은 파일이 이미 최근에 추가되었는지 확인
+    const now = Date.now();
+    const duplicateThreshold = 2000; // 2초 이내 같은 파일 = 중복
+    const isDuplicate = state.messages.some(msg =>
+        msg.type === 'file' &&
+        msg.filename === data.filename &&
+        msg.sender === sender &&
+        (now - msg.timestamp) < duplicateThreshold
+    );
+
+    if (isDuplicate) {
+        console.log('중복 파일 메시지 무시:', data.filename);
+        return;
+    }
+
     const message = {
         id: data.transferId || Date.now(),
         type: 'file',

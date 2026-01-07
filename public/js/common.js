@@ -3500,6 +3500,10 @@ function updateMessengerSidebarStatus(status, text) {
     updateMessengerStatus(status, text);
 }
 
+// 서버 가동 시간 관련 변수
+let serverStartTime = null;
+let serverUptimeInterval = null;
+
 // 메인 패널을 채팅 모드로 업데이트
 function updateMainPanelForChat(mode, port, nickname, host = null) {
     const chatArea = document.getElementById('messengerChatArea');
@@ -3514,6 +3518,205 @@ function updateMainPanelForChat(mode, port, nickname, host = null) {
     // 직접 display 조절도 추가 (CSS 클래스가 적용 안될 경우 대비)
     if (notConnected) notConnected.style.display = 'none';
     if (messengerLayout) messengerLayout.style.display = 'flex';
+
+    // 서버 상태 정보 업데이트
+    updateServerDashboard(mode, port, nickname, host);
+
+    // 가동 시간 트래킹 시작
+    startUptimeTracking();
+
+    // 초기 로그 추가
+    if (mode === 'host') {
+        addServerLog('system', `서버가 시작되었습니다. 포트: ${port}`);
+    } else {
+        addServerLog('system', `${host}:${port}에 연결되었습니다.`);
+    }
+
+    // 채팅 윈도우 열기 버튼 이벤트
+    const openChatWindowBtn = document.getElementById('openChatWindowBtn');
+    if (openChatWindowBtn) {
+        openChatWindowBtn.onclick = () => {
+            if (window.p2pAPI && window.p2pAPI.openChatWindow) {
+                window.p2pAPI.openChatWindow();
+            }
+        };
+    }
+
+    // 로그 지우기 버튼 이벤트
+    const clearServerLogsBtn = document.getElementById('clearServerLogsBtn');
+    if (clearServerLogsBtn) {
+        clearServerLogsBtn.onclick = clearServerLogs;
+    }
+}
+
+// 서버 대시보드 업데이트
+function updateServerDashboard(mode, port, nickname, host = null) {
+    // 상태 타이틀
+    const statusTitle = document.getElementById('serverStatusTitle');
+    if (statusTitle) {
+        statusTitle.textContent = mode === 'host' ? 'P2P 서버 호스팅 중' : 'P2P 서버 연결됨';
+    }
+
+    // 상태 설명
+    const statusDesc = document.getElementById('serverStatusDesc');
+    if (statusDesc) {
+        if (mode === 'host') {
+            statusDesc.textContent = `포트 ${port}에서 연결 대기 중`;
+        } else {
+            statusDesc.textContent = `${host}:${port}에 연결됨`;
+        }
+    }
+
+    // 상태 배지
+    const statusBadge = document.getElementById('serverStatusBadge');
+    if (statusBadge) {
+        statusBadge.className = 'server-status-badge ' + (mode === 'host' ? 'host' : 'online');
+        const statusText = statusBadge.querySelector('.status-text');
+        if (statusText) {
+            statusText.textContent = mode === 'host' ? '호스팅 중' : '연결됨';
+        }
+    }
+
+    // 정보 카드들
+    const serverNickname = document.getElementById('serverNickname');
+    if (serverNickname) serverNickname.textContent = nickname;
+
+    const serverPort = document.getElementById('serverPort');
+    if (serverPort) serverPort.textContent = port;
+
+    const serverUserCount = document.getElementById('serverUserCount');
+    if (serverUserCount) serverUserCount.textContent = `${messengerState.users.length}명`;
+
+    // 접속자 수 카운트 업데이트
+    const userCount = document.getElementById('userCount');
+    if (userCount) userCount.textContent = `${messengerState.users.length}명`;
+}
+
+// 가동 시간 트래킹 시작
+function startUptimeTracking() {
+    serverStartTime = Date.now();
+
+    // 이전 인터벌 정리
+    if (serverUptimeInterval) {
+        clearInterval(serverUptimeInterval);
+    }
+
+    // 1초마다 업데이트
+    serverUptimeInterval = setInterval(updateUptimeDisplay, 1000);
+    updateUptimeDisplay();
+}
+
+// 가동 시간 표시 업데이트
+function updateUptimeDisplay() {
+    const uptimeEl = document.getElementById('serverUptime');
+    if (!uptimeEl || !serverStartTime) return;
+
+    const elapsed = Date.now() - serverStartTime;
+    const seconds = Math.floor(elapsed / 1000) % 60;
+    const minutes = Math.floor(elapsed / 60000) % 60;
+    const hours = Math.floor(elapsed / 3600000);
+
+    if (hours > 0) {
+        uptimeEl.textContent = `${hours}시간 ${minutes}분`;
+    } else if (minutes > 0) {
+        uptimeEl.textContent = `${minutes}분 ${seconds}초`;
+    } else {
+        uptimeEl.textContent = `${seconds}초`;
+    }
+}
+
+// 가동 시간 트래킹 중지
+function stopUptimeTracking() {
+    if (serverUptimeInterval) {
+        clearInterval(serverUptimeInterval);
+        serverUptimeInterval = null;
+    }
+    serverStartTime = null;
+
+    const uptimeEl = document.getElementById('serverUptime');
+    if (uptimeEl) uptimeEl.textContent = '-';
+}
+
+// 서버 로그 추가
+function addServerLog(type, message) {
+    const logsContainer = document.getElementById('serverLogs');
+    if (!logsContainer) return;
+
+    // 첫 번째 기본 로그 제거
+    const defaultLog = logsContainer.querySelector('.log-entry.system');
+    if (defaultLog && defaultLog.querySelector('.log-message').textContent === '서버 로그가 여기에 표시됩니다') {
+        defaultLog.remove();
+    }
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${type}`;
+    logEntry.innerHTML = `
+        <span class="log-time">${timeStr}</span>
+        <span class="log-message">${message}</span>
+    `;
+
+    logsContainer.appendChild(logEntry);
+
+    // 스크롤을 아래로
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+
+    // 최대 100개 로그 유지
+    while (logsContainer.children.length > 100) {
+        logsContainer.removeChild(logsContainer.firstChild);
+    }
+}
+
+// 서버 로그 지우기
+function clearServerLogs() {
+    const logsContainer = document.getElementById('serverLogs');
+    if (!logsContainer) return;
+
+    logsContainer.innerHTML = `
+        <div class="log-entry system">
+            <span class="log-time">${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            <span class="log-message">로그가 초기화되었습니다</span>
+        </div>
+    `;
+}
+
+// 사용자 목록 업데이트
+function updateServerUsersList(users) {
+    const usersList = document.getElementById('usersList');
+    const userCount = document.getElementById('userCount');
+    const serverUserCount = document.getElementById('serverUserCount');
+
+    if (userCount) userCount.textContent = `${users.length}명`;
+    if (serverUserCount) serverUserCount.textContent = `${users.length}명`;
+
+    if (!usersList) return;
+
+    if (users.length === 0) {
+        usersList.innerHTML = `
+            <div class="empty-users">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <p>접속자가 없습니다</p>
+            </div>
+        `;
+        return;
+    }
+
+    usersList.innerHTML = users.map(user => {
+        const isHost = user.isHost || user.role === 'host';
+        const initial = (user.nickname || user.name || '?')[0].toUpperCase();
+        return `
+            <div class="user-item ${isHost ? 'host' : ''}">
+                <div class="user-avatar">${initial}</div>
+                <span class="user-name">${user.nickname || user.name}</span>
+                ${isHost ? '<span class="user-badge">호스트</span>' : ''}
+            </div>
+        `;
+    }).join('');
 }
 
 // 사이드바 새로고침
@@ -3575,6 +3778,12 @@ function resetMainPanelToSetup() {
     // 직접 display 조절도 추가
     if (notConnected) notConnected.style.display = 'flex';
     if (messengerLayout) messengerLayout.style.display = 'none';
+
+    // 가동 시간 트래킹 중지
+    stopUptimeTracking();
+
+    // 서버 로그에 종료 메시지 추가
+    addServerLog('system', '연결이 종료되었습니다.');
 }
 
 // 서버 삭제
@@ -12962,18 +13171,25 @@ function setupP2PEventListeners() {
     window.p2pAPI.onMessage((data) => {
         console.log('메시지 수신:', data);
         addChatMessage(data);
+        // 로그에 메시지 기록 (내용은 간략하게)
+        const preview = data.content?.substring(0, 30) + (data.content?.length > 30 ? '...' : '');
+        addServerLog('message', `[${data.sender || '알 수 없음'}] ${preview}`);
     });
 
     // 사용자 입장
     window.p2pAPI.onUserJoined((data) => {
         console.log('사용자 입장:', data);
         addSystemMessage(`${data.nickname}님이 입장했습니다.`);
+        // 서버 로그에도 추가
+        addServerLog('join', `${data.nickname}님이 입장했습니다.`);
     });
 
     // 사용자 퇴장
     window.p2pAPI.onUserLeft((data) => {
         console.log('사용자 퇴장:', data);
         addSystemMessage(`${data.nickname}님이 퇴장했습니다.`);
+        // 서버 로그에도 추가
+        addServerLog('leave', `${data.nickname}님이 퇴장했습니다.`);
     });
 
     // 사용자 목록 업데이트
@@ -12982,6 +13198,8 @@ function setupP2PEventListeners() {
         // users가 배열인지 확인 (배열이 아니면 users 속성 확인)
         const userList = Array.isArray(users) ? users : (users?.users || []);
         updateUsersList(userList);
+        // 서버 대시보드 사용자 목록도 업데이트
+        updateServerUsersList(userList);
         // 사이드바도 업데이트
         updateMessengerSidebar();
     });
@@ -12989,6 +13207,7 @@ function setupP2PEventListeners() {
     // 에러
     window.p2pAPI.onError((data) => {
         console.error('P2P 에러:', data);
+        addServerLog('error', `오류: ${data.message}`);
         alert('오류: ' + data.message);
     });
 
@@ -12997,6 +13216,7 @@ function setupP2PEventListeners() {
         console.log('연결 해제:', data);
         messengerState.mode = 'offline';
         messengerState.users = [];
+        addServerLog('leave', '연결이 끊어졌습니다: ' + (data.reason || ''));
         updateMessengerStatus('offline', '연결 끊김');
         resetMainPanelToSetup();
         updateMessengerSidebar();
@@ -13007,6 +13227,7 @@ function setupP2PEventListeners() {
     window.p2pAPI.onFileStart((data) => {
         console.log('파일 전송 시작:', data);
         showFileTransferProgress(data.fileName, 0);
+        addServerLog('message', `파일 전송 시작: ${data.fileName}`);
     });
 
     // 파일 전송 진행
@@ -13025,12 +13246,14 @@ function setupP2PEventListeners() {
             fileSize: data.size,
             timestamp: new Date().toISOString()
         });
+        addServerLog('system', `파일 수신 완료: ${data.fileName}`);
     });
 
     // 파일 전송 완료
     window.p2pAPI.onFileSent((data) => {
         console.log('파일 전송 완료:', data);
         showFileTransferProgress(data.fileName, 100);
+        addServerLog('system', `파일 전송 완료: ${data.fileName}`);
     });
 }
 

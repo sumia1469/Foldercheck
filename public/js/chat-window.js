@@ -21,17 +21,9 @@ const elements = {
     statusDot: document.getElementById('statusDot'),
     statusText: document.getElementById('statusText'),
 
-    // 연결 폼
-    hostForm: document.getElementById('hostForm'),
-    guestForm: document.getElementById('guestForm'),
-    hostNickname: document.getElementById('hostNickname'),
-    hostPort: document.getElementById('hostPort'),
-    guestNickname: document.getElementById('guestNickname'),
-    hostIP: document.getElementById('hostIP'),
-    guestPort: document.getElementById('guestPort'),
-    startHostBtn: document.getElementById('startHostBtn'),
-    connectBtn: document.getElementById('connectBtn'),
-    disconnectBtn: document.getElementById('disconnectBtn'),
+    // 연결 상태 패널
+    connectStatusPanel: document.getElementById('connectStatusPanel'),
+    connectionStatusText: document.getElementById('connectionStatusText'),
 
     // 채팅
     roomList: document.getElementById('roomList'),
@@ -86,26 +78,28 @@ async function saveMyProfile(profile) {
     }
 }
 
-// 현재 P2P 상태 확인
+// 현재 P2P 상태 확인 및 UI 동기화
 async function checkP2PStatus() {
     try {
         if (window.p2pAPI) {
             const status = await window.p2pAPI.getStatus();
-            if (status.mode !== 'offline') {
-                state.mode = status.mode;
-                state.nickname = status.nickname || state.nickname;
-                updateConnectionUI(true);
-                showChatView();
+            state.mode = status.mode || 'offline';
+            state.nickname = status.nickname || '';
 
+            updateConnectionUI(state.mode !== 'offline');
+
+            if (state.mode !== 'offline') {
                 // 사용자 목록 가져오기
                 const users = await window.p2pAPI.getUsers();
-                state.users = users;
+                state.users = users || [];
                 updateUsersList();
                 updateChatStatus();
             }
         }
     } catch (err) {
         console.error('P2P 상태 확인 실패:', err);
+        state.mode = 'offline';
+        updateConnectionUI(false);
     }
 }
 
@@ -139,127 +133,65 @@ function initTabs() {
     });
 }
 
-// 연결 관리
-function initConnection() {
-    // 호스트 시작
-    elements.startHostBtn.addEventListener('click', async () => {
-        const nickname = elements.hostNickname.value.trim() || 'Host';
-        const port = parseInt(elements.hostPort.value) || 9900;
+// P2P 상태 확인 및 동기화 (메인 패널에서 연결 관리)
+async function syncP2PStatus() {
+    try {
+        const status = await window.p2pAPI.getStatus();
+        if (status) {
+            state.mode = status.mode || 'offline';
+            state.nickname = status.nickname || '';
 
-        try {
-            elements.startHostBtn.disabled = true;
-            elements.startHostBtn.textContent = '시작 중...';
-
-            await window.p2pAPI.startHost(port, nickname);
-
-            state.mode = 'host';
-            state.nickname = nickname;
-
-            // 프로필 저장
-            const myId = `host_${Date.now()}`;
-            state.myContactId = myId;
-            await saveMyProfile({ id: myId, nickname: nickname });
-
-            updateConnectionUI(true);
-
-            // 기존 채팅방 목록 로드 (자동 생성하지 않음)
-            await loadRooms();
-
-            // 채팅방이 없으면 안내 메시지 표시
-            if (state.rooms.length === 0) {
-                showEmptyRoomMessage();
-            } else {
-                showChatView();
+            // 프로필 로드 또는 저장
+            if (state.mode !== 'offline' && state.nickname) {
+                const myId = `${state.mode}_${Date.now()}`;
+                state.myContactId = myId;
+                await saveMyProfile({ id: myId, nickname: state.nickname });
             }
 
-        } catch (err) {
-            alert('호스트 시작 실패: ' + err.message);
-        } finally {
-            elements.startHostBtn.disabled = false;
-            elements.startHostBtn.textContent = '호스트 시작';
+            updateConnectionUI(state.mode !== 'offline');
         }
-    });
-
-    // 게스트 연결
-    elements.connectBtn.addEventListener('click', async () => {
-        const nickname = elements.guestNickname.value.trim() || 'Guest';
-        const host = elements.hostIP.value.trim();
-        const port = parseInt(elements.guestPort.value) || 9900;
-
-        if (!host) {
-            alert('호스트 IP를 입력하세요.');
-            return;
-        }
-
-        try {
-            elements.connectBtn.disabled = true;
-            elements.connectBtn.textContent = '연결 중...';
-
-            await window.p2pAPI.connect(host, port, nickname);
-
-            state.mode = 'guest';
-            state.nickname = nickname;
-
-            // 프로필 저장
-            const myId = `guest_${Date.now()}`;
-            state.myContactId = myId;
-            await saveMyProfile({ id: myId, nickname: nickname });
-
-            updateConnectionUI(true);
-
-            // 기존 채팅방 목록 로드 (자동 생성하지 않음)
-            await loadRooms();
-
-            // 채팅방이 없으면 안내 메시지 표시
-            if (state.rooms.length === 0) {
-                showEmptyRoomMessage();
-            } else {
-                showChatView();
-            }
-
-        } catch (err) {
-            alert('연결 실패: ' + err.message);
-        } finally {
-            elements.connectBtn.disabled = false;
-            elements.connectBtn.textContent = '연결';
-        }
-    });
-
-    // 연결 해제
-    elements.disconnectBtn.addEventListener('click', async () => {
-        try {
-            if (state.mode === 'host') {
-                await window.p2pAPI.stopHost();
-            } else {
-                await window.p2pAPI.disconnect();
-            }
-
-            state.mode = 'offline';
-            state.nickname = '';
-            state.rooms = [];
-            state.messages = [];
-
-            updateConnectionUI(false);
-            hideChatView();
-            elements.roomList.innerHTML = '';
-
-        } catch (err) {
-            console.error('연결 해제 실패:', err);
-        }
-    });
+    } catch (err) {
+        console.error('P2P 상태 동기화 실패:', err);
+    }
 }
 
 // 연결 UI 업데이트
 function updateConnectionUI(connected) {
-    elements.statusDot.classList.toggle('connected', connected);
-    elements.statusText.textContent = connected ?
-        (state.mode === 'host' ? '호스트 중' : '연결됨') : '연결 안됨';
+    // 상태 도트 업데이트
+    if (elements.statusDot) {
+        elements.statusDot.classList.remove('connected', 'host');
+        if (connected) {
+            elements.statusDot.classList.add(state.mode === 'host' ? 'host' : 'connected');
+        }
+    }
 
-    // 폼/버튼 표시 전환
-    elements.hostForm.style.display = connected ? 'none' : '';
-    elements.guestForm.style.display = connected ? 'none' : '';
-    document.querySelector('.connect-tabs').style.display = connected ? 'none' : '';
-    elements.disconnectBtn.style.display = connected ? 'block' : 'none';
+    // 상태 텍스트 업데이트
+    if (elements.statusText) {
+        if (connected) {
+            elements.statusText.textContent = state.mode === 'host' ? '호스트 중' : '연결됨';
+        } else {
+            elements.statusText.textContent = '연결 안됨';
+        }
+    }
+
+    // 연결 상태 패널 업데이트
+    if (elements.connectStatusPanel) {
+        elements.connectStatusPanel.classList.remove('connected', 'host');
+        if (connected) {
+            elements.connectStatusPanel.classList.add(state.mode === 'host' ? 'host' : 'connected');
+        }
+    }
+
+    if (elements.connectionStatusText) {
+        if (connected) {
+            const statusText = state.mode === 'host' ?
+                `호스트 중 (${state.nickname})` :
+                `연결됨 (${state.nickname})`;
+            elements.connectionStatusText.textContent = statusText;
+        } else {
+            elements.connectionStatusText.textContent = '메인 패널에서 연결하세요';
+        }
+    }
 }
 
 // 채팅 초기화
@@ -364,10 +296,9 @@ function initP2PListeners() {
     // 상태 변경
     window.p2pAPI.onStatus((data) => {
         console.log('P2P 상태:', data);
-        if (data.mode === 'offline') {
-            state.mode = 'offline';
-            updateConnectionUI(false);
-        }
+        state.mode = data.mode || 'offline';
+        state.nickname = data.nickname || state.nickname;
+        updateConnectionUI(state.mode !== 'offline');
     });
 
     // 메시지 수신
@@ -1460,8 +1391,7 @@ const originalDOMContentLoaded = document.addEventListener;
 document.addEventListener('DOMContentLoaded', async () => {
     initTitlebar();
     initTabs();
-    initSidebarTabs(); // 새로 추가
-    initConnection();
+    initSidebarTabs();
     initChat();
     initP2PListeners();
     initChatAPIListeners(); // 메인 윈도우에서 보내는 이벤트 리스너
@@ -1475,8 +1405,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // UI 렌더링
     renderContactList();
     renderGroupList();
+    renderRoomList();
 
-    // 현재 P2P 상태 확인
+    // 현재 P2P 상태 확인 및 동기화
     await checkP2PStatus();
 });
 

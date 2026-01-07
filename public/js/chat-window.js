@@ -237,6 +237,18 @@ async function sendMessage() {
     try {
         // P2P 연결 상태에서 그룹 채팅인 경우 P2P로 전송
         if (state.mode !== 'offline' && !isDirectChat) {
+            // 게스트 모드일 때 내 메시지를 바로 화면에 표시
+            // (호스트는 emit으로 처리되므로 게스트만 직접 표시)
+            if (state.mode === 'guest') {
+                const messageData = {
+                    id: Date.now(),
+                    type: 'chat',
+                    nickname: state.nickname || '나',
+                    content: content,
+                    timestamp: Date.now()
+                };
+                addMessage(messageData);
+            }
             await window.p2pAPI.sendMessage(content);
         } else {
             // 오프라인이거나 1:1 채팅인 경우 로컬에만 저장하고 화면에 표시
@@ -254,14 +266,16 @@ async function sendMessage() {
         autoResize(elements.messageInput);
     } catch (err) {
         console.error('메시지 전송 실패:', err);
-        // 에러 발생 시에도 로컬에 저장
-        const messageData = {
-            id: Date.now(),
-            nickname: state.nickname || '나',
-            content: content,
-            timestamp: Date.now()
-        };
-        addMessage(messageData);
+        // 에러 발생 시에도 로컬에 저장 (게스트 모드가 아닐 때만)
+        if (state.mode !== 'guest') {
+            const messageData = {
+                id: Date.now(),
+                nickname: state.nickname || '나',
+                content: content,
+                timestamp: Date.now()
+            };
+            addMessage(messageData);
+        }
         elements.messageInput.value = '';
         elements.sendBtn.disabled = true;
     }

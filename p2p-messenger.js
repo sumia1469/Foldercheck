@@ -447,7 +447,8 @@ class P2PMessenger extends EventEmitter {
 
             case 'chat':
                 msg.nickname = this.users.get(clientId)?.nickname || msg.nickname;
-                this._broadcast(msg);
+                // 보낸 클라이언트 제외하고 브로드캐스트 (본인은 이미 화면에 표시함)
+                this._broadcastExcept(clientId, msg);
                 this.messageHistory.push(msg);
                 this.emit('message', msg);
                 break;

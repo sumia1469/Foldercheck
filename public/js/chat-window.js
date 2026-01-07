@@ -368,12 +368,15 @@ function initP2PListeners() {
         state.users = users;
         updateUsersList();
         updateChatStatus();
+        updateOnlineUsersInContacts(users);
     });
 
     // 사용자 입장
     window.p2pAPI.onUserJoined((data) => {
         console.log('사용자 입장:', data);
         addSystemMessage(`${data.nickname}님이 입장했습니다.`);
+        // 새 사용자를 자동으로 연락처에 추가 (옵션)
+        autoAddUserToContacts(data);
     });
 
     // 사용자 퇴장
@@ -397,6 +400,53 @@ function initP2PListeners() {
     });
 }
 
+// P2P 연결된 사용자들의 온라인 상태 업데이트
+async function updateOnlineUsersInContacts(users) {
+    // 모든 연락처를 오프라인으로 초기화
+    for (const contact of state.contacts) {
+        contact.status = 'offline';
+    }
+
+    // P2P 연결된 사용자들을 온라인으로 표시
+    for (const user of users) {
+        const contact = state.contacts.find(c =>
+            c.nickname.toLowerCase() === user.nickname.toLowerCase()
+        );
+        if (contact) {
+            contact.status = 'online';
+            // DB에도 상태 업데이트
+            if (window.messengerDB) {
+                await window.messengerDB.updateContactStatus(contact.id, 'online');
+            }
+        }
+    }
+
+    renderContactList();
+}
+
+// 새 사용자 자동 연락처 추가
+async function autoAddUserToContacts(userData) {
+    // 이미 연락처에 있는지 확인
+    const existing = state.contacts.find(c =>
+        c.nickname.toLowerCase() === userData.nickname.toLowerCase()
+    );
+
+    if (!existing && userData.nickname !== state.nickname) {
+        try {
+            if (window.messengerDB) {
+                await window.messengerDB.addContact({
+                    nickname: userData.nickname,
+                    status: 'online'
+                });
+                await loadContacts();
+                renderContactList();
+            }
+        } catch (err) {
+            console.error('자동 연락처 추가 실패:', err);
+        }
+    }
+}
+
 // 채팅방 추가
 function addRoom(room) {
     if (state.rooms.find(r => r.id === room.id)) return;
@@ -408,27 +458,85 @@ function addRoom(room) {
 
 // 채팅방 목록 렌더링
 function renderRoomList() {
-    elements.roomList.innerHTML = state.rooms.map(room => `
-        <div class="room-item ${room.id === state.currentRoom ? 'active' : ''}"
-             data-room-id="${room.id}" onclick="selectRoom('${room.id}')">
-            <div class="room-avatar">${room.name.charAt(0).toUpperCase()}</div>
-            <div class="room-info">
-                <div class="room-name">${escapeHtml(room.name)}</div>
-                <div class="room-preview">${room.lastMessage || '새 채팅방'}</div>
+    if (state.rooms.length === 0) {
+        elements.roomList.innerHTML = `
+            <div class="empty-list" style="padding: 16px;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style="opacity: 0.3;">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                </svg>
+                <div style="margin-top: 8px; font-size: 12px;">채팅방이 없습니다</div>
+                <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">연결 후 사용자를 클릭하여 채팅을 시작하세요</div>
             </div>
-            <div class="room-meta">
-                <div class="room-time">${room.lastTime || ''}</div>
-                ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
+        `;
+        return;
+    }
+
+    elements.roomList.innerHTML = state.rooms.map(room => {
+        const isGroup = room.type === 'group';
+        const avatarBg = isGroup ? 'var(--warning)' : 'var(--accent)';
+        const icon = isGroup ?
+            `<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>` :
+            room.name.charAt(0).toUpperCase();
+
+        return `
+            <div class="room-item ${room.id === state.currentRoom ? 'active' : ''}"
+                 data-room-id="${room.id}" onclick="selectRoom('${room.id}')">
+                <div class="room-avatar" style="background: ${avatarBg}; display: flex; align-items: center; justify-content: center;">
+                    ${isGroup ? icon : `<span>${icon}</span>`}
+                </div>
+                <div class="room-info">
+                    <div class="room-name">${escapeHtml(room.name)}</div>
+                    <div class="room-preview">${escapeHtml(room.lastMessage || (isGroup ? '그룹 채팅' : '1:1 채팅'))}</div>
+                </div>
+                <div class="room-meta">
+                    <div class="room-time">${room.lastTime || ''}</div>
+                    ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // 채팅방 선택
 function selectRoom(roomId) {
     state.currentRoom = roomId;
+
+    // 선택된 방 정보로 헤더 업데이트
+    const room = state.rooms.find(r => r.id === roomId);
+    if (room) {
+        updateChatHeader(room);
+    }
+
     renderRoomList();
     loadRoomMessages(roomId);
+    showChatView();
+}
+
+// 채팅 헤더 업데이트
+function updateChatHeader(room) {
+    if (!room) return;
+
+    const isGroup = room.type === 'group';
+
+    // 아바타 업데이트
+    elements.chatAvatar.style.background = isGroup ? 'var(--warning)' : 'var(--accent)';
+    if (isGroup) {
+        elements.chatAvatar.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>`;
+    } else {
+        elements.chatAvatar.textContent = room.name.charAt(0).toUpperCase();
+    }
+
+    // 이름 업데이트
+    elements.chatName.textContent = room.name;
+
+    // 상태 업데이트
+    if (isGroup) {
+        elements.chatStatus.textContent = `${state.users.length}명 참여중`;
+    } else {
+        // 1:1 채팅인 경우 상대방 온라인 상태 표시
+        const otherUser = state.users.find(u => u.nickname === room.name);
+        elements.chatStatus.textContent = otherUser ? '온라인' : '오프라인';
+    }
 }
 
 // 채팅 뷰 표시
@@ -578,19 +686,103 @@ function renderMessage(msg) {
 function updateUsersList() {
     elements.userCount.textContent = state.users.length;
     elements.usersList.innerHTML = state.users.map(user => `
-        <div class="user-item">
-            <div class="user-avatar">${user.nickname.charAt(0).toUpperCase()}</div>
-            <div>
-                <div class="user-name">${escapeHtml(user.nickname)}</div>
+        <div class="user-item" onclick="startDirectChat('${escapeHtml(user.nickname)}')" style="cursor: pointer;">
+            <div class="user-avatar" style="background: ${user.isHost ? 'var(--warning)' : 'var(--accent)'}">
+                ${user.nickname.charAt(0).toUpperCase()}
+            </div>
+            <div style="flex: 1;">
+                <div class="user-name">${escapeHtml(user.nickname)}${user.nickname === state.nickname ? ' (나)' : ''}</div>
                 ${user.isHost ? '<div class="user-host">호스트</div>' : ''}
             </div>
+            ${user.nickname !== state.nickname ? `
+                <button class="action-btn" onclick="event.stopPropagation(); startDirectChat('${escapeHtml(user.nickname)}')" title="1:1 채팅">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+            ` : ''}
         </div>
     `).join('');
+}
+
+// P2P 접속 사용자와 1:1 채팅 시작
+async function startDirectChat(nickname) {
+    if (nickname === state.nickname) return; // 자신과는 채팅 불가
+
+    const roomId = `direct_${nickname.replace(/\s+/g, '_')}_${Date.now()}`;
+
+    // 채팅방 생성
+    if (window.messengerDB) {
+        await window.messengerDB.createRoom({
+            id: roomId,
+            type: 'direct',
+            name: nickname
+        });
+
+        if (state.myContactId) {
+            await window.messengerDB.addRoomParticipant(roomId, state.myContactId, state.nickname);
+        }
+    }
+
+    // 채팅방 목록에 추가
+    addRoom({
+        id: roomId,
+        name: nickname,
+        type: 'direct',
+        unread: 0
+    });
+
+    // 채팅 탭으로 이동 및 선택
+    document.querySelector('[data-tab="chats"]')?.click();
+    selectRoom(roomId);
+    elements.usersPanel.classList.remove('visible');
 }
 
 // 채팅 상태 업데이트
 function updateChatStatus() {
     elements.chatStatus.textContent = `${state.users.length}명 참여중`;
+
+    // 온라인 사용자 섹션 업데이트 (채팅 탭의 상단)
+    updateOnlineUsersSection();
+}
+
+// 온라인 사용자 섹션 업데이트 (채팅 탭 상단)
+function updateOnlineUsersSection() {
+    const section = document.getElementById('onlineUsersSection');
+    const countEl = document.getElementById('onlineCount');
+    const listEl = document.getElementById('onlineUsersList');
+
+    if (!section || !listEl) return;
+
+    // 자신을 제외한 온라인 사용자들
+    const otherUsers = state.users.filter(u => u.nickname !== state.nickname);
+
+    if (otherUsers.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    countEl.textContent = otherUsers.length;
+
+    listEl.innerHTML = otherUsers.map(user => `
+        <div class="contact-item" onclick="startDirectChat('${escapeHtml(user.nickname)}')" style="cursor: pointer;">
+            <div class="contact-avatar" style="background: ${user.isHost ? 'var(--warning)' : 'var(--success)'}; width: 32px; height: 32px; font-size: 12px;">
+                ${user.nickname.charAt(0).toUpperCase()}
+            </div>
+            <div class="contact-info">
+                <div class="contact-name" style="font-size: 12px;">${escapeHtml(user.nickname)}</div>
+                <div class="contact-status online" style="font-size: 10px;">${user.isHost ? '호스트' : '온라인'}</div>
+            </div>
+            <div class="contact-actions" style="opacity: 1;">
+                <button class="action-btn" onclick="event.stopPropagation(); startDirectChat('${escapeHtml(user.nickname)}')" title="1:1 채팅" style="width: 24px; height: 24px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
 }
 
 // 스크롤 하단으로
@@ -1123,6 +1315,28 @@ async function startGroupChat(groupId) {
 // 채팅방 관리 UI
 // ============================================
 
+// 새 채팅방 만들기 (모달 열기)
+function createNewRoom() {
+    openModal('roomModal');
+}
+
+// 현재 채팅방 나가기
+async function leaveCurrentRoom() {
+    if (!state.currentRoom) return;
+
+    if (!confirm('이 채팅방을 나가시겠습니까?')) return;
+
+    try {
+        await leaveRoom(state.currentRoom);
+        state.currentRoom = null;
+        hideChatView();
+        elements.messagesContainer.innerHTML = '';
+    } catch (err) {
+        console.error('채팅방 나가기 실패:', err);
+        alert('채팅방 나가기 실패: ' + err.message);
+    }
+}
+
 async function saveRoom() {
     const name = document.getElementById('roomName').value.trim();
     const type = document.getElementById('roomType').value;
@@ -1197,3 +1411,6 @@ window.saveGroup = saveGroup;
 window.deleteGroupById = deleteGroupById;
 window.startGroupChat = startGroupChat;
 window.saveRoom = saveRoom;
+window.startDirectChat = startDirectChat;
+window.leaveCurrentRoom = leaveCurrentRoom;
+window.createNewRoom = createNewRoom;

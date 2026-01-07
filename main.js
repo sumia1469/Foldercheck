@@ -1450,67 +1450,51 @@ function initializeP2PMessenger() {
     };
 
     // 이벤트 리스너 설정
-    p2pMessenger.on('status', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:status', data);
+    // P2P 이벤트를 mainWindow와 chatWindow 모두에 전송하는 헬퍼 함수
+    const sendToAllWindows = (channel, data) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send(channel, data);
         }
-        notifyExtensions('p2p:status', data);
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.webContents.send(channel, data);
+        }
+        notifyExtensions(channel, data);
+    };
+
+    p2pMessenger.on('status', (data) => {
+        sendToAllWindows('p2p:status', data);
     });
 
     p2pMessenger.on('message', (msg) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:message', msg);
-        }
-        notifyExtensions('p2p:message', msg);
+        sendToAllWindows('p2p:message', msg);
     });
 
     p2pMessenger.on('user_joined', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:user-joined', data);
-        }
-        notifyExtensions('p2p:user-joined', data);
+        sendToAllWindows('p2p:user-joined', data);
     });
 
     p2pMessenger.on('user_left', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:user-left', data);
-        }
-        notifyExtensions('p2p:user-left', data);
+        sendToAllWindows('p2p:user-left', data);
     });
 
     p2pMessenger.on('user_list', (users) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:user-list', users);
-        }
-        notifyExtensions('p2p:user-list', users);
+        sendToAllWindows('p2p:user-list', users);
     });
 
     p2pMessenger.on('error', (err) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:error', err);
-        }
-        notifyExtensions('p2p:error', err);
+        sendToAllWindows('p2p:error', err);
     });
 
     p2pMessenger.on('disconnected', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:disconnected', data);
-        }
-        notifyExtensions('p2p:disconnected', data);
+        sendToAllWindows('p2p:disconnected', data);
     });
 
     p2pMessenger.on('file_start', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:file-start', data);
-        }
-        notifyExtensions('p2p:file-start', data);
+        sendToAllWindows('p2p:file-start', data);
     });
 
     p2pMessenger.on('file_progress', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:file-progress', data);
-        }
-        notifyExtensions('p2p:file-progress', data);
+        sendToAllWindows('p2p:file-progress', data);
     });
 
     p2pMessenger.on('file_received', (data) => {
@@ -1530,17 +1514,11 @@ function initializeP2PMessenger() {
             savedPath: savePath
         };
 
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:file-received', eventData);
-        }
-        notifyExtensions('p2p:file-received', eventData);
+        sendToAllWindows('p2p:file-received', eventData);
     });
 
     p2pMessenger.on('file_sent', (data) => {
-        if (mainWindow) {
-            mainWindow.webContents.send('p2p:file-sent', data);
-        }
-        notifyExtensions('p2p:file-sent', data);
+        sendToAllWindows('p2p:file-sent', data);
     });
 
     console.log('[P2P] 메신저 시스템 초기화 완료');

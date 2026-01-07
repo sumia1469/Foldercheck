@@ -51,7 +51,45 @@ class MessengerDB {
             } else {
                 // sql.js 폴백 (더 느리지만 네이티브 빌드 필요 없음)
                 const initSqlJs = require('sql.js');
-                const SQL = await initSqlJs();
+
+                // WASM 파일 경로 설정
+                let wasmPath;
+                try {
+                    // node_modules에서 sql.js wasm 파일 찾기
+                    const sqlJsPath = require.resolve('sql.js');
+                    const sqlJsDir = path.dirname(sqlJsPath);
+
+                    // 여러 가능한 경로 확인
+                    const possiblePaths = [
+                        path.join(sqlJsDir, 'dist', 'sql-wasm.wasm'),
+                        path.join(sqlJsDir, 'sql-wasm.wasm'),
+                        path.join(__dirname, 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm')
+                    ];
+
+                    for (const p of possiblePaths) {
+                        if (fs.existsSync(p)) {
+                            wasmPath = p;
+                            break;
+                        }
+                    }
+
+                    console.log('[MessengerDB] WASM 파일 경로:', wasmPath);
+                } catch (e) {
+                    console.error('[MessengerDB] WASM 경로 찾기 실패:', e);
+                }
+
+                // sql.js 초기화 옵션
+                const initOptions = {};
+                if (wasmPath && fs.existsSync(wasmPath)) {
+                    initOptions.locateFile = (file) => {
+                        if (file.endsWith('.wasm')) {
+                            return wasmPath;
+                        }
+                        return file;
+                    };
+                }
+
+                const SQL = await initSqlJs(initOptions);
 
                 if (fs.existsSync(this.dbPath)) {
                     const buffer = fs.readFileSync(this.dbPath);
@@ -197,12 +235,17 @@ class MessengerDB {
             INSERT OR REPLACE INTO contacts (id, nickname, ip_address, port, avatar, status)
             VALUES (?, ?, ?, ?, ?, ?)
         `;
+        const nickname = contact.nickname || null;
+        const ip = contact.ip || null;
+        const port = contact.port || 9900;
+        const avatar = contact.avatar || null;
+        const status = contact.status || 'offline';
 
         if (this.isSqlJs) {
-            this.db.run(sql, [id, contact.nickname, contact.ip, contact.port || 9900, contact.avatar, contact.status || 'offline']);
+            this.db.run(sql, [id, nickname, ip, port, avatar, status]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(id, contact.nickname, contact.ip, contact.port || 9900, contact.avatar, contact.status || 'offline');
+            this.db.prepare(sql).run(id, nickname, ip, port, avatar, status);
         }
 
         return id;
@@ -286,12 +329,15 @@ class MessengerDB {
     createGroup(group) {
         const id = group.id || `group_${Date.now()}`;
         const sql = 'INSERT INTO groups (id, name, description, avatar) VALUES (?, ?, ?, ?)';
+        const name = group.name || null;
+        const description = group.description || null;
+        const avatar = group.avatar || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [id, group.name, group.description, group.avatar]);
+            this.db.run(sql, [id, name, description, avatar]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(id, group.name, group.description, group.avatar);
+            this.db.prepare(sql).run(id, name, description, avatar);
         }
 
         return id;
@@ -406,13 +452,16 @@ class MessengerDB {
      */
     createRoom(room) {
         const id = room.id || `room_${Date.now()}`;
-        const sql = 'INSERT INTO rooms (id, type, name, avatar) VALUES (?, ?, ?, ?)';
+        const sql = 'INSERT OR REPLACE INTO rooms (id, type, name, avatar) VALUES (?, ?, ?, ?)';
+        const type = room.type || 'direct';
+        const name = room.name || null;
+        const avatar = room.avatar || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [id, room.type || 'direct', room.name, room.avatar]);
+            this.db.run(sql, [id, type, name, avatar]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(id, room.type || 'direct', room.name, room.avatar);
+            this.db.prepare(sql).run(id, type, name, avatar);
         }
 
         return id;
@@ -423,12 +472,13 @@ class MessengerDB {
      */
     addRoomParticipant(roomId, contactId, nickname) {
         const sql = 'INSERT OR REPLACE INTO room_participants (room_id, contact_id, nickname) VALUES (?, ?, ?)';
+        const nick = nickname || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [roomId, contactId, nickname]);
+            this.db.run(sql, [roomId, contactId, nick]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(roomId, contactId, nickname);
+            this.db.prepare(sql).run(roomId, contactId, nick);
         }
     }
 
@@ -603,25 +653,29 @@ class MessengerDB {
             INSERT INTO messages (id, room_id, sender_id, type, content, file_name, file_size, file_path, reply_to)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
+        const roomId = message.roomId || null;
+        const senderId = message.senderId || null;
+        const type = message.type || 'text';
+        const content = message.content || null;
+        const fileName = message.fileName || null;
+        const fileSize = message.fileSize || null;
+        const filePath = message.filePath || null;
+        const replyTo = message.replyTo || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [
-                id, message.roomId, message.senderId, message.type || 'text',
-                message.content, message.fileName, message.fileSize, message.filePath, message.replyTo
-            ]);
+            this.db.run(sql, [id, roomId, senderId, type, content, fileName, fileSize, filePath, replyTo]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(
-                id, message.roomId, message.senderId, message.type || 'text',
-                message.content, message.fileName, message.fileSize, message.filePath, message.replyTo
-            );
+            this.db.prepare(sql).run(id, roomId, senderId, type, content, fileName, fileSize, filePath, replyTo);
         }
 
         // 채팅방 업데이트
-        this.updateRoom(message.roomId, {
-            lastMessage: message.content || message.fileName,
-            lastMessageAt: new Date().toISOString()
-        });
+        if (roomId) {
+            this.updateRoom(roomId, {
+                lastMessage: content || fileName,
+                lastMessageAt: new Date().toISOString()
+            });
+        }
 
         return id;
     }

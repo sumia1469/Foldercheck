@@ -12414,9 +12414,13 @@ function setupP2PEventListeners() {
     });
 
     // 사용자 목록 업데이트
-    window.p2pAPI.onUserList((data) => {
-        console.log('사용자 목록:', data);
-        updateUsersList(data.users || []);
+    window.p2pAPI.onUserList((users) => {
+        console.log('사용자 목록:', users);
+        // users가 배열인지 확인 (배열이 아니면 users 속성 확인)
+        const userList = Array.isArray(users) ? users : (users?.users || []);
+        updateUsersList(userList);
+        // 사이드바도 업데이트
+        updateMessengerSidebar();
     });
 
     // 에러

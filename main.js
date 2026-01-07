@@ -1608,8 +1608,12 @@ ipcMain.handle('p2p:getHistory', () => {
 });
 
 // 파일 선택 다이얼로그
-ipcMain.handle('p2p:selectFile', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+ipcMain.handle('p2p:selectFile', async (event) => {
+    // 호출한 윈도우를 부모로 사용 (채팅 윈도우에서 호출 시 채팅 윈도우가 부모가 됨)
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    const parentWindow = senderWindow || chatWindow || mainWindow;
+
+    const result = await dialog.showOpenDialog(parentWindow, {
         properties: ['openFile'],
         title: '전송할 파일 선택'
     });
@@ -1659,8 +1663,12 @@ ipcMain.handle('cloud:deleteFile', (event, fileId) => {
 });
 
 // 클라우드 파일 선택 및 업로드
-ipcMain.handle('cloud:selectAndUpload', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+ipcMain.handle('cloud:selectAndUpload', async (event) => {
+    // 호출한 윈도우를 부모로 사용
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    const parentWindow = senderWindow || chatWindow || mainWindow;
+
+    const result = await dialog.showOpenDialog(parentWindow, {
         properties: ['openFile'],
         title: '클라우드에 업로드할 파일 선택'
     });

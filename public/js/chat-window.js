@@ -1692,9 +1692,21 @@ function initUsersPanelClose() {
 function initSidebarToggle() {
     const headerToggleBtn = document.getElementById('sidebarHeaderToggle');
     const floatingToggleBtn = document.getElementById('sidebarToggle');
+    const titlebarToggleBtn = document.getElementById('titlebarPanelToggle');
     const sidebar = document.getElementById('sidebar');
 
     if (!sidebar) return;
+
+    // 타이틀바 토글 버튼 상태 업데이트 함수
+    const updateTitlebarToggle = (isOpen) => {
+        if (titlebarToggleBtn) {
+            if (isOpen) {
+                titlebarToggleBtn.classList.add('active');
+            } else {
+                titlebarToggleBtn.classList.remove('active');
+            }
+        }
+    };
 
     // 사이드바 숨기기/보이기 함수
     const toggleSidebar = (collapse) => {
@@ -1705,11 +1717,23 @@ function initSidebarToggle() {
         if (collapse) {
             sidebar.classList.add('collapsed');
             if (floatingToggleBtn) floatingToggleBtn.classList.add('visible');
+            updateTitlebarToggle(false);
         } else {
             sidebar.classList.remove('collapsed');
             if (floatingToggleBtn) floatingToggleBtn.classList.remove('visible');
+            updateTitlebarToggle(true);
         }
     };
+
+    // 초기 상태 설정 (사이드바가 열려있으면 active)
+    updateTitlebarToggle(!sidebar.classList.contains('collapsed'));
+
+    // 타이틀바 토글 버튼 - 토글
+    if (titlebarToggleBtn) {
+        titlebarToggleBtn.addEventListener('click', () => {
+            toggleSidebar();
+        });
+    }
 
     // 헤더 토글 버튼 (사이드바 내부) - 숨기기
     if (headerToggleBtn) {

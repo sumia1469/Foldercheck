@@ -96,46 +96,6 @@ body {
     z-index: 5;
 }
 
-/* 헤더 채팅 윈도우 버튼 */
-.titlebar-chat-btn {
-    position: absolute;
-    left: 55px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    z-index: 10;
-    -webkit-app-region: no-drag;
-}
-
-.titlebar-chat-btn:hover {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
-    color: white;
-}
-
-.titlebar-chat-btn:active {
-    transform: translateY(-50%) scale(0.95);
-}
-
-.titlebar-chat-btn svg {
-    width: 14px;
-    height: 14px;
-}
-
-.titlebar-chat-btn .chat-btn-label {
-    font-size: 12px;
-    font-weight: 500;
-}
-
 .titlebar-controls {
     position: absolute;
     right: 0;

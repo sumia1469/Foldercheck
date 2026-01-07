@@ -161,25 +161,16 @@ function initConnection() {
             await saveMyProfile({ id: myId, nickname: nickname });
 
             updateConnectionUI(true);
-            showChatView();
 
-            // 기본 채팅방 생성 (DB에도 저장)
-            const roomId = 'main_' + Date.now();
-            if (window.messengerDB) {
-                await window.messengerDB.createRoom({
-                    id: roomId,
-                    type: 'group',
-                    name: 'P2P 채팅방'
-                });
-                await window.messengerDB.addRoomParticipant(roomId, myId, nickname);
+            // 기존 채팅방 목록 로드 (자동 생성하지 않음)
+            await loadRooms();
+
+            // 채팅방이 없으면 안내 메시지 표시
+            if (state.rooms.length === 0) {
+                showEmptyRoomMessage();
+            } else {
+                showChatView();
             }
-
-            addRoom({
-                id: roomId,
-                name: 'P2P 채팅방',
-                type: 'group',
-                unread: 0
-            });
 
         } catch (err) {
             alert('호스트 시작 실패: ' + err.message);
@@ -215,25 +206,16 @@ function initConnection() {
             await saveMyProfile({ id: myId, nickname: nickname });
 
             updateConnectionUI(true);
-            showChatView();
 
-            // 채팅방 추가 (DB에도 저장)
-            const roomId = 'room_' + host.replace(/\./g, '_') + '_' + port;
-            if (window.messengerDB) {
-                await window.messengerDB.createRoom({
-                    id: roomId,
-                    type: 'group',
-                    name: `${host}:${port}`
-                });
-                await window.messengerDB.addRoomParticipant(roomId, myId, nickname);
+            // 기존 채팅방 목록 로드 (자동 생성하지 않음)
+            await loadRooms();
+
+            // 채팅방이 없으면 안내 메시지 표시
+            if (state.rooms.length === 0) {
+                showEmptyRoomMessage();
+            } else {
+                showChatView();
             }
-
-            addRoom({
-                id: roomId,
-                name: `${host}:${port}`,
-                type: 'group',
-                unread: 0
-            });
 
         } catch (err) {
             alert('연결 실패: ' + err.message);
@@ -542,6 +524,10 @@ function selectRoom(roomId) {
     renderRoomList();
     loadRoomMessages(roomId);
     showChatView();
+
+    // 메시지 입력 활성화
+    elements.messageInput.disabled = false;
+    elements.messageInput.placeholder = '메시지를 입력하세요...';
 }
 
 // 채팅 헤더 업데이트
@@ -581,6 +567,40 @@ function showChatView() {
 function hideChatView() {
     elements.emptyState.style.display = 'flex';
     elements.chatView.style.display = 'none';
+}
+
+// 채팅방 없음 안내 표시 (연결은 되어 있지만 채팅방이 없는 상태)
+function showEmptyRoomMessage() {
+    elements.emptyState.style.display = 'none';
+    elements.chatView.style.display = 'flex';
+
+    // 메시지 영역에 안내 메시지 표시
+    elements.messageList.innerHTML = `
+        <div class="empty-room-notice" style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            text-align: center;
+            padding: 40px;
+        ">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 16px; opacity: 0.5;">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">채팅방이 없습니다</h3>
+            <p style="margin: 0; font-size: 13px; opacity: 0.8;">
+                좌측 패널에서 새 채팅방을 만들거나<br>
+                사용자 목록에서 1:1 채팅을 시작하세요.
+            </p>
+        </div>
+    `;
+
+    // 메시지 입력 비활성화
+    elements.messageInput.disabled = true;
+    elements.sendBtn.disabled = true;
+    elements.messageInput.placeholder = '채팅방을 선택하세요';
 }
 
 // 메시지 추가

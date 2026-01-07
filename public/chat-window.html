@@ -848,27 +848,21 @@
             font-size: 10px;
         }
 
-        .message-read {
-            display: flex;
-            align-items: center;
-            color: var(--accent);
+        /* 카카오톡 스타일 읽지 않음 숫자 표시 */
+        .message-unread-count {
+            font-size: 10px;
+            font-weight: 600;
+            color: #FFD700;
+            margin-right: 4px;
         }
 
-        .message-read svg {
-            width: 14px;
-            height: 14px;
+        /* 다크 테마에서 더 잘 보이도록 */
+        [data-theme="dark"] .message-unread-count {
+            color: #FFD700;
         }
 
-        /* 읽지 않음 (체크 1개) */
-        .message-unread {
-            display: flex;
-            align-items: center;
-            color: var(--text-muted);
-        }
-
-        .message-unread svg {
-            width: 14px;
-            height: 14px;
+        [data-theme="light"] .message-unread-count {
+            color: #E6A700;
         }
 
         /* 파일 메시지 */

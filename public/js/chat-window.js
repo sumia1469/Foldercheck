@@ -683,14 +683,11 @@ function renderMessage(msg) {
             </div>
         `;
     } else {
-        // 읽음 상태 아이콘 (카카오톡 스타일 - 더블 체크)
-        const readIcon = msg.isOwn ? `
-            <span class="message-read" title="읽음">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="1 12 5 16 12 9"></polyline>
-                    <polyline points="8 12 12 16 20 7"></polyline>
-                </svg>
-            </span>
+        // 카카오톡 스타일 읽음 표시: 안 읽은 사람 수 (숫자로 표시, 모두 읽으면 숫자 사라짐)
+        // msg.unreadCount: 안 읽은 사람 수 (undefined면 기본값 사용)
+        const unreadCount = msg.unreadCount !== undefined ? msg.unreadCount : (msg.isOwn ? getUnreadCountForMessage(msg) : 0);
+        const unreadBadge = msg.isOwn && unreadCount > 0 ? `
+            <span class="message-unread-count" title="${unreadCount}명이 안 읽음">${unreadCount}</span>
         ` : '';
 
         el.innerHTML = `
@@ -699,8 +696,8 @@ function renderMessage(msg) {
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
                 <div class="message-bubble">${escapeHtml(msg.content)}</div>
                 <div class="message-meta">
+                    ${unreadBadge}
                     <span class="message-time">${time}</span>
-                    ${readIcon}
                 </div>
             </div>
         `;
@@ -1070,6 +1067,25 @@ function formatFileSize(bytes) {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+}
+
+// 카카오톡 스타일: 안 읽은 사람 수 계산
+// P2P 그룹 채팅: 나를 제외한 접속자 수가 안 읽은 사람 수
+// 1:1 채팅: 상대방이 읽지 않으면 1, 읽으면 0
+function getUnreadCountForMessage(msg) {
+    // 현재 방의 타입 확인
+    const room = state.rooms.find(r => r.id === state.currentRoom);
+
+    if (room && room.type === 'direct') {
+        // 1:1 채팅: 상대방 1명
+        // 실제 읽음 상태 추적이 없으므로 일단 0 반환 (읽음으로 표시)
+        return 0;
+    } else {
+        // 그룹 채팅: 나를 제외한 접속자 수
+        // 실제 읽음 상태 추적이 없으므로 접속자 수 - 1 반환
+        const otherUsers = state.users.filter(u => u.nickname !== state.nickname);
+        return otherUsers.length;
+    }
 }
 
 // ============================================

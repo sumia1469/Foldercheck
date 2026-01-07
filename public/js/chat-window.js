@@ -161,14 +161,14 @@ function updateConnectionUI(connected) {
     if (elements.statusDot) {
         elements.statusDot.classList.remove('connected', 'host');
         if (connected) {
-            elements.statusDot.classList.add(state.mode === 'host' ? 'host' : 'connected');
+            elements.statusDot.classList.add('connected');
         }
     }
 
     // 상태 텍스트 업데이트
     if (elements.statusText) {
         if (connected) {
-            elements.statusText.textContent = state.mode === 'host' ? '호스트 중' : '연결됨';
+            elements.statusText.textContent = '연결됨';
         } else {
             elements.statusText.textContent = '연결 안됨';
         }
@@ -178,16 +178,13 @@ function updateConnectionUI(connected) {
     if (elements.connectStatusPanel) {
         elements.connectStatusPanel.classList.remove('connected', 'host');
         if (connected) {
-            elements.connectStatusPanel.classList.add(state.mode === 'host' ? 'host' : 'connected');
+            elements.connectStatusPanel.classList.add('connected');
         }
     }
 
     if (elements.connectionStatusText) {
         if (connected) {
-            const statusText = state.mode === 'host' ?
-                `호스트 중 (${state.nickname})` :
-                `연결됨 (${state.nickname})`;
-            elements.connectionStatusText.textContent = statusText;
+            elements.connectionStatusText.textContent = `연결됨 (${state.nickname})`;
         } else {
             elements.connectionStatusText.textContent = '메인 패널에서 연결하세요';
         }
@@ -581,11 +578,13 @@ function addSystemMessage(text) {
 
 // 파일 메시지 추가
 async function addFileMessage(data) {
-    const isOwn = data.nickname === state.nickname;
+    // from 또는 nickname 필드 사용 (main.js에서는 from으로 전송)
+    const sender = data.from || data.nickname || '알 수 없음';
+    const isOwn = sender === state.nickname;
     const message = {
         id: data.transferId || Date.now(),
         type: 'file',
-        sender: data.nickname,
+        sender: sender,
         filename: data.filename,
         fileSize: data.size,
         filePath: data.savedPath,
@@ -602,7 +601,7 @@ async function addFileMessage(data) {
         try {
             await window.messengerDB.saveMessage({
                 roomId: state.currentRoom,
-                senderId: isOwn ? state.myContactId : `remote_${data.nickname}`,
+                senderId: isOwn ? state.myContactId : `remote_${sender}`,
                 type: 'file',
                 content: data.filename,
                 fileName: data.filename,
@@ -1395,6 +1394,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initChat();
     initP2PListeners();
     initChatAPIListeners(); // 메인 윈도우에서 보내는 이벤트 리스너
+    initSettingsBtn(); // 설정 버튼 이벤트 리스너
+    initUsersPanelClose(); // 참여자 패널 닫기 버튼
+    initUsersPanelResize(); // 참여자 패널 리사이즈
 
     // 데이터 로드
     await loadMyProfile();
@@ -1473,6 +1475,186 @@ function initChatAPIListeners() {
     }
 }
 
+// ============================================
+// 설정 기능
+// ============================================
+
+// 설정 모달 열기
+function openSettingsModal() {
+    if (!state.currentRoom) {
+        alert('먼저 채팅방을 선택하세요.');
+        return;
+    }
+
+    const room = state.rooms.find(r => r.id === state.currentRoom);
+    if (room) {
+        document.getElementById('settingsRoomName').value = room.name || '';
+        document.getElementById('settingsNotification').value = room.notification || 'all';
+        document.getElementById('settingsPin').checked = room.pinned || false;
+    }
+
+    openModal('settingsModal');
+}
+
+// 설정 저장
+async function saveSettings() {
+    if (!state.currentRoom) return;
+
+    const name = document.getElementById('settingsRoomName').value.trim();
+    const notification = document.getElementById('settingsNotification').value;
+    const pinned = document.getElementById('settingsPin').checked;
+
+    try {
+        if (window.messengerDB) {
+            await window.messengerDB.updateRoom(state.currentRoom, {
+                name: name,
+                notification: notification,
+                pinned: pinned
+            });
+
+            // 로컬 상태 업데이트
+            const room = state.rooms.find(r => r.id === state.currentRoom);
+            if (room) {
+                room.name = name;
+                room.notification = notification;
+                room.pinned = pinned;
+            }
+
+            renderRoomList();
+            updateChatHeader(room);
+        }
+
+        closeModal('settingsModal');
+    } catch (err) {
+        console.error('설정 저장 실패:', err);
+        alert('설정 저장 실패: ' + err.message);
+    }
+}
+
+// ============================================
+// 사용자 초대 기능
+// ============================================
+
+// 초대 모달 열기
+function openInviteModal() {
+    const inviteList = document.getElementById('inviteUserList');
+
+    // 현재 온라인 사용자 중 본인 제외
+    const availableUsers = state.users.filter(u => u.nickname !== state.nickname);
+
+    if (availableUsers.length === 0) {
+        inviteList.innerHTML = `
+            <div style="color: var(--text-muted); font-size: 12px; text-align: center; padding: 16px;">
+                초대 가능한 온라인 사용자가 없습니다
+            </div>
+        `;
+    } else {
+        inviteList.innerHTML = availableUsers.map(user => `
+            <label class="user-item" style="cursor: pointer;">
+                <input type="checkbox" value="${escapeHtml(user.nickname)}" style="width: auto; margin-right: 8px;">
+                <div class="user-avatar">${user.nickname.charAt(0).toUpperCase()}</div>
+                <div class="user-info">
+                    <div class="user-name">${escapeHtml(user.nickname)}</div>
+                    <div class="user-status" style="color: var(--success);">온라인</div>
+                </div>
+            </label>
+        `).join('');
+    }
+
+    openModal('inviteModal');
+}
+
+// 선택된 사용자 초대
+async function inviteSelectedUsers() {
+    const checkboxes = document.querySelectorAll('#inviteUserList input[type="checkbox"]:checked');
+    const selectedUsers = Array.from(checkboxes).map(cb => cb.value);
+
+    if (selectedUsers.length === 0) {
+        alert('초대할 사용자를 선택하세요.');
+        return;
+    }
+
+    // 현재 채팅방에 참가자 추가
+    if (state.currentRoom && window.messengerDB) {
+        try {
+            for (const nickname of selectedUsers) {
+                await window.messengerDB.addRoomParticipant(state.currentRoom, `user_${nickname}`, nickname);
+            }
+
+            // 시스템 메시지 추가
+            addSystemMessage(`${selectedUsers.join(', ')}님을 초대했습니다.`);
+
+            closeModal('inviteModal');
+        } catch (err) {
+            console.error('사용자 초대 실패:', err);
+            alert('사용자 초대 실패: ' + err.message);
+        }
+    } else {
+        closeModal('inviteModal');
+    }
+}
+
+// ============================================
+// 참여자 패널 닫기 및 리사이즈
+// ============================================
+
+// 참여자 패널 닫기
+function closeUsersPanel() {
+    elements.usersPanel.classList.remove('visible');
+}
+
+// 패널 리사이즈 초기화
+function initUsersPanelResize() {
+    const panel = document.getElementById('usersPanel');
+    const resizeHandle = document.getElementById('usersPanelResize');
+
+    if (!resizeHandle) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = panel.offsetWidth;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const diff = startX - e.clientX;
+        const newWidth = Math.min(Math.max(startWidth + diff, 180), 350);
+        panel.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// 설정 버튼 이벤트 리스너 초기화
+function initSettingsBtn() {
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', openSettingsModal);
+    }
+}
+
+// 참여자 패널 닫기 버튼 이벤트 리스너 초기화
+function initUsersPanelClose() {
+    const closeBtn = document.getElementById('usersPanelClose');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeUsersPanel);
+    }
+}
+
 // 전역 함수 노출
 window.selectRoom = selectRoom;
 window.openFile = openFile;
@@ -1489,3 +1671,8 @@ window.startDirectChat = startDirectChat;
 window.leaveCurrentRoom = leaveCurrentRoom;
 window.createNewRoom = createNewRoom;
 window.deleteRoom = deleteRoom;
+window.openSettingsModal = openSettingsModal;
+window.saveSettings = saveSettings;
+window.openInviteModal = openInviteModal;
+window.inviteSelectedUsers = inviteSelectedUsers;
+window.closeUsersPanel = closeUsersPanel;

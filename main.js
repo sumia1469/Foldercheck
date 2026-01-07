@@ -1665,6 +1665,16 @@ ipcMain.handle('p2p:startDirectChatWith', (event, nickname) => {
     return { success: false, error: '채팅 윈도우가 열려있지 않습니다' };
 });
 
+// 채팅 윈도우에서 특정 채팅방 선택
+ipcMain.handle('p2p:selectRoomInChat', (event, roomId) => {
+    if (chatWindow && !chatWindow.isDestroyed()) {
+        chatWindow.webContents.send('chat:selectRoom', roomId);
+        chatWindow.focus();
+        return { success: true };
+    }
+    return { success: false, error: '채팅 윈도우가 열려있지 않습니다' };
+});
+
 // 채팅 윈도우 컨트롤
 ipcMain.handle('chat:minimize', () => {
     if (chatWindow) chatWindow.minimize();

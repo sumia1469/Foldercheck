@@ -22,6 +22,13 @@ contextBridge.exposeInMainWorld('chatAPI', {
         return () => ipcRenderer.removeListener('chat:startDirectChat', handler);
     },
 
+    // 채팅방 선택 이벤트 수신
+    onSelectRoom: (callback) => {
+        const handler = (event, roomId) => callback(roomId);
+        ipcRenderer.on('chat:selectRoom', handler);
+        return () => ipcRenderer.removeListener('chat:selectRoom', handler);
+    },
+
     // Electron 환경 확인
     isElectron: true
 });

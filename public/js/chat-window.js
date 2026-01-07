@@ -1434,11 +1434,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 메인 윈도우 API 이벤트 리스너
 function initChatAPIListeners() {
-    if (window.chatAPI && window.chatAPI.onStartDirectChat) {
-        window.chatAPI.onStartDirectChat((nickname) => {
-            console.log('1:1 채팅 요청 수신:', nickname);
-            startDirectChat(nickname);
-        });
+    if (window.chatAPI) {
+        // 1:1 채팅 시작 이벤트
+        if (window.chatAPI.onStartDirectChat) {
+            window.chatAPI.onStartDirectChat((nickname) => {
+                console.log('1:1 채팅 요청 수신:', nickname);
+                startDirectChat(nickname);
+            });
+        }
+
+        // 채팅방 선택 이벤트
+        if (window.chatAPI.onSelectRoom) {
+            window.chatAPI.onSelectRoom(async (roomId) => {
+                console.log('채팅방 선택 요청 수신:', roomId);
+                // 채팅방 목록 새로고침
+                await loadRooms();
+                // 해당 채팅방 선택
+                if (state.rooms.find(r => r.id === roomId)) {
+                    selectRoom(roomId);
+                } else {
+                    // 채팅방이 목록에 없으면 채팅 탭으로만 이동
+                    document.querySelector('[data-tab="chats"]')?.click();
+                }
+            });
+        }
     }
 }
 

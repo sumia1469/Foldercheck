@@ -3106,6 +3106,48 @@ function renderMessengerSidebar(container) {
                 }
             </div>
         </div>
+
+        <!-- 채팅방 목록 (Teams 스타일) -->
+        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>채팅방</span>
+                <span class="tree-item-badge" id="messengerRoomCount">0</span>
+                <button class="explorer-action-btn" onclick="event.stopPropagation(); showCreateRoomDialog()" title="새 채팅방" style="margin-left: auto; width: 20px; height: 20px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="sidebar-section-items" id="messengerRoomList">
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    채팅방이 없습니다
+                </div>
+            </div>
+        </div>
+
+        <!-- 팀/그룹 목록 (Teams 스타일) -->
+        <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
+            <div class="sidebar-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+                <span>팀</span>
+                <span class="tree-item-badge" id="messengerTeamCount">0</span>
+                <button class="explorer-action-btn" onclick="event.stopPropagation(); showCreateTeamDialog()" title="새 팀 만들기" style="margin-left: auto; width: 20px; height: 20px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="sidebar-section-items" id="messengerTeamList">
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    팀이 없습니다
+                </div>
+            </div>
+        </div>
         ` : `
         <!-- 빠른 연결 (오프라인 시) -->
         <div class="sidebar-section" style="border-bottom: 1px solid var(--border-color);">
@@ -3186,6 +3228,11 @@ function renderMessengerSidebar(container) {
     // 오프라인일 때만 저장된 서버 목록 로드
     if (!isConnected) {
         loadMessengerServers();
+    }
+
+    // 연결 상태일 때 채팅방/팀 목록 로드
+    if (isConnected) {
+        initMessengerSidebarData();
     }
 }
 
@@ -12090,6 +12137,468 @@ async function startSidebarDirectChat(nickname) {
         console.error('1:1 채팅 시작 실패:', err);
         showToast('1:1 채팅 시작 실패: ' + err.message, 'error');
     }
+}
+
+// ============================================
+// Teams 스타일 채팅방/팀 관리 기능
+// ============================================
+
+// 메신저 사이드바 데이터 상태
+const messengerSidebarData = {
+    rooms: [],
+    teams: [],
+    selectedUsers: [] // 사용자 초대용 선택 목록
+};
+
+// 채팅방 생성 다이얼로그 표시
+function showCreateRoomDialog() {
+    // 기존 모달 제거
+    const existingModal = document.getElementById('messengerRoomModal');
+    if (existingModal) existingModal.remove();
+
+    // 접속 중인 사용자 목록 생성
+    const otherUsers = messengerState.users.filter(u => u.nickname !== messengerState.nickname);
+
+    const modal = document.createElement('div');
+    modal.id = 'messengerRoomModal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    modal.innerHTML = `
+        <div class="modal-content" style="background: var(--bg-secondary); border-radius: 8px; width: 400px; max-height: 80vh; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+            <div class="modal-header" style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">새 채팅방 만들기</h3>
+                <button onclick="closeMessengerModal('messengerRoomModal')" style="background: none; border: none; cursor: pointer; padding: 4px; color: var(--text-secondary);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 16px; overflow-y: auto; max-height: 60vh;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500;">채팅방 이름</label>
+                    <input type="text" id="newRoomName" placeholder="채팅방 이름을 입력하세요" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; box-sizing: border-box;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500;">채팅방 유형</label>
+                    <select id="newRoomType" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px;">
+                        <option value="group">그룹 채팅</option>
+                        <option value="direct">1:1 채팅</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500;">참여자 선택 (${otherUsers.length}명 접속중)</label>
+                    <div id="userSelectList" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary);">
+                        ${otherUsers.length > 0 ? otherUsers.map(user => `
+                            <label style="display: flex; align-items: center; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color);">
+                                <input type="checkbox" class="room-user-checkbox" value="${escapeHtml(user.nickname)}" style="margin-right: 10px;">
+                                <span style="width: 28px; height: 28px; border-radius: 50%; background: ${user.isHost ? 'var(--warning)' : 'var(--success)'}; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; margin-right: 10px;">${user.nickname?.charAt(0)?.toUpperCase() || '?'}</span>
+                                <span style="flex: 1;">${escapeHtml(user.nickname)}</span>
+                                ${user.isHost ? '<span style="font-size: 10px; color: var(--warning);">호스트</span>' : ''}
+                            </label>
+                        `).join('') : '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px;">접속 중인 사용자가 없습니다</div>'}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="closeMessengerModal('messengerRoomModal')" style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 13px;">취소</button>
+                <button onclick="createRoomFromSidebar()" style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--primary-color); color: white; cursor: pointer; font-size: 13px; font-weight: 500;">만들기</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 모달 외부 클릭 시 닫기
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeMessengerModal('messengerRoomModal');
+    });
+
+    // 입력 필드에 포커스
+    setTimeout(() => document.getElementById('newRoomName')?.focus(), 100);
+}
+
+// 팀 생성 다이얼로그 표시
+function showCreateTeamDialog() {
+    // 기존 모달 제거
+    const existingModal = document.getElementById('messengerTeamModal');
+    if (existingModal) existingModal.remove();
+
+    // 접속 중인 사용자 목록 생성
+    const otherUsers = messengerState.users.filter(u => u.nickname !== messengerState.nickname);
+
+    const modal = document.createElement('div');
+    modal.id = 'messengerTeamModal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    modal.innerHTML = `
+        <div class="modal-content" style="background: var(--bg-secondary); border-radius: 8px; width: 420px; max-height: 80vh; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+            <div class="modal-header" style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">새 팀 만들기</h3>
+                <button onclick="closeMessengerModal('messengerTeamModal')" style="background: none; border: none; cursor: pointer; padding: 4px; color: var(--text-secondary);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 16px; overflow-y: auto; max-height: 60vh;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500;">팀 이름 *</label>
+                    <input type="text" id="newTeamName" placeholder="예: 개발팀, 마케팅팀" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; box-sizing: border-box;">
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500;">팀 설명</label>
+                    <textarea id="newTeamDescription" placeholder="팀에 대한 설명을 입력하세요" rows="3" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; resize: vertical; box-sizing: border-box;"></textarea>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500;">팀원 초대 (${otherUsers.length}명 접속중)</label>
+                    <div id="teamUserSelectList" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary);">
+                        ${otherUsers.length > 0 ? otherUsers.map(user => `
+                            <label style="display: flex; align-items: center; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color);">
+                                <input type="checkbox" class="team-user-checkbox" value="${escapeHtml(user.nickname)}" style="margin-right: 10px;">
+                                <span style="width: 28px; height: 28px; border-radius: 50%; background: ${user.isHost ? 'var(--warning)' : 'var(--success)'}; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; margin-right: 10px;">${user.nickname?.charAt(0)?.toUpperCase() || '?'}</span>
+                                <span style="flex: 1;">${escapeHtml(user.nickname)}</span>
+                                ${user.isHost ? '<span style="font-size: 10px; color: var(--warning);">호스트</span>' : ''}
+                            </label>
+                        `).join('') : '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px;">접속 중인 사용자가 없습니다</div>'}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="closeMessengerModal('messengerTeamModal')" style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 13px;">취소</button>
+                <button onclick="createTeamFromSidebar()" style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--primary-color); color: white; cursor: pointer; font-size: 13px; font-weight: 500;">팀 만들기</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 모달 외부 클릭 시 닫기
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeMessengerModal('messengerTeamModal');
+    });
+
+    // 입력 필드에 포커스
+    setTimeout(() => document.getElementById('newTeamName')?.focus(), 100);
+}
+
+// 모달 닫기
+function closeMessengerModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.remove();
+}
+
+// 사이드바에서 채팅방 생성
+async function createRoomFromSidebar() {
+    const nameInput = document.getElementById('newRoomName');
+    const typeSelect = document.getElementById('newRoomType');
+    const name = nameInput?.value.trim();
+    const type = typeSelect?.value || 'group';
+
+    if (!name) {
+        showToast('채팅방 이름을 입력하세요', 'warning');
+        nameInput?.focus();
+        return;
+    }
+
+    // 선택된 사용자 목록
+    const selectedUsers = Array.from(document.querySelectorAll('.room-user-checkbox:checked'))
+        .map(cb => cb.value);
+
+    try {
+        // DB에 채팅방 생성
+        const roomId = `room_${Date.now()}`;
+        await window.messengerDB?.createRoom({
+            id: roomId,
+            type: type,
+            name: name
+        });
+
+        // 자신을 참가자로 추가
+        const myId = `sidebar_${messengerState.nickname}_${Date.now()}`;
+        await window.messengerDB?.addRoomParticipant(roomId, myId, messengerState.nickname);
+
+        // 선택된 사용자들을 참가자로 추가
+        for (const nickname of selectedUsers) {
+            const participantId = `participant_${nickname}_${Date.now()}`;
+            await window.messengerDB?.addRoomParticipant(roomId, participantId, nickname);
+        }
+
+        // 모달 닫기
+        closeMessengerModal('messengerRoomModal');
+
+        // 사이드바 채팅방 목록 새로고침
+        await loadMessengerRooms();
+
+        // 채팅 윈도우 열고 해당 채팅방 선택
+        await openChatWindow();
+
+        showToast(`'${name}' 채팅방이 생성되었습니다`, 'success');
+    } catch (err) {
+        console.error('채팅방 생성 실패:', err);
+        showToast('채팅방 생성 실패: ' + err.message, 'error');
+    }
+}
+
+// 사이드바에서 팀 생성
+async function createTeamFromSidebar() {
+    const nameInput = document.getElementById('newTeamName');
+    const descInput = document.getElementById('newTeamDescription');
+    const name = nameInput?.value.trim();
+    const description = descInput?.value.trim();
+
+    if (!name) {
+        showToast('팀 이름을 입력하세요', 'warning');
+        nameInput?.focus();
+        return;
+    }
+
+    // 선택된 사용자 목록
+    const selectedUsers = Array.from(document.querySelectorAll('.team-user-checkbox:checked'))
+        .map(cb => cb.value);
+
+    try {
+        // DB에 그룹(팀) 생성
+        const groupId = `team_${Date.now()}`;
+        await window.messengerDB?.createGroup({
+            id: groupId,
+            name: name,
+            description: description
+        });
+
+        // 자신을 그룹 멤버로 추가 (관리자 역할)
+        const myId = `sidebar_${messengerState.nickname}_${Date.now()}`;
+        await window.messengerDB?.addGroupMember(groupId, myId, 'admin');
+
+        // 선택된 사용자들을 멤버로 추가
+        for (const nickname of selectedUsers) {
+            const memberId = `member_${nickname}_${Date.now()}`;
+            await window.messengerDB?.addGroupMember(groupId, memberId, 'member');
+        }
+
+        // 팀 채팅방도 자동 생성
+        const roomId = `teamroom_${groupId}`;
+        await window.messengerDB?.createRoom({
+            id: roomId,
+            type: 'group',
+            name: `${name} (팀 채팅)`
+        });
+
+        // 모달 닫기
+        closeMessengerModal('messengerTeamModal');
+
+        // 사이드바 팀 목록 새로고침
+        await loadMessengerTeams();
+        await loadMessengerRooms();
+
+        showToast(`'${name}' 팀이 생성되었습니다`, 'success');
+    } catch (err) {
+        console.error('팀 생성 실패:', err);
+        showToast('팀 생성 실패: ' + err.message, 'error');
+    }
+}
+
+// 사이드바 채팅방 목록 로드
+async function loadMessengerRooms() {
+    try {
+        if (!window.messengerDB) return;
+
+        const rooms = await window.messengerDB.getRooms();
+        messengerSidebarData.rooms = rooms || [];
+
+        // UI 업데이트
+        const container = document.getElementById('messengerRoomList');
+        const countEl = document.getElementById('messengerRoomCount');
+
+        if (countEl) countEl.textContent = messengerSidebarData.rooms.length;
+
+        if (!container) return;
+
+        if (messengerSidebarData.rooms.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    채팅방이 없습니다
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = messengerSidebarData.rooms.map(room => {
+            const isGroup = room.type === 'group';
+            const avatarBg = isGroup ? 'var(--warning)' : 'var(--accent)';
+            const icon = isGroup ? `
+                <svg viewBox="0 0 24 24" fill="white" style="width: 14px; height: 14px;">
+                    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+            ` : (room.name?.charAt(0)?.toUpperCase() || '?');
+
+            return `
+                <div class="server-item" onclick="openRoomInChatWindow('${room.id}')" style="cursor: pointer;">
+                    <div class="server-item-icon" style="background: ${avatarBg}; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;">
+                        ${icon}
+                    </div>
+                    <div class="server-item-info" style="flex: 1; min-width: 0;">
+                        <div class="server-item-name" style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(room.name || '채팅방')}</div>
+                        <div class="server-item-status" style="font-size: 11px; color: var(--text-muted);">${isGroup ? '그룹 채팅' : '1:1 채팅'}</div>
+                    </div>
+                    ${room.unread_count > 0 ? `<span style="background: var(--danger); color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px;">${room.unread_count}</span>` : ''}
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('채팅방 목록 로드 실패:', err);
+    }
+}
+
+// 사이드바 팀 목록 로드
+async function loadMessengerTeams() {
+    try {
+        if (!window.messengerDB) return;
+
+        const teams = await window.messengerDB.getGroups();
+        messengerSidebarData.teams = teams || [];
+
+        // UI 업데이트
+        const container = document.getElementById('messengerTeamList');
+        const countEl = document.getElementById('messengerTeamCount');
+
+        if (countEl) countEl.textContent = messengerSidebarData.teams.length;
+
+        if (!container) return;
+
+        if (messengerSidebarData.teams.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    팀이 없습니다
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = messengerSidebarData.teams.map(team => `
+            <div class="server-item" onclick="showTeamDetails('${team.id}')" style="cursor: pointer;">
+                <div class="server-item-icon" style="background: var(--primary-color); width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 600;">
+                    ${team.name?.charAt(0)?.toUpperCase() || 'T'}
+                </div>
+                <div class="server-item-info" style="flex: 1; min-width: 0;">
+                    <div class="server-item-name" style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(team.name)}</div>
+                    <div class="server-item-status" style="font-size: 11px; color: var(--text-muted);">${team.member_count || 0}명</div>
+                </div>
+                <button class="explorer-action-btn" onclick="event.stopPropagation(); inviteToTeam('${team.id}')" title="멤버 초대" style="width: 24px; height: 24px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                        <circle cx="8.5" cy="7" r="4"/>
+                        <line x1="20" y1="8" x2="20" y2="14"/>
+                        <line x1="23" y1="11" x2="17" y2="11"/>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('팀 목록 로드 실패:', err);
+    }
+}
+
+// 채팅 윈도우에서 특정 채팅방 열기
+async function openRoomInChatWindow(roomId) {
+    try {
+        await openChatWindow();
+        // 채팅 윈도우에 채팅방 선택 이벤트 전송
+        setTimeout(() => {
+            if (window.p2pAPI && window.p2pAPI.selectRoomInChat) {
+                window.p2pAPI.selectRoomInChat(roomId);
+            }
+        }, 500);
+    } catch (err) {
+        console.error('채팅방 열기 실패:', err);
+    }
+}
+
+// 팀 상세 보기
+async function showTeamDetails(teamId) {
+    try {
+        // 팀 채팅방 열기
+        const roomId = `teamroom_${teamId}`;
+        await openRoomInChatWindow(roomId);
+    } catch (err) {
+        console.error('팀 상세 보기 실패:', err);
+    }
+}
+
+// 팀에 멤버 초대
+function inviteToTeam(teamId) {
+    // 기존 모달 제거
+    const existingModal = document.getElementById('messengerInviteModal');
+    if (existingModal) existingModal.remove();
+
+    // 접속 중인 사용자 목록 생성
+    const otherUsers = messengerState.users.filter(u => u.nickname !== messengerState.nickname);
+
+    const modal = document.createElement('div');
+    modal.id = 'messengerInviteModal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    modal.innerHTML = `
+        <div class="modal-content" style="background: var(--bg-secondary); border-radius: 8px; width: 380px; max-height: 70vh; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+            <div class="modal-header" style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">팀원 초대</h3>
+                <button onclick="closeMessengerModal('messengerInviteModal')" style="background: none; border: none; cursor: pointer; padding: 4px; color: var(--text-secondary);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 16px; overflow-y: auto; max-height: 50vh;">
+                <div id="inviteUserSelectList" style="border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary);">
+                    ${otherUsers.length > 0 ? otherUsers.map(user => `
+                        <label style="display: flex; align-items: center; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color);">
+                            <input type="checkbox" class="invite-user-checkbox" value="${escapeHtml(user.nickname)}" style="margin-right: 10px;">
+                            <span style="width: 28px; height: 28px; border-radius: 50%; background: ${user.isHost ? 'var(--warning)' : 'var(--success)'}; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; margin-right: 10px;">${user.nickname?.charAt(0)?.toUpperCase() || '?'}</span>
+                            <span style="flex: 1;">${escapeHtml(user.nickname)}</span>
+                        </label>
+                    `).join('') : '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px;">초대할 수 있는 사용자가 없습니다</div>'}
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="closeMessengerModal('messengerInviteModal')" style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-primary); cursor: pointer; font-size: 13px;">취소</button>
+                <button onclick="inviteMembersToTeam('${teamId}')" style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--primary-color); color: white; cursor: pointer; font-size: 13px; font-weight: 500;">초대</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeMessengerModal('messengerInviteModal');
+    });
+}
+
+// 팀에 멤버 초대 실행
+async function inviteMembersToTeam(teamId) {
+    const selectedUsers = Array.from(document.querySelectorAll('.invite-user-checkbox:checked'))
+        .map(cb => cb.value);
+
+    if (selectedUsers.length === 0) {
+        showToast('초대할 멤버를 선택하세요', 'warning');
+        return;
+    }
+
+    try {
+        for (const nickname of selectedUsers) {
+            const memberId = `member_${nickname}_${Date.now()}`;
+            await window.messengerDB?.addGroupMember(teamId, memberId, 'member');
+        }
+
+        closeMessengerModal('messengerInviteModal');
+        await loadMessengerTeams();
+
+        showToast(`${selectedUsers.length}명의 멤버가 초대되었습니다`, 'success');
+    } catch (err) {
+        console.error('멤버 초대 실패:', err);
+        showToast('멤버 초대 실패: ' + err.message, 'error');
+    }
+}
+
+// 메신저 사이드바 데이터 초기화
+async function initMessengerSidebarData() {
+    await loadMessengerRooms();
+    await loadMessengerTeams();
 }
 
 // 메신저 UI 초기화

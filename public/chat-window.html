@@ -109,7 +109,7 @@
             z-index: 10;
         }
 
-        /* 타이틀바 패널 토글 버튼 - 메인 앱 스타일 동일 */
+        /* 타이틀바 패널 토글 버튼 - 심플 아이콘 스타일 */
         .titlebar-action-btn {
             width: 32px;
             height: 26px;
@@ -121,30 +121,19 @@
             align-items: center;
             justify-content: center;
             border-radius: 4px;
-            transition: all 0.15s ease;
         }
 
         .titlebar-action-btn:hover {
-            background: var(--bg-hover);
-            color: var(--accent-primary);
+            color: var(--text-primary);
         }
 
         .titlebar-action-btn.active {
-            background: rgba(0, 212, 170, 0.15);
-            color: var(--accent-primary);
+            color: var(--text-primary);
         }
 
         .titlebar-action-btn svg {
             width: 14px;
             height: 14px;
-        }
-
-        #titlebarPanelToggle svg {
-            transition: transform 0.3s ease;
-        }
-
-        #titlebarPanelToggle.active svg {
-            transform: rotate(180deg);
         }
 
         /* 메인 레이아웃 */

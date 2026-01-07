@@ -3206,14 +3206,6 @@ function renderMessengerSidebar(container) {
 
         <!-- 하단 액션 -->
         <div style="border-top: 1px solid var(--border-color); margin-top: auto;">
-            <button class="quick-action-btn" onclick="openChatWindow()" style="background: var(--primary-color);">
-                <span class="btn-label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    채팅 윈도우 열기
-                </span>
-            </button>
             <button class="quick-action-btn" onclick="window.p2pAPI.openDownloads()">
                 <span class="btn-label">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3530,16 +3522,6 @@ function updateMainPanelForChat(mode, port, nickname, host = null) {
         addServerLog('system', `서버가 시작되었습니다. 포트: ${port}`);
     } else {
         addServerLog('system', `${host}:${port}에 연결되었습니다.`);
-    }
-
-    // 채팅 윈도우 열기 버튼 이벤트
-    const openChatWindowBtn = document.getElementById('openChatWindowBtn');
-    if (openChatWindowBtn) {
-        openChatWindowBtn.onclick = () => {
-            if (window.p2pAPI && window.p2pAPI.openChatWindow) {
-                window.p2pAPI.openChatWindow();
-            }
-        };
     }
 
     // 로그 지우기 버튼 이벤트
@@ -13171,9 +13153,7 @@ function setupP2PEventListeners() {
     window.p2pAPI.onMessage((data) => {
         console.log('메시지 수신:', data);
         addChatMessage(data);
-        // 로그에 메시지 기록 (내용은 간략하게)
-        const preview = data.content?.substring(0, 30) + (data.content?.length > 30 ? '...' : '');
-        addServerLog('message', `[${data.sender || '알 수 없음'}] ${preview}`);
+        // 채팅 메시지는 서버 로그에 표시하지 않음 (서버 관련 이벤트만 로그에 표시)
     });
 
     // 사용자 입장
@@ -13227,7 +13207,7 @@ function setupP2PEventListeners() {
     window.p2pAPI.onFileStart((data) => {
         console.log('파일 전송 시작:', data);
         showFileTransferProgress(data.fileName, 0);
-        addServerLog('message', `파일 전송 시작: ${data.fileName}`);
+        // 파일 전송 시작은 서버 로그에 표시하지 않음 (완료 시에만 표시)
     });
 
     // 파일 전송 진행

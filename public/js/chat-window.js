@@ -317,6 +317,11 @@ function initP2PListeners() {
     // 메시지 수신
     window.p2pAPI.onMessage((data) => {
         console.log('메시지 수신:', data);
+        // 게스트 모드에서 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시
+        if (state.mode === 'guest' && data.nickname === state.nickname) {
+            console.log('게스트 모드: 자신의 메시지 에코 무시');
+            return;
+        }
         addMessage(data);
     });
 
@@ -580,7 +585,8 @@ async function addMessage(data) {
         try {
             await window.messengerDB.saveMessage({
                 roomId: state.currentRoom,
-                senderId: isOwn ? state.myContactId : `remote_${data.nickname}`,
+                senderId: isOwn ? (state.myContactId || 'self') : `remote_${data.nickname}`,
+                senderNickname: data.nickname || state.nickname,
                 type: 'text',
                 content: data.content
             });
@@ -629,7 +635,8 @@ async function addFileMessage(data) {
         try {
             await window.messengerDB.saveMessage({
                 roomId: state.currentRoom,
-                senderId: isOwn ? state.myContactId : `remote_${sender}`,
+                senderId: isOwn ? (state.myContactId || 'self') : `remote_${sender}`,
+                senderNickname: sender,
                 type: 'file',
                 content: data.filename,
                 fileName: data.filename,
@@ -916,7 +923,8 @@ async function saveMessageToDB(roomId, message) {
         if (window.messengerDB) {
             await window.messengerDB.saveMessage({
                 roomId: roomId,
-                senderId: message.senderId || state.myContactId,
+                senderId: message.senderId || state.myContactId || 'self',
+                senderNickname: message.senderNickname || message.nickname || state.nickname,
                 type: message.type || 'text',
                 content: message.content,
                 fileName: message.fileName,

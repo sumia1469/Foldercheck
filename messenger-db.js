@@ -180,7 +180,8 @@ class MessengerDB {
             CREATE TABLE IF NOT EXISTS messages (
                 id TEXT PRIMARY KEY,
                 room_id TEXT NOT NULL,
-                sender_id TEXT NOT NULL,
+                sender_id TEXT DEFAULT 'unknown', -- nullable for P2P chat
+                sender_nickname TEXT, -- 발신자 닉네임 (P2P용)
                 type TEXT DEFAULT 'text', -- text, file, image, system
                 content TEXT,
                 file_name TEXT,
@@ -213,6 +214,8 @@ class MessengerDB {
 
         // 마이그레이션: notification 컬럼 추가 (기존 DB 호환)
         this._migrateAddNotificationColumn();
+        // 마이그레이션: messages 테이블 sender_nickname 컬럼 및 sender_id 기본값 수정
+        this._migrateMessagesTable();
     }
 
     /**
@@ -241,6 +244,80 @@ class MessengerDB {
             } catch (alterErr) {
                 console.error('[MessengerDB] notification 컬럼 추가 실패:', alterErr.message);
             }
+        }
+    }
+
+    /**
+     * 마이그레이션: messages 테이블에 sender_nickname 컬럼 추가 및 sender_id NOT NULL 해제
+     */
+    _migrateMessagesTable() {
+        // 먼저 테이블이 존재하는지 확인
+        let tableExists = false;
+        try {
+            const checkTableSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'";
+            if (this.isSqlJs) {
+                const result = this.db.exec(checkTableSql);
+                tableExists = result && result.length > 0 && result[0].values && result[0].values.length > 0;
+            } else {
+                const row = this.db.prepare(checkTableSql).get();
+                tableExists = !!row;
+            }
+        } catch (e) {
+            console.log('[MessengerDB] messages 테이블 확인 실패:', e.message);
+        }
+
+        if (!tableExists) {
+            console.log('[MessengerDB] messages 테이블이 아직 없음 - 마이그레이션 건너뜀');
+            return;
+        }
+
+        // sender_nickname 컬럼 존재 여부 확인
+        let hasNicknameColumn = false;
+        try {
+            const checkColSql = "PRAGMA table_info(messages)";
+            if (this.isSqlJs) {
+                const result = this.db.exec(checkColSql);
+                if (result && result.length > 0 && result[0].values) {
+                    hasNicknameColumn = result[0].values.some(row => row[1] === 'sender_nickname');
+                }
+            } else {
+                const columns = this.db.prepare(checkColSql).all();
+                hasNicknameColumn = columns.some(col => col.name === 'sender_nickname');
+            }
+        } catch (e) {
+            console.log('[MessengerDB] 컬럼 정보 확인 실패:', e.message);
+        }
+
+        // sender_nickname 컬럼 추가
+        if (!hasNicknameColumn) {
+            console.log('[MessengerDB] sender_nickname 컬럼 추가 마이그레이션 실행');
+            const alterSql = "ALTER TABLE messages ADD COLUMN sender_nickname TEXT";
+            try {
+                if (this.isSqlJs) {
+                    this.db.run(alterSql);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql);
+                }
+                console.log('[MessengerDB] sender_nickname 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] sender_nickname 컬럼 추가 실패:', alterErr.message);
+            }
+        } else {
+            console.log('[MessengerDB] sender_nickname 컬럼이 이미 존재함');
+        }
+
+        // sender_id가 NULL인 기존 레코드에 기본값 설정
+        try {
+            const updateSql = "UPDATE messages SET sender_id = 'unknown' WHERE sender_id IS NULL";
+            if (this.isSqlJs) {
+                this.db.run(updateSql);
+                this.saveToFile();
+            } else {
+                this.db.exec(updateSql);
+            }
+        } catch (e) {
+            // 업데이트 실패해도 무시 (테이블이 없거나 이미 처리됨)
         }
     }
 
@@ -691,11 +768,12 @@ class MessengerDB {
     saveMessage(message) {
         const id = message.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const sql = `
-            INSERT INTO messages (id, room_id, sender_id, type, content, file_name, file_size, file_path, reply_to)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (id, room_id, sender_id, sender_nickname, type, content, file_name, file_size, file_path, reply_to)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const roomId = message.roomId || null;
-        const senderId = message.senderId || null;
+        const senderId = message.senderId || 'unknown'; // 기본값 설정
+        const senderNickname = message.senderNickname || null; // P2P용 닉네임
         const type = message.type || 'text';
         const content = message.content || null;
         const fileName = message.fileName || null;
@@ -704,10 +782,10 @@ class MessengerDB {
         const replyTo = message.replyTo || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [id, roomId, senderId, type, content, fileName, fileSize, filePath, replyTo]);
+            this.db.run(sql, [id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(id, roomId, senderId, type, content, fileName, fileSize, filePath, replyTo);
+            this.db.prepare(sql).run(id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo);
         }
 
         // 채팅방 업데이트

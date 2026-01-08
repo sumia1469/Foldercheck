@@ -96,6 +96,69 @@ let whisperDownloadProgress = {
 // Ollama 설정 (로컬 LLM)
 const OLLAMA_HOST = 'http://localhost:11434';
 
+// Ollama 설치 여부 확인
+function isOllamaInstalled() {
+    const os = require('os');
+    const isPackaged = !process.defaultApp;
+
+    // 1. 내장 Ollama 경로 확인
+    let ollamaDir;
+    if (isPackaged) {
+        ollamaDir = path.join(process.resourcesPath || '', 'ollama');
+    } else {
+        ollamaDir = path.join(__dirname, 'resources', 'ollama');
+    }
+    const ollamaBinary = path.join(ollamaDir, process.platform === 'win32' ? 'ollama.exe' : 'ollama');
+
+    if (fs.existsSync(ollamaBinary)) {
+        return true;
+    }
+
+    // 2. 시스템 Ollama 확인 (Windows)
+    if (process.platform === 'win32') {
+        const systemPaths = [
+            path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Ollama', 'ollama.exe'),
+            path.join(process.env.ProgramFiles || '', 'Ollama', 'ollama.exe'),
+            path.join(process.env['ProgramFiles(x86)'] || '', 'Ollama', 'ollama.exe')
+        ];
+        for (const p of systemPaths) {
+            if (fs.existsSync(p)) return true;
+        }
+    }
+
+    return false;
+}
+
+// URL 데이터 가져오기 헬퍼 함수
+function fetchUrl(url) {
+    return new Promise((resolve, reject) => {
+        const protocol = url.startsWith('https') ? https : http;
+        const request = protocol.get(url, (response) => {
+            // 리다이렉트 처리
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                fetchUrl(response.headers.location).then(resolve).catch(reject);
+                return;
+            }
+
+            if (response.statusCode !== 200) {
+                reject(new Error(`HTTP ${response.statusCode}: ${url}`));
+                return;
+            }
+
+            const chunks = [];
+            response.on('data', (chunk) => chunks.push(chunk));
+            response.on('end', () => resolve(Buffer.concat(chunks)));
+            response.on('error', reject);
+        });
+
+        request.on('error', reject);
+        request.setTimeout(30000, () => {
+            request.destroy();
+            reject(new Error('Request timeout'));
+        });
+    });
+}
+
 // 사용 가능한 AI 모델 목록 (로컬 전용 - 폐쇄망 환경)
 const AVAILABLE_MODELS = {
     // 고품질 모델 (권장)
@@ -2135,6 +2198,8 @@ async function callAI(prompt, systemPrompt, numPredict = 2000) {
 
 // Ollama 상태 확인
 async function checkOllamaStatus() {
+    const ollamaInstalled = isOllamaInstalled();
+
     return new Promise((resolve) => {
         const req = http.get(`${OLLAMA_HOST}/api/tags`, (res) => {
             let data = '';
@@ -2148,20 +2213,21 @@ async function checkOllamaStatus() {
                     resolve({
                         ready: hasModel,
                         ollamaRunning: true,
+                        ollamaInstalled: true, // 실행 중이면 당연히 설치됨
                         hasModel,
                         models,
                         currentModel: CURRENT_AI_MODEL,
                         error: hasModel ? null : '모델이 설치되지 않았습니다. 설정에서 모델을 설치해주세요.'
                     });
                 } catch (e) {
-                    resolve({ ready: false, ollamaRunning: false, error: 'JSON 파싱 오류' });
+                    resolve({ ready: false, ollamaRunning: false, ollamaInstalled, error: 'JSON 파싱 오류' });
                 }
             });
         });
-        req.on('error', () => resolve({ ready: false, ollamaRunning: false, error: '내장 AI 연결 실패' }));
+        req.on('error', () => resolve({ ready: false, ollamaRunning: false, ollamaInstalled, error: ollamaInstalled ? '내장 AI 시작 중...' : '내장 AI가 설치되지 않았습니다' }));
         req.setTimeout(3000, () => {
             req.destroy();
-            resolve({ ready: false, ollamaRunning: false, error: '타임아웃' });
+            resolve({ ready: false, ollamaRunning: false, ollamaInstalled, error: ollamaInstalled ? '내장 AI 시작 중...' : '내장 AI가 설치되지 않았습니다' });
         });
     });
 }
@@ -4011,6 +4077,21 @@ const server = http.createServer(async (req, res) => {
         if (pathname === '/api/whisper/download/progress' && req.method === 'GET') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify(whisperDownloadProgress));
+            return;
+        }
+
+        // API: 마켓플레이스 확장 목록 (R2 프록시)
+        if (pathname === '/api/marketplace/extensions' && req.method === 'GET') {
+            try {
+                const marketplaceUrl = 'https://file.docwatch.app/extensions/index.json';
+                const data = await fetchUrl(marketplaceUrl);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(data);
+            } catch (err) {
+                console.error('[Marketplace] 프록시 요청 실패:', err.message);
+                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
             return;
         }
 

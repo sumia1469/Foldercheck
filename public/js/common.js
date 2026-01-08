@@ -11740,7 +11740,7 @@ let marketplaceCache = null;
 let marketplaceCacheTime = 0;
 const MARKETPLACE_CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
 
-// R2에서 마켓플레이스 확장 목록 가져오기
+// 마켓플레이스 확장 목록 가져오기 (서버 프록시 사용 - CORS 우회)
 async function fetchMarketplaceExtensions() {
     const now = Date.now();
 
@@ -11751,7 +11751,8 @@ async function fetchMarketplaceExtensions() {
     }
 
     try {
-        const response = await fetch(`${MARKETPLACE_URL}/index.json`);
+        // 서버 프록시 API 사용 (CORS 문제 해결)
+        const response = await fetch('/api/marketplace/extensions');
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

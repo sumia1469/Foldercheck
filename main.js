@@ -57,20 +57,10 @@ let p2pMessenger = null;
 let messengerDB = null;
 
 // P2P 메신저 확장 로드 시도
+// 참고: 루트 폴더의 p2p-messenger.js, messenger-db.js는 더 이상 사용하지 않음
+// 확장은 반드시 마켓플레이스에서 설치해야 함
 function loadP2PMessengerExtension() {
-    // 1. 개발 모드에서 루트 폴더 확인 (빌드에는 포함 안됨)
-    if (!isPackaged) {
-        try {
-            P2PMessenger = require('./p2p-messenger');
-            MessengerDB = require('./messenger-db');
-            console.log('[P2P] 메신저 모듈 로드됨 (개발 모드 - 루트)');
-            return true;
-        } catch (e) {
-            // 루트에 없음
-        }
-    }
-
-    // 2. 확장 폴더에서 시도 (프로덕션에서는 이 경로만 사용)
+    // 확장 폴더에서만 로드 (개발/프로덕션 모두 동일)
     const extensionsDir = path.join(getUserDataDir(), 'extensions', 'p2p-messenger');
     try {
         if (fs.existsSync(path.join(extensionsDir, 'p2p-messenger.js'))) {
@@ -89,7 +79,7 @@ function loadP2PMessengerExtension() {
         console.log('[P2P] 확장 폴더에서 로드 실패:', e.message);
     }
 
-    console.log('[P2P] 메신저 확장 없음 - 다운로드 필요');
+    console.log('[P2P] 메신저 확장 없음 - 마켓플레이스에서 설치 필요');
     return false;
 }
 

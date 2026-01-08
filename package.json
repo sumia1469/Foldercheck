@@ -9,7 +9,9 @@
     "start:win": "chcp 65001 >nul && electron .",
     "start:mac": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
+    "build:win": "electron-builder --win && node scripts/apply-icon.js --rebuild-installer",
+    "build:win:noicon": "electron-builder --win",
+    "apply-icon": "node scripts/apply-icon.js",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac",
     "build:portable": "electron-builder --win portable",
@@ -23,6 +25,7 @@
     "electron": "^33.4.11",
     "electron-builder": "^24.9.1",
     "png-to-ico": "^3.0.1",
+    "rcedit": "^5.0.2",
     "sharp": "^0.34.5"
   },
   "repository": {
@@ -44,6 +47,7 @@
       ],
       "icon": "build/icons/icon.ico",
       "signAndEditExecutable": false,
+      "requestedExecutionLevel": "asInvoker",
       "publish": [
         "github"
       ]

@@ -1600,19 +1600,25 @@ ipcMain.handle('marketplace:getExtensions', async () => {
 
 // 마켓플레이스에서 확장 설치
 ipcMain.handle('marketplace:install', async (event, extensionId) => {
-    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
-    return await extensionManager.installFromMarketplace(extensionId);
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    try {
+        const result = await extensionManager.installFromMarketplace(extensionId);
+        return { success: true, ...result };
+    } catch (err) {
+        console.error('[Marketplace] 설치 실패:', err);
+        return { success: false, error: err.message };
+    }
 });
 
 // 업데이트 확인
 ipcMain.handle('marketplace:checkUpdates', async () => {
-    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
     return await extensionManager.checkForUpdates();
 });
 
 // 모든 확장 업데이트
 ipcMain.handle('marketplace:updateAll', async () => {
-    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
     return await extensionManager.updateAllExtensions();
 });
 

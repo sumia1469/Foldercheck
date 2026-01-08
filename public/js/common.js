@@ -2231,9 +2231,9 @@ async function installExtensionFromSidebar(extId) {
         }
 
         // Electron IPC를 통해 마켓플레이스에서 설치
-        if (window.electronAPI && window.electronAPI.invoke) {
-            console.log('[Sidebar] R2에서 확장 설치:', extId, ext.downloadUrl);
-            const result = await window.electronAPI.invoke('extensions:installFromUrl', ext.downloadUrl, ext.sha256);
+        if (window.extensionAPI && window.extensionAPI.installFromMarketplace) {
+            console.log('[Sidebar] R2에서 확장 설치:', extId);
+            const result = await window.extensionAPI.installFromMarketplace(extId);
 
             if (!result.success) {
                 throw new Error(result.error || '설치 실패');
@@ -2242,7 +2242,7 @@ async function installExtensionFromSidebar(extId) {
             btn.textContent = '설치됨';
             btn.classList.remove('installing');
             btn.classList.add('installed');
-            showToast(`확장이 설치되었습니다.`, 'success');
+            showToast(`확장이 설치되었습니다. 재시작 후 사용 가능합니다.`, 'success');
 
             // 마켓플레이스 캐시 무효화
             marketplaceCache = null;
@@ -2251,15 +2251,7 @@ async function installExtensionFromSidebar(extId) {
             loadSidebarExtensions();
             loadRecommendedExtensions();
         } else {
-            // 폴백: HTTP API (개발 모드)
-            const res = await fetch(`/api/extensions/install/${extId}`, { method: 'POST' });
-            if (!res.ok) throw new Error('설치 실패');
-
-            btn.textContent = '설치됨';
-            btn.classList.remove('installing');
-            btn.classList.add('installed');
-            showToast(`확장이 설치되었습니다.`, 'success');
-            loadSidebarExtensions();
+            throw new Error('확장 설치 API를 사용할 수 없습니다');
         }
     } catch (err) {
         console.error('확장 설치 실패:', err);
@@ -2461,13 +2453,24 @@ async function showMarketplaceExtension(extId) {
     }
 }
 
-// 마켓플레이스 확장 ID로 찾기 (API 호출)
+// 마켓플레이스 확장 ID로 찾기 (로컬 캐시 또는 R2 조회)
 async function getMarketplaceExtensionById(extId) {
     try {
-        const res = await fetch(`/api/extensions/marketplace/${extId}`);
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data.extension || null;
+        // 이미 로드된 마켓플레이스 데이터에서 먼저 찾기
+        const extensions = await fetchMarketplaceExtensions();
+        const ext = extensions.find(e => e.id === extId);
+        if (ext) {
+            // 메타데이터 병합
+            const meta = extensionMetadata[extId] || {};
+            return {
+                ...ext,
+                icon: meta.icon || ext.icon || '📦',
+                publisher: meta.publisher || ext.author || 'Unknown',
+                categories: meta.categories || ['other'],
+                contributes: meta.contributes || {}
+            };
+        }
+        return null;
     } catch (err) {
         console.log('마켓플레이스 확장 조회 실패:', err);
         return null;

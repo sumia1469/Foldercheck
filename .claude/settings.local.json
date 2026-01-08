@@ -111,7 +111,11 @@
       "Bash(xattr:*)",
       "Bash(/tmp/test-electron-app/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /tmp/test-electron-app)",
       "Bash(dir \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\")",
-      "Bash(dir /s \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\\\\*.7z\")"
+      "Bash(dir /s \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\\\\*.7z\")",
+      "Bash(npm run build:extensions:*)",
+      "Bash(dir \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist-extensions\")",
+      "Bash(dir /s \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\\\\win-unpacked\\\\resources\\\\app.asar.unpacked\")",
+      "Bash(dir \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\build\\\\icons\")"
     ]
   }
 }

@@ -92,3 +92,21 @@ remove ggml-cuda.dll: The process cannot access the file
 ### electron-builder 캐시 문제
 - 캐시 위치: `%LOCALAPPDATA%\electron-builder\Cache\`
 - NSIS 문제 시 `nsis` 폴더 삭제 후 재빌드
+
+### ExtensionManager 모듈 에러
+```
+Cannot find module ./extensions/ExtensionManager
+```
+- **원인**: extensions 폴더는 런타임에 다운로드되므로 빌드에 포함하지 않음
+- **해결**: main.js에서 try-catch로 동적 로딩 처리됨
+- **주의**: extensions 폴더를 `files`에 추가하지 말 것
+
+## 동적 로딩 모듈
+
+다음 모듈들은 런타임에 다운로드되므로 빌드에 포함하지 않고, 없어도 에러 없이 동작:
+- `extensions/ExtensionManager.js`
+- `extensions/ExtensionHost.js`
+- `extensions/ExtensionAPI.js`
+- `resources/ollama/` - ollama 실행 파일
+
+main.js에서 try-catch로 감싸서 모듈이 없을 때 graceful하게 처리됨.

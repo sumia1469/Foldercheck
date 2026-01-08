@@ -31,21 +31,143 @@ let ollamaProcess = null; // 내장 Ollama 프로세스
 const PORT = 4400;
 const OLLAMA_PORT = 11434;
 
-// Extension System
-const ExtensionManager = require('./extensions/ExtensionManager');
-const ExtensionHost = require('./extensions/ExtensionHost');
-const ExtensionAPI = require('./extensions/ExtensionAPI');
+// Extension System (동적 로딩 - 파일이 없어도 에러 없이 동작)
+let ExtensionManager = null;
+let ExtensionHost = null;
+let ExtensionAPI = null;
 const license = require('./license');
+
+try {
+    ExtensionManager = require('./extensions/ExtensionManager');
+    ExtensionHost = require('./extensions/ExtensionHost');
+    ExtensionAPI = require('./extensions/ExtensionAPI');
+    console.log('[Extension] 확장 시스템 모듈 로드됨');
+} catch (e) {
+    console.log('[Extension] 확장 시스템 모듈 없음 - 나중에 다운로드 필요');
+}
 
 let extensionManager = null;
 let extensionHost = null;
 let extensionAPI = null;
 
-// P2P Messenger System
-const P2PMessenger = require('./p2p-messenger');
-const MessengerDB = require('./messenger-db');
+// P2P Messenger System (동적 로딩 - 확장으로 분리됨)
+let P2PMessenger = null;
+let MessengerDB = null;
 let p2pMessenger = null;
 let messengerDB = null;
+
+// P2P 메신저 확장 로드 시도
+function loadP2PMessengerExtension() {
+    // 1. 개발 모드에서 루트 폴더 확인 (빌드에는 포함 안됨)
+    if (!isPackaged) {
+        try {
+            P2PMessenger = require('./p2p-messenger');
+            MessengerDB = require('./messenger-db');
+            console.log('[P2P] 메신저 모듈 로드됨 (개발 모드 - 루트)');
+            return true;
+        } catch (e) {
+            // 루트에 없음
+        }
+    }
+
+    // 2. 확장 폴더에서 시도 (프로덕션에서는 이 경로만 사용)
+    const extensionsDir = path.join(getUserDataDir(), 'extensions', 'p2p-messenger');
+    try {
+        if (fs.existsSync(path.join(extensionsDir, 'p2p-messenger.js'))) {
+            // 캐시 제거 후 다시 로드
+            const modulePath = path.join(extensionsDir, 'p2p-messenger.js');
+            const dbPath = path.join(extensionsDir, 'messenger-db.js');
+            delete require.cache[require.resolve(modulePath)];
+            delete require.cache[require.resolve(dbPath)];
+
+            P2PMessenger = require(modulePath);
+            MessengerDB = require(dbPath);
+            console.log('[P2P] 메신저 모듈 로드됨 (확장 폴더)');
+            return true;
+        }
+    } catch (e) {
+        console.log('[P2P] 확장 폴더에서 로드 실패:', e.message);
+    }
+
+    console.log('[P2P] 메신저 확장 없음 - 다운로드 필요');
+    return false;
+}
+
+// 확장 zip 파일 설치
+async function installExtensionFromZip(zipPath) {
+    const unzipper = require('unzipper');
+
+    // zip 파일에서 manifest.json 읽기
+    const directory = await unzipper.Open.file(zipPath);
+    const manifestEntry = directory.files.find(f => f.path === 'manifest.json');
+
+    if (!manifestEntry) {
+        throw new Error('manifest.json not found in extension zip');
+    }
+
+    const manifestContent = await manifestEntry.buffer();
+    const manifest = JSON.parse(manifestContent.toString('utf8'));
+
+    const extensionId = manifest.id;
+    const extensionsDir = path.join(getUserDataDir(), 'extensions', extensionId);
+
+    // 확장 폴더 생성
+    if (!fs.existsSync(extensionsDir)) {
+        fs.mkdirSync(extensionsDir, { recursive: true });
+    }
+
+    // 모든 파일 압축 해제
+    console.log(`[Extension] ${manifest.name} 설치 중...`);
+
+    await directory.extract({ path: extensionsDir });
+
+    console.log(`[Extension] ${manifest.name} v${manifest.version} 설치 완료: ${extensionsDir}`);
+
+    return {
+        id: extensionId,
+        name: manifest.name,
+        version: manifest.version,
+        path: extensionsDir
+    };
+}
+
+// P2P 메신저 확장 설치 IPC 핸들러
+ipcMain.handle('p2p-extension:install', async (event, zipPath) => {
+    try {
+        const result = await installExtensionFromZip(zipPath);
+
+        // 설치 후 바로 로드 시도
+        if (result.id === 'p2p-messenger') {
+            loadP2PMessengerExtension();
+        }
+
+        return { success: true, ...result };
+    } catch (e) {
+        console.error('[Extension] 설치 실패:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// P2P 메신저 확장 상태 확인
+ipcMain.handle('p2p-extension:status', () => {
+    const extensionsDir = path.join(getUserDataDir(), 'extensions', 'p2p-messenger');
+    const installed = fs.existsSync(path.join(extensionsDir, 'manifest.json'));
+
+    let version = null;
+    if (installed) {
+        try {
+            const manifest = JSON.parse(fs.readFileSync(path.join(extensionsDir, 'manifest.json'), 'utf8'));
+            version = manifest.version;
+        } catch (e) {}
+    }
+
+    return {
+        installed,
+        loaded: P2PMessenger !== null,
+        version,
+        path: extensionsDir
+    };
+});
 
 // 모든 윈도우에 이벤트 브로드캐스트 (전역 헬퍼 함수)
 function broadcastToAllWindows(channel, data) {
@@ -1143,6 +1265,12 @@ ipcMain.handle('app-relaunch', () => {
  * 확장 시스템 초기화
  */
 async function initializeExtensions() {
+    // 확장 모듈이 로드되지 않았으면 스킵
+    if (!ExtensionManager || !ExtensionHost || !ExtensionAPI) {
+        console.log('[Extensions] 확장 시스템 모듈이 없어 초기화 스킵');
+        return;
+    }
+
     try {
         console.log('[Extensions] 확장 시스템 초기화 시작...');
 
@@ -1459,6 +1587,12 @@ ipcMain.on('inputbox:result', (event, { id, value }) => {
  */
 function initializeP2PMessenger() {
     if (p2pMessenger) return;
+
+    // P2P 메신저 확장 로드 시도
+    if (!P2PMessenger && !loadP2PMessengerExtension()) {
+        console.log('[P2P] 메신저 확장이 설치되지 않음');
+        return false;
+    }
 
     p2pMessenger = new P2PMessenger();
 

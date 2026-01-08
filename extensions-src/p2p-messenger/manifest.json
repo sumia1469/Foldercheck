@@ -1,0 +1,29 @@
+{
+  "id": "p2p-messenger",
+  "name": "P2P 메신저",
+  "version": "1.0.0",
+  "description": "폐쇄망용 호스트/게스트 방식 P2P 메신저 및 클라우드 파일 서버",
+  "author": "DocWatch Team",
+  "main": "p2p-messenger.js",
+  "preload": "preload-chat.js",
+  "ui": {
+    "chatWindow": "public/chat-window.html"
+  },
+  "activationEvents": [
+    "onCommand:openMessenger",
+    "onMenu:messenger"
+  ],
+  "permissions": [
+    "network",
+    "filesystem",
+    "notifications"
+  ],
+  "minAppVersion": "1.0.0",
+  "dependencies": {},
+  "files": [
+    "p2p-messenger.js",
+    "messenger-db.js",
+    "preload-chat.js",
+    "public/**/*"
+  ]
+}

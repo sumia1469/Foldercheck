@@ -1,107 +1,39 @@
-// preload.js - 렌더러와 메인 프로세스 간 안전한 통신
+// preload-chat.js - P2P 채팅 윈도우 전용 preload 스크립트
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
-    // 폴더 선택 다이얼로그
-    selectFolder: () => ipcRenderer.invoke('select-folder'),
-
-    // 파일 선택 다이얼로그
-    selectFile: () => ipcRenderer.invoke('select-file'),
-
-    // 여러 항목 선택 (폴더 또는 파일)
-    selectMultiple: (type) => ipcRenderer.invoke('select-multiple', type),
-
+// 채팅 윈도우 API
+contextBridge.exposeInMainWorld('chatAPI', {
     // 윈도우 컨트롤
-    minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
-    maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
-    closeWindow: () => ipcRenderer.invoke('window-close'),
+    minimize: () => ipcRenderer.invoke('chat:minimize'),
+    maximize: () => ipcRenderer.invoke('chat:maximize'),
+    close: () => ipcRenderer.invoke('chat:close'),
 
-    // 쉘 작업 (Finder/탐색기에서 열기, 클립보드 복사)
-    showItemInFolder: (path) => ipcRenderer.invoke('shell-show-item-in-folder', path),
-    copyToClipboard: (text) => ipcRenderer.invoke('clipboard-write-text', text),
+    // 알림
+    showNotification: (title, body) => ipcRenderer.invoke('chat:showNotification', title, body),
 
-    // 앱 재시작
-    relaunchApp: () => ipcRenderer.invoke('app-relaunch'),
+    // 파일 열기
+    openFile: (filePath) => ipcRenderer.invoke('chat:openFile', filePath),
+    openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
 
-    // 자동 업데이트 API
-    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-    onUpdateStatus: (callback) => {
-        const handler = (event, data) => callback(data);
-        ipcRenderer.on('update-status', handler);
-        return () => ipcRenderer.removeListener('update-status', handler);
+    // 1:1 채팅 시작 이벤트 수신
+    onStartDirectChat: (callback) => {
+        const handler = (event, nickname) => callback(nickname);
+        ipcRenderer.on('chat:startDirectChat', handler);
+        return () => ipcRenderer.removeListener('chat:startDirectChat', handler);
+    },
+
+    // 채팅방 선택 이벤트 수신
+    onSelectRoom: (callback) => {
+        const handler = (event, roomId) => callback(roomId);
+        ipcRenderer.on('chat:selectRoom', handler);
+        return () => ipcRenderer.removeListener('chat:selectRoom', handler);
     },
 
     // Electron 환경 확인
     isElectron: true
 });
 
-// Extension API
-contextBridge.exposeInMainWorld('extensionAPI', {
-    // 확장 목록 조회
-    getExtensions: () => ipcRenderer.invoke('extensions:getAll'),
-
-    // 확장 정보 조회
-    getExtension: (id) => ipcRenderer.invoke('extensions:get', id),
-
-    // 확장 활성화
-    activate: (id) => ipcRenderer.invoke('extensions:activate', id),
-
-    // 확장 비활성화
-    deactivate: (id) => ipcRenderer.invoke('extensions:deactivate', id),
-
-    // 확장 활성화/비활성화 토글
-    toggle: (id, enabled) => ipcRenderer.invoke('extensions:toggle', id, enabled),
-
-    // 확장 설치
-    install: (source) => ipcRenderer.invoke('extensions:install', source),
-
-    // 확장 제거
-    uninstall: (id) => ipcRenderer.invoke('extensions:uninstall', id),
-
-    // 확장 설정 조회
-    getSettings: (id) => ipcRenderer.invoke('extensions:getSettings', id),
-
-    // 확장 설정 저장
-    setSettings: (id, settings) => ipcRenderer.invoke('extensions:setSettings', id, settings),
-
-    // 라이선스 변경 시 ExtensionManager 업데이트
-    updateLicense: () => ipcRenderer.invoke('extensions:updateLicense'),
-
-    // 명령어 목록 조회
-    getCommands: () => ipcRenderer.invoke('extensions:getCommands'),
-
-    // 명령어 실행
-    executeCommand: (commandId, ...args) => ipcRenderer.invoke('extensions:executeCommand', commandId, ...args),
-
-    // 확장 이벤트 수신
-    onEvent: (callback) => {
-        const handler = (event, data) => callback(data);
-        ipcRenderer.on('extension-api', handler);
-        return () => ipcRenderer.removeListener('extension-api', handler);
-    },
-
-    // 확장 상태 변경 이벤트 수신
-    onExtensionStateChange: (callback) => {
-        const handler = (event, data) => callback(data);
-        ipcRenderer.on('extension-state-change', handler);
-        return () => ipcRenderer.removeListener('extension-state-change', handler);
-    },
-
-    // QuickPick 결과 전송
-    sendQuickPickResult: (id, selected) => ipcRenderer.send('quickpick:result', { id, selected }),
-
-    // InputBox 결과 전송
-    sendInputBoxResult: (id, value) => ipcRenderer.send('inputbox:result', { id, value }),
-
-    // P2P 메신저 확장 설치 (zip 파일 경로)
-    installP2PExtension: (zipPath) => ipcRenderer.invoke('p2p-extension:install', zipPath),
-
-    // P2P 메신저 확장 상태 확인
-    getP2PExtensionStatus: () => ipcRenderer.invoke('p2p-extension:status')
-});
-
-// Messenger Database API (메인 패널에서도 사용)
+// 메신저 데이터베이스 API
 contextBridge.exposeInMainWorld('messengerDB', {
     // 연락처 관리
     getContacts: () => ipcRenderer.invoke('messenger:getContacts'),
@@ -154,7 +86,7 @@ contextBridge.exposeInMainWorld('messengerDB', {
     }
 });
 
-// P2P Messenger API
+// P2P Messenger API (메인 윈도우와 동일)
 contextBridge.exposeInMainWorld('p2pAPI', {
     // 호스트 모드
     startHost: (port, nickname) => ipcRenderer.invoke('p2p:startHost', port, nickname),
@@ -172,15 +104,6 @@ contextBridge.exposeInMainWorld('p2pAPI', {
     selectFile: () => ipcRenderer.invoke('p2p:selectFile'),
     sendFile: (filePath, cloudInfo) => ipcRenderer.invoke('p2p:sendFile', filePath, cloudInfo),
     openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
-
-    // 채팅 윈도우 열기
-    openChatWindow: () => ipcRenderer.invoke('p2p:openChatWindow'),
-
-    // 채팅 윈도우에 1:1 채팅 시작 요청
-    startDirectChatWith: (nickname) => ipcRenderer.invoke('p2p:startDirectChatWith', nickname),
-
-    // 채팅 윈도우에서 특정 채팅방 선택
-    selectRoomInChat: (roomId) => ipcRenderer.invoke('p2p:selectRoomInChat', roomId),
 
     // 상태
     getStatus: () => ipcRenderer.invoke('p2p:getStatus'),

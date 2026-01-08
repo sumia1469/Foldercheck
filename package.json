@@ -12,7 +12,9 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac",
-    "build:portable": "electron-builder --win portable"
+    "build:portable": "electron-builder --win portable",
+    "build:extensions": "node scripts/build-extensions.js",
+    "build:all-with-ext": "npm run build:extensions && npm run build:all"
   },
   "author": "DocWatch Team",
   "license": "MIT",
@@ -67,6 +69,8 @@
       "server.js",
       "license.js",
       "public/**/*",
+      "!public/chat-window.html",
+      "!public/js/chat-window.js",
       "templates/**/*",
       "node_modules/**/*",
       "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",

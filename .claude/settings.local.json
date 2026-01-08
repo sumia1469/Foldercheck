@@ -109,7 +109,9 @@
       "Bash(node:*)",
       "Bash(codesign:*)",
       "Bash(xattr:*)",
-      "Bash(/tmp/test-electron-app/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /tmp/test-electron-app)"
+      "Bash(/tmp/test-electron-app/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /tmp/test-electron-app)",
+      "Bash(dir \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\")",
+      "Bash(dir /s \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\\\\*.7z\")"
     ]
   }
 }

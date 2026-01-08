@@ -56,8 +56,11 @@
         "ko-KR",
         "en-US"
       ],
-      "language": "1042"
+      "language": "1042",
+      "packElevateHelper": false,
+      "unicode": true
     },
+    "compression": "store",
     "files": [
       "main.js",
       "preload.js",
@@ -81,13 +84,6 @@
       {
         "from": "models",
         "to": "models",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "resources/ollama",
-        "to": "ollama",
         "filter": [
           "**/*"
         ]

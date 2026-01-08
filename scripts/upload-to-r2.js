@@ -29,7 +29,7 @@ const config = {
     accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
     bucketName: process.env.R2_BUCKET_NAME || 'docwatch',
-    publicUrl: process.env.R2_PUBLIC_URL || 'https://pub-xxxxxxxx.r2.dev',
+    publicUrl: process.env.R2_PUBLIC_URL || 'https://file.docwatch.app',
     prefix: 'extensions/' // R2 내 경로 접두사
 };
 

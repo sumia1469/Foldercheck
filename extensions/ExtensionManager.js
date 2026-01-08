@@ -47,7 +47,7 @@ class ExtensionManager extends EventEmitter {
 
         // R2 마켓플레이스 설정
         this.marketplaceBaseUrl = options.marketplaceBaseUrl ||
-            'https://pub-xxxxxxxx.r2.dev/extensions'; // Cloudflare R2 공개 URL
+            'https://file.docwatch.app/extensions'; // Cloudflare R2 공개 URL
 
         // 마켓플레이스 캐시
         this.marketplaceCache = null;

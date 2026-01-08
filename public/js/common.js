@@ -11633,6 +11633,8 @@ function initExtensionsUI() {
             loadExtensions();
             // 확장 활성화 시 동적 메뉴 업데이트
             updateExtensionMenus();
+            // P2P 메신저 확장 설치 상태에 따라 메뉴 업데이트
+            checkP2PExtensionAndShowMenu();
         });
     }
 
@@ -13537,7 +13539,67 @@ document.addEventListener('DOMContentLoaded', () => {
         loadNotificationSettingsUI();
         loadTelegramSettings();
     }, 500);
+
+    // P2P 메신저 확장 설치 상태 확인 및 메뉴 표시
+    checkP2PExtensionAndShowMenu();
 });
+
+// P2P 메신저 확장 설치 상태 확인 및 메뉴/섹션 표시
+async function checkP2PExtensionAndShowMenu() {
+    try {
+        // window.extensionAPI.getP2PExtensionStatus()로 확장 설치 상태 확인
+        if (window.extensionAPI && window.extensionAPI.getP2PExtensionStatus) {
+            const status = await window.extensionAPI.getP2PExtensionStatus();
+            console.log('[P2P] 확장 상태:', status);
+
+            if (status && status.loaded) {
+                // 확장이 설치되어 있으면 메뉴와 섹션 표시
+                showP2PMessengerFeature();
+            } else {
+                // 확장 미설치 시 숨김 유지
+                hideP2PMessengerFeature();
+            }
+        } else {
+            // Electron 환경이 아니면 숨김
+            hideP2PMessengerFeature();
+        }
+    } catch (err) {
+        console.error('[P2P] 확장 상태 확인 실패:', err);
+        hideP2PMessengerFeature();
+    }
+}
+
+// P2P 메신저 기능 표시
+function showP2PMessengerFeature() {
+    const menuBtn = document.getElementById('messengerMenuBtn');
+    const section = document.getElementById('messenger');
+
+    if (menuBtn) {
+        menuBtn.style.display = '';
+    }
+    if (section) {
+        section.style.display = '';
+        section.setAttribute('data-extension-enabled', 'true');
+    }
+
+    console.log('[P2P] 메신저 기능 활성화됨');
+}
+
+// P2P 메신저 기능 숨김
+function hideP2PMessengerFeature() {
+    const menuBtn = document.getElementById('messengerMenuBtn');
+    const section = document.getElementById('messenger');
+
+    if (menuBtn) {
+        menuBtn.style.display = 'none';
+    }
+    if (section) {
+        section.style.display = 'none';
+        section.setAttribute('data-extension-enabled', 'false');
+    }
+
+    console.log('[P2P] 메신저 기능 비활성화됨 (확장 미설치)');
+}
 
 // ========================================
 // 재시작 모달 함수

@@ -119,7 +119,8 @@
       "Bash(dir \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\dist\\\\win-unpacked\\\\DocWatch.exe\")",
       "Bash(dir /s /b \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\node_modules\\\\rcedit\")",
       "Bash(node scripts/apply-icon.js:*)",
-      "Bash(dir /b \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\*.js\")"
+      "Bash(dir /b \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\*.js\")",
+      "Bash(npx wrangler:*)"
     ]
   }
 }

@@ -143,7 +143,7 @@
                         <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                     </svg>
                 </button>
-                <button class="activity-icon" data-section="messenger" title="메신저">
+                <button class="activity-icon" data-section="messenger" id="messengerMenuBtn" title="메신저" style="display: none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
                     </svg>
@@ -1091,7 +1091,7 @@
             </section>
 
             <!-- P2P 메신저 섹션 (확장에서 제공) -->
-            <section id="messenger" class="content-section" data-extension-id="p2p-messenger" data-extension-enabled="true">
+            <section id="messenger" class="content-section" data-extension-id="p2p-messenger" data-extension-enabled="false" style="display: none;">
                 <div class="section-header">
                     <h1>P2P 메신저</h1>
                     <div class="header-actions">

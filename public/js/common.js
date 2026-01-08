@@ -2110,49 +2110,43 @@ async function loadRecommendedExtensions() {
     if (!container) return;
 
     try {
-        const res = await fetch('/api/extensions/marketplace?category=recommended');
-        const data = await res.json();
-        const extensions = data.extensions || [];
+        // R2 마켓플레이스에서 확장 목록 가져오기
+        const extensions = await fetchMarketplaceExtensions();
 
         if (extensions.length === 0) {
-            // 추천 확장이 없으면 섹션 숨김
+            // 확장이 없으면 섹션 숨김
+            if (section) section.style.display = 'none';
+            return;
+        }
+
+        // 설치되지 않은 확장만 추천으로 표시
+        const installedIds = new Set();
+        if (window.extensionAPI && typeof window.extensionAPI.getExtensions === 'function') {
+            const installed = await window.extensionAPI.getExtensions() || [];
+            installed.forEach(e => installedIds.add(e.id));
+        }
+
+        const notInstalled = extensions.filter(ext => !installedIds.has(ext.id));
+
+        if (notInstalled.length === 0) {
             if (section) section.style.display = 'none';
             return;
         }
 
         if (section) section.style.display = 'block';
-        container.innerHTML = extensions.map(ext => renderExtensionItem(ext, false)).join('');
+        container.innerHTML = notInstalled.map(ext => renderExtensionItem(ext, false)).join('');
     } catch (err) {
-        // API가 없을 경우 섹션 숨김
+        // R2 조회 실패 시 섹션 숨김
         if (section) section.style.display = 'none';
-        console.log('추천 확장 API 없음 - 섹션 숨김');
+        console.log('추천 확장 로드 실패:', err.message);
     }
 }
 
-// 인기 확장 목록 로드
+// 인기 확장 목록 로드 (현재는 숨김 - 추천 섹션이 마켓플레이스 표시)
 async function loadPopularExtensions() {
-    const container = document.getElementById('popularExtensionList');
     const section = document.getElementById('popularSection');
-    if (!container) return;
-
-    try {
-        const res = await fetch('/api/extensions/marketplace?category=popular');
-        const data = await res.json();
-        const extensions = data.extensions || [];
-
-        if (extensions.length === 0) {
-            // 인기 확장이 없으면 섹션 숨김
-            if (section) section.style.display = 'none';
-            return;
-        }
-
-        if (section) section.style.display = 'block';
-        container.innerHTML = extensions.map(ext => renderExtensionItem(ext, false)).join('');
-    } catch (err) {
-        // API가 없을 경우 섹션 숨김
-        if (section) section.style.display = 'none';
-        console.log('인기 확장 API 없음 - 섹션 숨김');
-    }
+    // 인기 섹션은 현재 숨김 (추천 섹션이 모든 마켓플레이스 확장을 표시)
+    if (section) section.style.display = 'none';
 }
 
 // 확장 아이템 렌더링
@@ -2228,26 +2222,51 @@ async function installExtensionFromSidebar(extId) {
     btn.classList.add('installing');
 
     try {
-        // 실제 설치 API 호출
-        const res = await fetch(`/api/extensions/install/${extId}`, { method: 'POST' });
+        // R2 마켓플레이스에서 확장 정보 가져오기
+        const marketplaceExtensions = await fetchMarketplaceExtensions();
+        const ext = marketplaceExtensions.find(e => e.id === extId);
 
-        if (res.ok) {
-            const data = await res.json();
+        if (!ext) {
+            throw new Error('확장을 찾을 수 없습니다');
+        }
+
+        // Electron IPC를 통해 마켓플레이스에서 설치
+        if (window.electronAPI && window.electronAPI.invoke) {
+            console.log('[Sidebar] R2에서 확장 설치:', extId, ext.downloadUrl);
+            const result = await window.electronAPI.invoke('extensions:installFromUrl', ext.downloadUrl, ext.sha256);
+
+            if (!result.success) {
+                throw new Error(result.error || '설치 실패');
+            }
+
             btn.textContent = '설치됨';
             btn.classList.remove('installing');
             btn.classList.add('installed');
             showToast(`확장이 설치되었습니다.`, 'success');
 
+            // 마켓플레이스 캐시 무효화
+            marketplaceCache = null;
+
             // 사이드바 목록 새로고침
             loadSidebarExtensions();
+            loadRecommendedExtensions();
         } else {
-            throw new Error('설치 실패');
+            // 폴백: HTTP API (개발 모드)
+            const res = await fetch(`/api/extensions/install/${extId}`, { method: 'POST' });
+            if (!res.ok) throw new Error('설치 실패');
+
+            btn.textContent = '설치됨';
+            btn.classList.remove('installing');
+            btn.classList.add('installed');
+            showToast(`확장이 설치되었습니다.`, 'success');
+            loadSidebarExtensions();
         }
     } catch (err) {
+        console.error('확장 설치 실패:', err);
         btn.disabled = false;
         btn.textContent = originalText;
         btn.classList.remove('installing');
-        showToast('확장 설치에 실패했습니다.', 'error');
+        showToast(`확장 설치에 실패했습니다: ${err.message}`, 'error');
     }
 }
 
@@ -2325,18 +2344,38 @@ async function searchExtensions(query) {
     `;
 
     try {
-        // 설치된 확장에서 검색 (Electron API 사용)
-        let installedExtensions = [];
+        const queryLower = query.toLowerCase();
+        const allResults = [];
+        const seenIds = new Set();
+
+        // 1. 설치된 확장에서 검색 (Electron API 사용)
         if (window.extensionAPI && typeof window.extensionAPI.getExtensions === 'function') {
             const allExtensions = await window.extensionAPI.getExtensions() || [];
-            installedExtensions = allExtensions.filter(ext =>
-                (ext.name && ext.name.toLowerCase().includes(query.toLowerCase())) ||
-                (ext.displayName && ext.displayName.toLowerCase().includes(query.toLowerCase())) ||
-                (ext.description && ext.description.toLowerCase().includes(query.toLowerCase()))
+            const installedMatches = allExtensions.filter(ext =>
+                (ext.name && ext.name.toLowerCase().includes(queryLower)) ||
+                (ext.displayName && ext.displayName.toLowerCase().includes(queryLower)) ||
+                (ext.description && ext.description.toLowerCase().includes(queryLower))
             );
+            installedMatches.forEach(ext => {
+                seenIds.add(ext.id);
+                allResults.push({ ...ext, isInstalled: true });
+            });
         }
 
-        const allResults = installedExtensions.map(e => ({ ...e, isInstalled: true }));
+        // 2. R2 마켓플레이스에서 검색
+        const marketplaceExtensions = await fetchMarketplaceExtensions();
+        const marketplaceMatches = marketplaceExtensions.filter(ext =>
+            (ext.name && ext.name.toLowerCase().includes(queryLower)) ||
+            (ext.id && ext.id.toLowerCase().includes(queryLower)) ||
+            (ext.description && ext.description.toLowerCase().includes(queryLower))
+        );
+        marketplaceMatches.forEach(ext => {
+            // 이미 설치된 확장은 중복 추가하지 않음
+            if (!seenIds.has(ext.id)) {
+                seenIds.add(ext.id);
+                allResults.push({ ...ext, isInstalled: false, isMarketplace: true });
+            }
+        });
 
         if (searchCount) {
             searchCount.textContent = `(${allResults.length})`;
@@ -5000,8 +5039,13 @@ async function loadAiModelStatus() {
             } else if (status.ollamaRunning && !status.hasModel) {
                 aiStatusEl.textContent = '설치 필요';
                 aiStatusEl.style.color = 'var(--warning)';
+            } else if (!status.ollamaRunning && !status.ollamaInstalled) {
+                // ollama가 설치되지 않은 경우
+                aiStatusEl.textContent = '미설치';
+                aiStatusEl.style.color = 'var(--text-muted)';
             } else if (!status.ollamaRunning) {
-                aiStatusEl.textContent = '준비 중';
+                // ollama가 설치되었지만 실행 중이 아닌 경우
+                aiStatusEl.textContent = '시작 중';
                 aiStatusEl.style.color = 'var(--text-secondary)';
             } else {
                 aiStatusEl.textContent = status.error || '연결 실패';
@@ -5012,20 +5056,38 @@ async function loadAiModelStatus() {
         // 다운로드 진행 상황 확인
         const progress = await checkOllamaDownloadProgress();
 
+        // 안내 메시지 요소
+        const installHelp = document.getElementById('ollamaInstallHelp');
+
         // 다운로드 중이면 인라인 박스 표시, 버튼 숨김
         if (progress && progress.downloading) {
             if (installBtn) installBtn.style.display = 'none';
+            if (installHelp) installHelp.style.display = 'none';
             InlineDownload.show('ollama', 'AI 모델 설치 중', progress.status || '다운로드 중...');
             InlineDownload.update('ollama', `${progress.status || '다운로드 중...'} (${progress.progress}%)`, progress.progress);
             // 폴링 시작
             startOllamaProgressPolling();
         } else {
-            // 설치 버튼 표시/숨김 (내장 AI 실행 중이고 모델 없을 때만)
-            if (installBtn) {
+            // 설치 버튼 및 안내 메시지 표시/숨김
+            if (installBtn && installHelp) {
                 if (status.ollamaRunning && !status.hasModel) {
+                    // ollama 실행 중이지만 모델이 없는 경우 - 설치 버튼 표시
                     installBtn.style.display = 'inline-block';
-                } else {
+                    installHelp.style.display = 'none';
+                } else if (!status.ollamaRunning && !status.ollamaInstalled) {
+                    // ollama가 설치되지 않은 경우 - 안내 메시지
                     installBtn.style.display = 'none';
+                    installHelp.textContent = '내장 AI 엔진이 설치되지 않았습니다. 앱을 재시작하면 자동으로 설치됩니다.';
+                    installHelp.style.display = 'block';
+                } else if (!status.ollamaRunning) {
+                    // ollama가 설치되었지만 시작 중인 경우 - 안내 메시지
+                    installBtn.style.display = 'none';
+                    installHelp.textContent = '내장 AI 엔진을 시작하는 중입니다. 잠시만 기다려주세요...';
+                    installHelp.style.display = 'block';
+                } else {
+                    // 모두 준비된 경우
+                    installBtn.style.display = 'none';
+                    installHelp.style.display = 'none';
                 }
             }
         }

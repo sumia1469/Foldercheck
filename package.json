@@ -64,7 +64,8 @@
       ],
       "language": "1042",
       "packElevateHelper": false,
-      "unicode": true
+      "unicode": true,
+      "include": "build/installer.nsh"
     },
     "compression": "store",
     "files": [

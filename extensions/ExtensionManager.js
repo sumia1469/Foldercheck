@@ -9,7 +9,10 @@
 
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const EventEmitter = require('events');
+const crypto = require('crypto');
 
 class ExtensionManager extends EventEmitter {
     constructor(options = {}) {
@@ -41,6 +44,15 @@ class ExtensionManager extends EventEmitter {
 
         // 현재 라이선스 타입 (free, trial, pro)
         this.currentLicenseType = 'free';
+
+        // R2 마켓플레이스 설정
+        this.marketplaceBaseUrl = options.marketplaceBaseUrl ||
+            'https://pub-xxxxxxxx.r2.dev/extensions'; // Cloudflare R2 공개 URL
+
+        // 마켓플레이스 캐시
+        this.marketplaceCache = null;
+        this.marketplaceCacheTime = 0;
+        this.marketplaceCacheDuration = 5 * 60 * 1000; // 5분 캐시
     }
 
     /**
@@ -684,6 +696,263 @@ class ExtensionManager extends EventEmitter {
         this.config.settings[id] = settings;
         this.saveConfig();
         this.emit('extension:settings-changed', { id, settings });
+    }
+
+    // ========== R2 마켓플레이스 기능 ==========
+
+    /**
+     * 마켓플레이스 기본 URL 설정
+     * @param {string} url - R2 공개 URL (예: https://pub-xxx.r2.dev/extensions)
+     */
+    setMarketplaceUrl(url) {
+        this.marketplaceBaseUrl = url;
+        this.marketplaceCache = null; // 캐시 초기화
+        console.log(`[ExtensionManager] 마켓플레이스 URL 설정: ${url}`);
+    }
+
+    /**
+     * HTTP/HTTPS 요청 유틸리티
+     */
+    _fetch(url) {
+        return new Promise((resolve, reject) => {
+            const protocol = url.startsWith('https') ? https : http;
+
+            const request = protocol.get(url, (response) => {
+                // 리다이렉트 처리
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    this._fetch(response.headers.location).then(resolve).catch(reject);
+                    return;
+                }
+
+                if (response.statusCode !== 200) {
+                    reject(new Error(`HTTP ${response.statusCode}: ${url}`));
+                    return;
+                }
+
+                const chunks = [];
+                response.on('data', (chunk) => chunks.push(chunk));
+                response.on('end', () => resolve(Buffer.concat(chunks)));
+                response.on('error', reject);
+            });
+
+            request.on('error', reject);
+            request.setTimeout(30000, () => {
+                request.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
+    }
+
+    /**
+     * 마켓플레이스에서 확장 목록 조회
+     * @returns {Promise<Array>} - 사용 가능한 확장 목록
+     */
+    async fetchMarketplaceExtensions() {
+        // 캐시 확인
+        const now = Date.now();
+        if (this.marketplaceCache && (now - this.marketplaceCacheTime) < this.marketplaceCacheDuration) {
+            console.log('[ExtensionManager] 마켓플레이스 캐시 사용');
+            return this.marketplaceCache;
+        }
+
+        console.log('[ExtensionManager] 마켓플레이스 목록 조회 중...');
+
+        try {
+            const indexUrl = `${this.marketplaceBaseUrl}/index.json`;
+            const data = await this._fetch(indexUrl);
+            const index = JSON.parse(data.toString());
+
+            // 설치 상태 추가
+            const extensions = (index.extensions || []).map(ext => {
+                const installed = this.registry.has(ext.id);
+                const installedExt = installed ? this.registry.get(ext.id) : null;
+                const installedVersion = installedExt ? installedExt.manifest.version : null;
+                const hasUpdate = installed && installedVersion &&
+                    this.compareVersions(ext.version, installedVersion) > 0;
+
+                return {
+                    ...ext,
+                    installed,
+                    installedVersion,
+                    hasUpdate,
+                    downloadUrl: `${this.marketplaceBaseUrl}/${ext.filename}`
+                };
+            });
+
+            // 캐시 저장
+            this.marketplaceCache = extensions;
+            this.marketplaceCacheTime = now;
+
+            console.log(`[ExtensionManager] 마켓플레이스: ${extensions.length}개 확장 발견`);
+            return extensions;
+        } catch (err) {
+            console.error('[ExtensionManager] 마켓플레이스 조회 실패:', err.message);
+            throw new Error(`마켓플레이스 조회 실패: ${err.message}`);
+        }
+    }
+
+    /**
+     * 마켓플레이스에서 확장 다운로드 및 설치
+     * @param {string} extensionId - 확장 ID
+     * @returns {Promise<Object>} - 설치 결과
+     */
+    async installFromMarketplace(extensionId) {
+        console.log(`[ExtensionManager] 마켓플레이스에서 설치 시작: ${extensionId}`);
+
+        // 마켓플레이스 목록 조회
+        const extensions = await this.fetchMarketplaceExtensions();
+        const extInfo = extensions.find(e => e.id === extensionId);
+
+        if (!extInfo) {
+            throw new Error(`마켓플레이스에서 확장을 찾을 수 없음: ${extensionId}`);
+        }
+
+        // 앱 버전 체크 (minAppVersion)
+        if (extInfo.minAppVersion) {
+            // TODO: 실제 앱 버전과 비교
+            console.log(`[ExtensionManager] 최소 앱 버전 요구: ${extInfo.minAppVersion}`);
+        }
+
+        this.emit('extension:download-start', { id: extensionId, ...extInfo });
+
+        try {
+            // ZIP 파일 다운로드
+            console.log(`[ExtensionManager] 다운로드 중: ${extInfo.downloadUrl}`);
+            const zipData = await this._fetch(extInfo.downloadUrl);
+
+            // SHA256 검증
+            if (extInfo.sha256) {
+                const hash = crypto.createHash('sha256').update(zipData).digest('hex');
+                if (hash !== extInfo.sha256) {
+                    throw new Error('SHA256 해시 불일치 - 파일이 손상되었을 수 있습니다');
+                }
+                console.log(`[ExtensionManager] SHA256 검증 성공`);
+            }
+
+            this.emit('extension:download-complete', { id: extensionId, size: zipData.length });
+
+            // 임시 파일로 저장
+            const tempDir = path.join(this.extensionsDir, '.temp');
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            const tempZipPath = path.join(tempDir, `${extensionId}.zip`);
+            fs.writeFileSync(tempZipPath, zipData);
+
+            // ZIP 압축 해제
+            const targetDir = path.join(this.extensionsDir, extensionId);
+
+            // 기존 확장 제거 (업데이트 시)
+            if (fs.existsSync(targetDir)) {
+                // 활성화되어 있으면 먼저 비활성화
+                if (this.activeExtensions.has(extensionId)) {
+                    await this.deactivateExtension(extensionId);
+                }
+                fs.rmSync(targetDir, { recursive: true });
+            }
+
+            // ZIP 압축 해제 (unzipper 사용)
+            await this._unzip(tempZipPath, targetDir);
+
+            // 임시 파일 삭제
+            fs.unlinkSync(tempZipPath);
+
+            // 확장 등록
+            const manifestPath = path.join(targetDir, 'package.json');
+            if (!fs.existsSync(manifestPath)) {
+                throw new Error('package.json을 찾을 수 없습니다');
+            }
+
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            await this.registerExtension(targetDir, manifest, false);
+
+            // 캐시 무효화
+            this.marketplaceCache = null;
+
+            this.emit('extension:installed', { id: extensionId, version: manifest.version });
+            console.log(`[ExtensionManager] 마켓플레이스 설치 완료: ${extensionId} v${manifest.version}`);
+
+            return {
+                success: true,
+                id: extensionId,
+                version: manifest.version,
+                name: manifest.displayName || extensionId
+            };
+        } catch (err) {
+            this.emit('extension:install-error', { id: extensionId, error: err.message });
+            console.error(`[ExtensionManager] 마켓플레이스 설치 실패: ${extensionId}`, err.message);
+            throw err;
+        }
+    }
+
+    /**
+     * ZIP 압축 해제
+     */
+    async _unzip(zipPath, targetDir) {
+        // unzipper 모듈 사용 (dependencies에 있음)
+        try {
+            const unzipper = require('unzipper');
+
+            await new Promise((resolve, reject) => {
+                fs.createReadStream(zipPath)
+                    .pipe(unzipper.Extract({ path: targetDir }))
+                    .on('close', resolve)
+                    .on('error', reject);
+            });
+
+            console.log(`[ExtensionManager] ZIP 압축 해제 완료: ${targetDir}`);
+        } catch (err) {
+            // unzipper가 없으면 기본 방식으로 시도
+            console.error('[ExtensionManager] unzipper 모듈 사용 불가, 수동 압축 해제 필요');
+            throw new Error('ZIP 압축 해제 실패: unzipper 모듈이 필요합니다');
+        }
+    }
+
+    /**
+     * 마켓플레이스에서 확장 업데이트 확인
+     * @returns {Promise<Array>} - 업데이트 가능한 확장 목록
+     */
+    async checkForUpdates() {
+        console.log('[ExtensionManager] 업데이트 확인 중...');
+
+        try {
+            const extensions = await this.fetchMarketplaceExtensions();
+            const updates = extensions.filter(ext => ext.hasUpdate);
+
+            console.log(`[ExtensionManager] ${updates.length}개 업데이트 발견`);
+
+            return updates.map(ext => ({
+                id: ext.id,
+                name: ext.name,
+                currentVersion: ext.installedVersion,
+                newVersion: ext.version,
+                description: ext.description
+            }));
+        } catch (err) {
+            console.error('[ExtensionManager] 업데이트 확인 실패:', err.message);
+            return [];
+        }
+    }
+
+    /**
+     * 모든 확장 업데이트
+     * @returns {Promise<Array>} - 업데이트 결과
+     */
+    async updateAllExtensions() {
+        const updates = await this.checkForUpdates();
+        const results = [];
+
+        for (const update of updates) {
+            try {
+                await this.installFromMarketplace(update.id);
+                results.push({ id: update.id, success: true });
+            } catch (err) {
+                results.push({ id: update.id, success: false, error: err.message });
+            }
+        }
+
+        return results;
     }
 
     /**

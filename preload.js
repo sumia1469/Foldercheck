@@ -98,7 +98,31 @@ contextBridge.exposeInMainWorld('extensionAPI', {
     installP2PExtension: (zipPath) => ipcRenderer.invoke('p2p-extension:install', zipPath),
 
     // P2P 메신저 확장 상태 확인
-    getP2PExtensionStatus: () => ipcRenderer.invoke('p2p-extension:status')
+    getP2PExtensionStatus: () => ipcRenderer.invoke('p2p-extension:status'),
+
+    // ========== 마켓플레이스 API ==========
+
+    // 마켓플레이스 URL 설정
+    setMarketplaceUrl: (url) => ipcRenderer.invoke('marketplace:setUrl', url),
+
+    // 마켓플레이스 확장 목록 조회
+    getMarketplaceExtensions: () => ipcRenderer.invoke('marketplace:getExtensions'),
+
+    // 마켓플레이스에서 확장 설치
+    installFromMarketplace: (extensionId) => ipcRenderer.invoke('marketplace:install', extensionId),
+
+    // 업데이트 확인
+    checkForUpdates: () => ipcRenderer.invoke('marketplace:checkUpdates'),
+
+    // 모든 확장 업데이트
+    updateAllExtensions: () => ipcRenderer.invoke('marketplace:updateAll'),
+
+    // 마켓플레이스 이벤트 수신
+    onMarketplaceEvent: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('marketplace-event', handler);
+        return () => ipcRenderer.removeListener('marketplace-event', handler);
+    }
 });
 
 // Messenger Database API (메인 패널에서도 사용)

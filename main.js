@@ -1564,6 +1564,39 @@ ipcMain.handle('extensions:executeCommand', async (event, commandId, ...args) =>
     });
 });
 
+// ========== 마켓플레이스 API ==========
+
+// 마켓플레이스 URL 설정
+ipcMain.handle('marketplace:setUrl', (event, url) => {
+    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    extensionManager.setMarketplaceUrl(url);
+    return { success: true };
+});
+
+// 마켓플레이스 확장 목록 조회
+ipcMain.handle('marketplace:getExtensions', async () => {
+    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    return await extensionManager.fetchMarketplaceExtensions();
+});
+
+// 마켓플레이스에서 확장 설치
+ipcMain.handle('marketplace:install', async (event, extensionId) => {
+    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    return await extensionManager.installFromMarketplace(extensionId);
+});
+
+// 업데이트 확인
+ipcMain.handle('marketplace:checkUpdates', async () => {
+    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    return await extensionManager.checkForUpdates();
+});
+
+// 모든 확장 업데이트
+ipcMain.handle('marketplace:updateAll', async () => {
+    if (!ExtensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    return await extensionManager.updateAllExtensions();
+});
+
 // QuickPick 결과 수신
 ipcMain.on('quickpick:result', (event, { id, selected }) => {
     if (extensionAPI) {

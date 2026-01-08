@@ -72,6 +72,7 @@
       "preload.js",
       "server.js",
       "license.js",
+      "meetingPipeline.js",
       "public/**/*",
       "!public/chat-window.html",
       "!public/js/chat-window.js",

@@ -11650,17 +11650,15 @@ function initExtensionsUI() {
 // 마켓플레이스 시스템
 // ========================================
 
-// 마켓플레이스 확장 목록 (실제 내장 확장만 표시)
-const marketplaceExtensions = [
-    {
-        id: 'p2p-messenger',
-        name: 'P2P 메신저',
-        description: '폐쇄망 환경에서 사용할 수 있는 P2P 메신저. 호스트/게스트 방식으로 채팅과 파일 공유를 지원합니다.',
+// R2 마켓플레이스 URL
+const MARKETPLACE_URL = 'https://file.docwatch.app/extensions';
+
+// 확장별 추가 메타데이터 (아이콘, 카테고리 등)
+const extensionMetadata = {
+    'p2p-messenger': {
         icon: '💬',
-        version: '1.0.0',
         publisher: 'DocWatch',
         categories: ['communication', 'collaboration'],
-        isBuiltin: true,
         contributes: {
             menus: [
                 { id: 'messenger', title: 'P2P 메신저', icon: 'message-square', section: 'messenger' }
@@ -11671,11 +11669,56 @@ const marketplaceExtensions = [
             ]
         }
     }
-];
+};
 
 let marketplaceData = [];
 let currentMarketplaceCategory = 'all';
 let selectedMarketplaceExtId = null;
+let marketplaceCache = null;
+let marketplaceCacheTime = 0;
+const MARKETPLACE_CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
+
+// R2에서 마켓플레이스 확장 목록 가져오기
+async function fetchMarketplaceExtensions() {
+    const now = Date.now();
+
+    // 캐시 확인
+    if (marketplaceCache && (now - marketplaceCacheTime) < MARKETPLACE_CACHE_DURATION) {
+        console.log('[Marketplace] 캐시 사용');
+        return marketplaceCache;
+    }
+
+    try {
+        const response = await fetch(`${MARKETPLACE_URL}/index.json`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const extensions = (data.extensions || []).map(ext => {
+            // 로컬 메타데이터 병합
+            const meta = extensionMetadata[ext.id] || {};
+            return {
+                ...ext,
+                icon: meta.icon || '📦',
+                publisher: meta.publisher || 'Unknown',
+                categories: meta.categories || ['other'],
+                contributes: meta.contributes || {},
+                downloadUrl: `${MARKETPLACE_URL}/${ext.filename}`
+            };
+        });
+
+        // 캐시 저장
+        marketplaceCache = extensions;
+        marketplaceCacheTime = now;
+
+        console.log(`[Marketplace] ${extensions.length}개 확장 로드됨`);
+        return extensions;
+    } catch (err) {
+        console.error('[Marketplace] R2에서 확장 목록 로드 실패:', err);
+        return [];
+    }
+}
 
 // 마켓플레이스 로드 (VSCode 스타일)
 async function loadMarketplace() {
@@ -11687,6 +11730,9 @@ async function loadMarketplace() {
     if (loading) loading.style.display = 'flex';
 
     try {
+        // R2에서 마켓플레이스 확장 목록 가져오기
+        const marketplaceExtensions = await fetchMarketplaceExtensions();
+
         // 설치된 확장 목록 가져오기
         const installedExtensions = window.extensionAPI ? await window.extensionAPI.getExtensions() : [];
         const installedIds = installedExtensions.map(e => e.id);
@@ -11922,13 +11968,17 @@ async function installMarketplaceExtension(extId) {
         const ext = marketplaceData.find(e => e.id === extId);
         if (!ext) throw new Error('확장을 찾을 수 없습니다');
 
-        // 내장 확장이면 활성화만 수행
-        if (ext.isBuiltin) {
-            await window.extensionAPI.toggle(extId, true);
+        // R2 마켓플레이스에서 확장 설치
+        if (ext.downloadUrl) {
+            console.log('[Marketplace] 확장 설치 시작:', extId, ext.downloadUrl);
+            // IPC를 통해 메인 프로세스에서 설치 수행
+            const result = await window.electronAPI.invoke('extensions:installFromUrl', ext.downloadUrl, ext.sha256);
+            if (!result.success) {
+                throw new Error(result.error || '설치 실패');
+            }
+            console.log('[Marketplace] 확장 설치 완료:', extId);
         } else {
-            // 외부 확장은 다운로드 후 설치 (향후 구현)
-            console.log('외부 확장 설치:', extId);
-            // await window.extensionAPI.install(downloadUrl);
+            throw new Error('다운로드 URL이 없습니다');
         }
 
         // 리스트 버튼 UI 업데이트

@@ -151,13 +151,22 @@ ipcMain.handle('p2p-extension:install', async (event, zipPath) => {
 // P2P 메신저 확장 상태 확인
 ipcMain.handle('p2p-extension:status', () => {
     const extensionsDir = path.join(getUserDataDir(), 'extensions', 'p2p-messenger');
-    const installed = fs.existsSync(path.join(extensionsDir, 'manifest.json'));
+    // package.json 또는 manifest.json 둘 다 확인
+    const packageJsonPath = path.join(extensionsDir, 'package.json');
+    const manifestJsonPath = path.join(extensionsDir, 'manifest.json');
+    const installed = fs.existsSync(packageJsonPath) || fs.existsSync(manifestJsonPath);
 
     let version = null;
     if (installed) {
         try {
-            const manifest = JSON.parse(fs.readFileSync(path.join(extensionsDir, 'manifest.json'), 'utf8'));
-            version = manifest.version;
+            // package.json 우선 확인
+            if (fs.existsSync(packageJsonPath)) {
+                const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                version = pkg.version;
+            } else if (fs.existsSync(manifestJsonPath)) {
+                const manifest = JSON.parse(fs.readFileSync(manifestJsonPath, 'utf8'));
+                version = manifest.version;
+            }
         } catch (e) {}
     }
 
@@ -1467,6 +1476,26 @@ ipcMain.handle('extensions:install', async (event, source) => {
     if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
     const id = await extensionManager.installExtension(source);
     return { success: true, id };
+});
+
+// R2 마켓플레이스에서 확장 설치 (URL로 다운로드)
+ipcMain.handle('extensions:installFromUrl', async (event, downloadUrl, expectedSha256) => {
+    if (!extensionManager) throw new Error('확장 시스템이 초기화되지 않았습니다');
+    try {
+        console.log('[Extensions] URL에서 설치 시작:', downloadUrl);
+
+        // URL에서 확장 ID 추출 (p2p-messenger-v1.0.0.zip -> p2p-messenger)
+        const filename = downloadUrl.split('/').pop();
+        const extIdMatch = filename.match(/^(.+)-v[\d.]+\.zip$/);
+        const extensionId = extIdMatch ? extIdMatch[1] : filename.replace('.zip', '');
+
+        // installFromMarketplace 사용 (ExtensionManager에 구현된 기능)
+        const result = await extensionManager.installFromMarketplace(extensionId);
+        return { success: true, id: result.id, version: result.version };
+    } catch (err) {
+        console.error('[Extensions] URL 설치 실패:', err);
+        return { success: false, error: err.message };
+    }
 });
 
 // 확장 제거

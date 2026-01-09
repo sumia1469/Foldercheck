@@ -296,7 +296,7 @@ function createSafeRequire(basePath, perms) {
 
     // 권한에 따른 추가 모듈
     if (perms.includes('fs:read') || perms.includes('fs:write') || perms.includes('filesystem')) {
-        allowedBuiltins.push('fs');
+        allowedBuiltins.push('fs', 'crypto'); // crypto는 파일 해시에 필요
     }
     if (perms.includes('network')) {
         allowedBuiltins.push('http', 'https', 'net', 'dgram', 'dns');

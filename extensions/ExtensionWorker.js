@@ -295,7 +295,7 @@ function createSafeRequire(basePath, perms) {
     const allowedBuiltins = ['path', 'url', 'querystring', 'util', 'events', 'stream', 'string_decoder'];
 
     // 권한에 따른 추가 모듈
-    if (perms.includes('fs:read') || perms.includes('fs:write')) {
+    if (perms.includes('fs:read') || perms.includes('fs:write') || perms.includes('filesystem')) {
         allowedBuiltins.push('fs');
     }
     if (perms.includes('network')) {

@@ -1,89 +1,89 @@
-# DocWatch Agent Guidelines
+# DocWatch 에이전트 가이드라인
 
-This file contains build commands, code style guidelines, and development conventions for agentic coding agents working in the DocWatch repository.
+## 실행 명령어
 
-## Build/Test Commands
+### 개발 모드
+- `npm run start` - 앱 실행 (macOS)
+- `npm run start:win` - 앱 실행 (Windows, UTF-8)
+- `npm run start:alt` - 대체 실행 명령
+- `npm run start:mac` - 앱 실행 (macOS 대체)
 
-### Development
-- `npm run start` - Start application (macOS)
-- `npm run start:win` - Start application (Windows with UTF-8)
-- `npm run start:alt` - Alternative start command
-- `npm run start:mac` - Start application (macOS alternative)
+### 빌드
+- `npm run build` - 현재 플랫폼 빌드
+- `npm run build:win` - Windows 인스톨러 빌드
+- `npm run build:mac` - macOS DMG/ZIP 빌드
+- `npm run build:all` - 전체 플랫폼 빌드
+- `npm run build:portable` - Windows 포터블 빌드
 
-### Building
-- `npm run build` - Build for current platform
-- `npm run build:win` - Build Windows installer
-- `npm run build:mac` - Build macOS DMG/ZIP
-- `npm run build:all` - Build for all platforms
-- `npm run build:portable` - Build Windows portable version
+### 테스트
+- `node test-simple.js` - 기본 Electron 런타임 테스트
+- `node test-electron.js` - Electron 모듈 로딩 테스트
+- `node test-electron-check.js` - Electron 환경 검증
 
-### Testing
-- `node test-simple.js` - Basic Electron runtime test
-- `node test-electron.js` - Electron module loading test
-- `node test-electron-check.js` - Electron environment validation
+## 프로젝트 구조
 
-## Project Architecture
+DocWatch는 로컬 업무 자동화를 위한 Electron 기반 데스크톱 앱입니다.
 
-DocWatch is an Electron-based desktop application for local business automation, featuring:
-- File watching and document processing
-- Meeting transcription and summarization
-- Extension system (VSCode-like)
-- P2P messaging
-- Local AI integration (Whisper + Ollama)
+### 주요 기능
+- 파일 감시 및 문서 처리
+- 회의 녹취 및 요약
+- 확장 시스템 (VSCode 스타일)
+- P2P 메시징
+- 로컬 AI 연동 (Whisper + Ollama)
 
-### Key Directories
-- `main.js` - Electron main process
-- `server.js` - Local HTTP server
-- `extensions/` - Extension system implementation
-- `bundled-extensions/` - Built-in extensions
-- `public/` - Frontend HTML/CSS/JS
-- `docs/` - Documentation and guides
-- `bin/` - Whisper CLI binaries
-- `models/` - AI model files
+### 핵심 디렉토리
+- `main.js` - Electron 메인 프로세스
+- `server.js` - 로컬 HTTP 서버
+- `extensions/` - 확장 시스템 구현
+- `bundled-extensions/` - 내장 확장
+- `public/` - 프론트엔드 HTML/CSS/JS
+- `docs/` - 문서 및 가이드
+- `bin/` - Whisper CLI 바이너리
+- `models/` - AI 모델 파일
 
-## Code Style Guidelines
+## 코드 스타일 가이드
 
-### JavaScript/Node.js Conventions
-- Use ES6+ features (async/await, destructuring, arrow functions)
-- Prefer `const` over `let`, avoid `var`
-- Use semicolons consistently
-- Indentation: 2 spaces (no tabs)
-- Maximum line length: 120 characters
+### JavaScript/Node.js 규칙
+- ES6+ 문법 사용 (async/await, 구조분해, 화살표 함수)
+- `const` 우선, `let` 차선, `var` 금지
+- 세미콜론 일관성 유지
+- 들여쓰기: 스페이스 2칸 (탭 금지)
+- 최대 줄 길이: 120자
 
-### Import Organization
+### import 순서
 ```javascript
-// Node.js core modules
+// Node.js 코어 모듈
 const fs = require('fs');
 const path = require('path');
 
-// Electron modules
+// Electron 모듈
 const { app, BrowserWindow } = require('electron');
 
-// Third-party dependencies
+// 서드파티 의존성
 const express = require('express');
 
-// Local modules
+// 로컬 모듈
 const ExtensionManager = require('./extensions/ExtensionManager');
 ```
 
-### Error Handling
-- Use try-catch blocks for synchronous operations
-- Use .catch() for promises or async/await with try-catch
-- Log errors with context information
-- Provide meaningful error messages in Korean (primary language) or English
+### 에러 처리
+- 동기 작업: try-catch 블록 사용
+- 비동기 작업: .catch() 또는 async/await + try-catch
+- 에러 로그에 컨텍스트 정보 포함
+- 에러 메시지는 한국어 우선, 영어 차선
 
-### Naming Conventions
-- **Files**: kebab-case (e.g., `extension-manager.js`)
-- **Variables**: camelCase (e.g., `extensionManager`)
-- **Classes**: PascalCase (e.g., `ExtensionManager`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `DEFAULT_PORT`)
-- **Functions**: camelCase, descriptive verbs (e.g., `loadExtension`)
+### 네이밍 규칙
+- **파일**: kebab-case (예: `extension-manager.js`)
+- **변수**: camelCase (예: `extensionManager`)
+- **클래스**: PascalCase (예: `ExtensionManager`)
+- **상수**: UPPER_SNAKE_CASE (예: `DEFAULT_PORT`)
+- **함수**: camelCase, 동사형 (예: `loadExtension`)
 
-### Comment Style
-- Use JSDoc-style comments for functions and classes
-- Comments in Korean when possible, English as fallback
-- Include parameter types and return values
-- Add usage examples for complex functions
+### 주석 스타일
+- JSDoc 스타일 주석 사용
+- 한국어 우선, 영어 차선
+- 파라미터 타입 및 반환값 명시
+- 복잡한 함수는 사용 예시 포함
 
 ```javascript
 /**
@@ -93,119 +93,119 @@ const ExtensionManager = require('./extensions/ExtensionManager');
  * @returns {Promise<Extension>} 로드된 확장 인스턴스
  */
 async function loadExtension(extensionPath, options = {}) {
-    // Implementation
+    // 구현
 }
 ```
 
-## Extension Development
+## 확장 개발
 
-### Extension Structure
-Extensions follow VSCode-like patterns:
-- `package.json` - Extension manifest
-- `src/extension.js` - Main entry point
-- Activation events in manifest
-- Contribution points for commands, UI elements
+### 확장 구조
+VSCode 스타일 패턴을 따릅니다:
+- `package.json` - 확장 매니페스트
+- `src/extension.js` - 메인 진입점
+- 매니페스트에 활성화 이벤트 정의
+- 명령어, UI 요소에 대한 기여점 정의
 
-### Extension API
-- Use `ExtensionAPI` class for safe operations
-- Emit events for extension communication
-- Handle lifecycle properly (activate/deactivate)
-- Access controlled through permission system
+### 확장 API
+- `ExtensionAPI` 클래스로 안전한 작업 수행
+- 확장 간 통신은 이벤트 발행 사용
+- 라이프사이클 적절히 처리 (activate/deactivate)
+- 권한 시스템을 통한 접근 제어
 
-## Platform-Specific Considerations
+## 플랫폼별 고려사항
 
 ### Windows
-- Set UTF-8 encoding: `chcp 65001`
-- Handle path separators correctly
-- Use `process.env.LOCALAPPDATA` for user data
+- UTF-8 인코딩 설정: `chcp 65001`
+- 경로 구분자 올바르게 처리
+- 사용자 데이터: `process.env.LOCALAPPDATA`
 
 ### macOS
-- Use code signing for distribution
-- Handle sandbox permissions
-- Use `process.env.HOME` for user data
+- 배포 시 코드 서명 사용
+- 샌드박스 권한 처리
+- 사용자 데이터: `process.env.HOME`
 
-### Cross-Platform
-- Use `path.join()` for file paths
-- Check `process.platform` for platform-specific code
-- Test on all target platforms
+### 크로스 플랫폼
+- 파일 경로: `path.join()` 사용
+- 플랫폼별 코드: `process.platform` 확인
+- 모든 대상 플랫폼에서 테스트
 
-## Security Best Practices
+## 보안 모범 사례
 
-- Never commit secrets or API keys
-- Use environment variables for configuration
-- Validate all user inputs
-- Sanitize file paths to prevent directory traversal
-- Use secure IPC communication between processes
+- 시크릿이나 API 키 커밋 금지
+- 설정은 환경 변수 사용
+- 모든 사용자 입력 검증
+- 디렉토리 탐색 방지를 위한 파일 경로 살균
+- 프로세스 간 안전한 IPC 통신 사용
 
-## Performance Guidelines
+## 성능 가이드라인
 
-- Lazy load modules when possible
-- Use streaming for large file operations
-- Implement proper cleanup in event handlers
-- Monitor memory usage in long-running processes
-- Optimize AI model loading and inference
+- 가능하면 모듈 지연 로딩
+- 대용량 파일 작업은 스트리밍 사용
+- 이벤트 핸들러에서 적절한 정리 구현
+- 장시간 실행 프로세스의 메모리 사용량 모니터링
+- AI 모델 로딩 및 추론 최적화
 
-## Testing Strategy
+## 테스트 전략
 
-- Test Electron runtime environment before main app logic
-- Validate extension loading/unloading
-- Test file watching functionality
-- Verify cross-platform compatibility
-- Test AI model integration separately
+- 메인 앱 로직 전에 Electron 런타임 환경 테스트
+- 확장 로딩/언로딩 검증
+- 파일 감시 기능 테스트
+- 크로스 플랫폼 호환성 확인
+- AI 모델 연동 별도 테스트
 
-## Common Patterns
+## 공통 패턴
 
-### Event Emission
+### 이벤트 발행
 ```javascript
 class MyClass extends EventEmitter {
     doSomething() {
-        // Emit events for state changes
+        // 상태 변경 시 이벤트 발행
         this.emit('statusChanged', { status: 'processing' });
     }
 }
 ```
 
-### Async Operations
+### 비동기 작업
 ```javascript
 async function processFile(filePath) {
     try {
         const content = await fs.promises.readFile(filePath, 'utf8');
         return await processContent(content);
     } catch (error) {
-        console.error(`Failed to process ${filePath}:`, error);
+        console.error(`파일 처리 실패 ${filePath}:`, error);
         throw error;
     }
 }
 ```
 
-### IPC Communication
+### IPC 통신
 ```javascript
-// Main process
+// 메인 프로세스
 ipcMain.handle('get-data', async (event, arg) => {
     return await fetchData(arg);
 });
 
-// Renderer process
+// 렌더러 프로세스
 const data = await ipcRenderer.invoke('get-data', param);
 ```
 
-## Linting and Formatting
+## 린팅 및 포맷팅
 
-This project does not currently have formal linting configured. When adding linting:
-- Consider ESLint with Electron preset
-- Use Prettier for consistent formatting
-- Add pre-commit hooks for code quality
+현재 프로젝트에는 공식 린팅 설정이 없습니다. 린팅 추가 시:
+- ESLint with Electron 프리셋 고려
+- Prettier로 일관된 포맷팅
+- 코드 품질을 위한 pre-commit 훅 추가
 
-## Dependencies Management
+## 의존성 관리
 
-- Use `npm` for package management
-- Keep dependencies minimal for performance
-- Prefer Electron-specific packages when available
-- Update dependencies regularly for security
+- 패키지 관리: `npm` 사용
+- 성능을 위해 의존성 최소화
+- 가능하면 Electron 전용 패키지 우선
+- 보안을 위해 정기적으로 의존성 업데이트
 
-## Documentation
+## 문서화
 
-- Maintain Korean documentation as primary
-- Provide English translations for broader adoption
-- Update README.md for user-facing changes
-- Document extension API changes thoroughly
+- 한국어 문서를 기본으로 유지
+- 폭넓은 채택을 위해 영어 번역 제공
+- 사용자 대상 변경 시 README.md 업데이트
+- 확장 API 변경 사항 철저히 문서화

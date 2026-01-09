@@ -126,7 +126,8 @@
       "Bash(git stash:*)",
       "Bash(npx electron .)",
       "Bash(\"node_modules/electron/dist/electron.exe\" --version)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(certutil -hashfile:*)"
     ]
   }
 }

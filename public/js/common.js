@@ -12304,10 +12304,13 @@ function removeExtensionSidebarMenu(extId) {
 
 // 확장 UI 로드 (확장이 자체 제공하는 HTML을 로드)
 async function loadExtensionUI(extId, containerSection) {
+    console.log(`[loadExtensionUI] 시작: ${extId}`);
     try {
         // 확장에게 UI 렌더링 요청 (IPC를 통해)
         if (window.electronAPI && window.electronAPI.invoke) {
+            console.log(`[loadExtensionUI] IPC 호출: extension:renderUI`);
             const uiResult = await window.electronAPI.invoke('extension:renderUI', extId);
+            console.log(`[loadExtensionUI] 결과:`, uiResult);
 
             if (uiResult && uiResult.html) {
                 const container = containerSection.querySelector('.extension-section-container');

@@ -272,8 +272,11 @@ function navigateTo(section) {
         sec.classList.remove('active');
     });
     const targetSection = document.getElementById(section);
+    console.log(`[navigateTo] section: ${section}, targetSection:`, targetSection);
     if (targetSection) {
         targetSection.classList.add('active');
+    } else {
+        console.warn(`[navigateTo] 섹션을 찾을 수 없음: ${section}`);
     }
 
     // 사이드바 업데이트
@@ -12241,7 +12244,7 @@ function createExtensionSidebarMenu(extId, menuConfig) {
             const section = document.createElement('section');
             section.id = sectionId;
             section.className = 'content-section';
-            section.style.display = 'none';
+            // inline style 제거 - CSS의 .content-section과 .active 클래스로 표시/숨김 제어
             section.setAttribute('data-extension-id', extId);
             section.setAttribute('data-extension-enabled', 'true');
 

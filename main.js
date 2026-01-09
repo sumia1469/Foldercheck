@@ -31,11 +31,12 @@ let ollamaProcess = null; // 내장 Ollama 프로세스
 const PORT = 4400;
 const OLLAMA_PORT = 11434;
 
-// Extension System (동적 로딩 - 파일이 없어도 에러 없이 동작)
+const license = require('./license');
+
+// 확장 시스템 클래스 (동적 로딩)
 let ExtensionManager = null;
 let ExtensionHost = null;
 let ExtensionAPI = null;
-const license = require('./license');
 
 try {
     ExtensionManager = require('./extensions/ExtensionManager');
@@ -43,9 +44,10 @@ try {
     ExtensionAPI = require('./extensions/ExtensionAPI');
     console.log('[Extension] 확장 시스템 모듈 로드됨');
 } catch (e) {
-    console.log('[Extension] 확장 시스템 모듈 없음 - 나중에 다운로드 필요');
+    console.log('[Extension] 확장 시스템 모듈 없음:', e.message);
 }
 
+// 확장 시스템 인스턴스
 let extensionManager = null;
 let extensionHost = null;
 let extensionAPI = null;

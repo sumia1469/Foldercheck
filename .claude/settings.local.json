@@ -127,7 +127,8 @@
       "Bash(npx electron .)",
       "Bash(\"node_modules/electron/dist/electron.exe\" --version)",
       "Bash(npm uninstall:*)",
-      "Bash(certutil -hashfile:*)"
+      "Bash(certutil -hashfile:*)",
+      "Bash(del \"c:\\\\Users\\\\D101\\\\check\\\\docwatch\\\\temp-check.zip\")"
     ]
   }
 }

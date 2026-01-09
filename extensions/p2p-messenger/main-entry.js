@@ -172,6 +172,8 @@ function registerIpcHandlers() {
             height: 700,
             minWidth: 600,
             minHeight: 400,
+            frame: false,
+            autoHideMenuBar: true,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -179,6 +181,9 @@ function registerIpcHandlers() {
             },
             title: 'P2P 메신저'
         });
+
+        // 메뉴바 완전히 제거
+        chatWindow.setMenu(null);
 
         chatWindow.loadFile(chatHtmlPath);
         return { success: true };

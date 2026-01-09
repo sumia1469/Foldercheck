@@ -25,7 +25,6 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow;
-let chatWindow = null; // P2P 채팅 윈도우
 let tray;
 let ollamaProcess = null; // 내장 Ollama 프로세스
 const PORT = 4400;
@@ -50,38 +49,9 @@ let extensionManager = null;
 let extensionHost = null;
 let extensionAPI = null;
 
-// P2P Messenger System (동적 로딩 - 확장으로 분리됨)
-let P2PMessenger = null;
-let MessengerDB = null;
-let p2pMessenger = null;
-let messengerDB = null;
-
-// P2P 메신저 확장 로드 시도
-// 참고: 루트 폴더의 p2p-messenger.js, messenger-db.js는 더 이상 사용하지 않음
-// 확장은 반드시 마켓플레이스에서 설치해야 함
-function loadP2PMessengerExtension() {
-    // 확장 폴더에서만 로드 (개발/프로덕션 모두 동일)
-    const extensionsDir = path.join(getUserDataDir(), 'extensions', 'p2p-messenger');
-    try {
-        if (fs.existsSync(path.join(extensionsDir, 'p2p-messenger.js'))) {
-            // 캐시 제거 후 다시 로드
-            const modulePath = path.join(extensionsDir, 'p2p-messenger.js');
-            const dbPath = path.join(extensionsDir, 'messenger-db.js');
-            delete require.cache[require.resolve(modulePath)];
-            delete require.cache[require.resolve(dbPath)];
-
-            P2PMessenger = require(modulePath);
-            MessengerDB = require(dbPath);
-            console.log('[P2P] 메신저 모듈 로드됨 (확장 폴더)');
-            return true;
-        }
-    } catch (e) {
-        console.log('[P2P] 확장 폴더에서 로드 실패:', e.message);
-    }
-
-    console.log('[P2P] 메신저 확장 없음 - 마켓플레이스에서 설치 필요');
-    return false;
-}
+// P2P Messenger System - 확장으로 완전히 분리됨
+// IPC 핸들러는 p2p-messenger 확장의 main-entry.js에서 동적으로 등록됨
+// 참고: bundled-extensions/p2p-messenger/main-entry.js
 
 // 확장 zip 파일 설치
 async function installExtensionFromZip(zipPath) {
@@ -121,60 +91,10 @@ async function installExtensionFromZip(zipPath) {
     };
 }
 
-// P2P 메신저 확장 설치 IPC 핸들러
-ipcMain.handle('p2p-extension:install', async (event, zipPath) => {
-    try {
-        const result = await installExtensionFromZip(zipPath);
-
-        // 설치 후 바로 로드 시도
-        if (result.id === 'p2p-messenger') {
-            loadP2PMessengerExtension();
-        }
-
-        return { success: true, ...result };
-    } catch (e) {
-        console.error('[Extension] 설치 실패:', e);
-        return { success: false, error: e.message };
-    }
-});
-
-// P2P 메신저 확장 상태 확인
-ipcMain.handle('p2p-extension:status', () => {
-    const extensionsDir = path.join(getUserDataDir(), 'extensions', 'p2p-messenger');
-    // package.json 또는 manifest.json 둘 다 확인
-    const packageJsonPath = path.join(extensionsDir, 'package.json');
-    const manifestJsonPath = path.join(extensionsDir, 'manifest.json');
-    const installed = fs.existsSync(packageJsonPath) || fs.existsSync(manifestJsonPath);
-
-    let version = null;
-    if (installed) {
-        try {
-            // package.json 우선 확인
-            if (fs.existsSync(packageJsonPath)) {
-                const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-                version = pkg.version;
-            } else if (fs.existsSync(manifestJsonPath)) {
-                const manifest = JSON.parse(fs.readFileSync(manifestJsonPath, 'utf8'));
-                version = manifest.version;
-            }
-        } catch (e) {}
-    }
-
-    return {
-        installed,
-        loaded: P2PMessenger !== null,
-        version,
-        path: extensionsDir
-    };
-});
-
 // 모든 윈도우에 이벤트 브로드캐스트 (전역 헬퍼 함수)
 function broadcastToAllWindows(channel, data) {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send(channel, data);
-    }
-    if (chatWindow && !chatWindow.isDestroyed()) {
-        chatWindow.webContents.send(channel, data);
     }
 }
 
@@ -1329,55 +1249,12 @@ async function initializeExtensions() {
         });
 
         // ExtensionAPI에서 IPC invoke 이벤트 처리
+        // P2P 관련 채널은 p2p-messenger 확장의 main-entry.js에서 동적으로 등록됨
         extensionAPI.on('ipc:invoke', async ({ requestId, channel, args, extensionId }) => {
             try {
                 let result;
-                // P2P 관련 채널은 직접 처리
+                // 공통 채널만 직접 처리 (P2P 관련 채널은 확장에서 처리)
                 switch (channel) {
-                    case 'p2p:startHost':
-                        initializeP2PMessenger();
-                        result = await p2pMessenger.startHost(args[0], args[1]);
-                        break;
-                    case 'p2p:stopHost':
-                        if (p2pMessenger) result = await p2pMessenger.stopHost();
-                        break;
-                    case 'p2p:connect':
-                        initializeP2PMessenger();
-                        result = await p2pMessenger.connect(args[0], args[1], args[2]);
-                        break;
-                    case 'p2p:disconnect':
-                        if (p2pMessenger) result = await p2pMessenger.disconnect();
-                        break;
-                    case 'p2p:sendMessage':
-                        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-                        result = p2pMessenger.sendMessage(args[0]);
-                        break;
-                    case 'p2p:sendFile':
-                        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-                        result = await p2pMessenger.sendFile(args[0], args[1]); // args[1] = cloudInfo
-                        break;
-                    case 'p2p:getStatus':
-                        result = p2pMessenger ? p2pMessenger.getStatus() :
-                            { mode: 'offline', nickname: '', port: 9900, connectedUsers: [], userCount: 0 };
-                        break;
-                    case 'p2p:getUsers':
-                        result = p2pMessenger ? p2pMessenger.getUsers() : [];
-                        break;
-                    case 'p2p:selectFile':
-                        const fileResult = await dialog.showOpenDialog(mainWindow, {
-                            properties: ['openFile'],
-                            title: '전송할 파일 선택'
-                        });
-                        result = fileResult.canceled ? null : fileResult.filePaths[0];
-                        break;
-                    case 'p2p:openDownloads':
-                        const downloadsDir = path.join(getUserDataDir(), 'p2p-downloads');
-                        if (!fs.existsSync(downloadsDir)) {
-                            fs.mkdirSync(downloadsDir, { recursive: true });
-                        }
-                        shell.openPath(downloadsDir);
-                        result = { success: true };
-                        break;
                     case 'select-folder':
                         const folderResult = await dialog.showOpenDialog(mainWindow, {
                             properties: ['openDirectory'],
@@ -1401,7 +1278,9 @@ async function initializeExtensions() {
                         result = { success: true };
                         break;
                     default:
-                        throw new Error(`알 수 없는 IPC 채널: ${channel}`);
+                        // 알 수 없는 채널은 에러 대신 null 반환 (확장에서 처리할 수 있음)
+                        console.warn(`[IPC] 처리되지 않은 채널: ${channel}`);
+                        result = null;
                 }
 
                 extensionAPI.emit('ipc:response', { requestId, result });
@@ -1506,6 +1385,46 @@ ipcMain.handle('extensions:setSettings', (event, id, settings) => {
     if (!extensionManager) return { success: false };
     extensionManager.setExtensionSettings(id, settings);
     return { success: true };
+});
+
+// 확장 UI 렌더링 요청 - 확장이 자체 UI HTML을 제공
+ipcMain.handle('extension:renderUI', async (event, extId) => {
+    if (!extensionManager) return null;
+
+    const extension = extensionManager.registry.get(extId);
+    if (!extension) return null;
+
+    try {
+        // 확장의 manifest에서 UI 정보 확인
+        const manifest = extension.manifest;
+        const contributes = manifest.contributes || {};
+
+        // contributes.sections에서 UI 템플릿 정보 가져오기
+        if (contributes.sections && contributes.sections.length > 0) {
+            const section = contributes.sections[0]; // 첫 번째 섹션 사용
+
+            // 확장이 자체 HTML 템플릿을 제공하는 경우
+            if (section.template) {
+                // 확장 디렉토리에서 HTML 파일 로드
+                const templatePath = path.join(extension.path, 'public', `${section.template}.html`);
+                if (fs.existsSync(templatePath)) {
+                    const html = fs.readFileSync(templatePath, 'utf8');
+                    return { html, initScript: null };
+                }
+            }
+        }
+
+        // 확장이 UI 정보를 제공하지 않는 경우 기본 UI 반환
+        // 확장의 instance에서 renderUI 메서드를 호출할 수도 있음
+        if (extension.instance && typeof extension.instance.renderUI === 'function') {
+            return await extension.instance.renderUI();
+        }
+
+        return null;
+    } catch (err) {
+        console.error(`[Extension] UI 렌더링 실패: ${extId}`, err);
+        return null;
+    }
 });
 
 // 라이선스 변경 시 ExtensionManager 업데이트
@@ -1636,597 +1555,7 @@ ipcMain.on('inputbox:result', (event, { id, value }) => {
     }
 });
 
-// ========================================
-// P2P Messenger IPC Handlers
-// ========================================
 
-/**
- * P2P 메신저 초기화
- */
-function initializeP2PMessenger() {
-    if (p2pMessenger) return;
-
-    // P2P 메신저 확장 로드 시도
-    if (!P2PMessenger && !loadP2PMessengerExtension()) {
-        console.log('[P2P] 메신저 확장이 설치되지 않음');
-        return false;
-    }
-
-    p2pMessenger = new P2PMessenger();
-
-    // P2P 이벤트를 확장 시스템으로 전달하는 헬퍼 함수
-    const notifyExtensions = (channel, data) => {
-        if (extensionHost) {
-            extensionHost.broadcast({ type: 'ipc-event', channel, data });
-        }
-    };
-
-    // 이벤트 리스너 설정
-    // P2P 이벤트를 mainWindow와 chatWindow 모두에 전송하는 헬퍼 함수
-    const sendToAllWindows = (channel, data) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send(channel, data);
-        }
-        if (chatWindow && !chatWindow.isDestroyed()) {
-            chatWindow.webContents.send(channel, data);
-        }
-        notifyExtensions(channel, data);
-    };
-
-    p2pMessenger.on('status', (data) => {
-        sendToAllWindows('p2p:status', data);
-    });
-
-    p2pMessenger.on('message', (msg) => {
-        sendToAllWindows('p2p:message', msg);
-    });
-
-    p2pMessenger.on('user_joined', (data) => {
-        sendToAllWindows('p2p:user-joined', data);
-    });
-
-    p2pMessenger.on('user_left', (data) => {
-        sendToAllWindows('p2p:user-left', data);
-    });
-
-    p2pMessenger.on('user_list', (users) => {
-        sendToAllWindows('p2p:user-list', users);
-    });
-
-    p2pMessenger.on('error', (err) => {
-        sendToAllWindows('p2p:error', err);
-    });
-
-    p2pMessenger.on('disconnected', (data) => {
-        sendToAllWindows('p2p:disconnected', data);
-    });
-
-    p2pMessenger.on('file_start', (data) => {
-        sendToAllWindows('p2p:file-start', data);
-    });
-
-    p2pMessenger.on('file_progress', (data) => {
-        sendToAllWindows('p2p:file-progress', data);
-    });
-
-    p2pMessenger.on('file_received', (data) => {
-        // 파일 저장 경로 결정
-        const downloadsDir = path.join(getUserDataDir(), 'p2p-downloads');
-        if (!fs.existsSync(downloadsDir)) {
-            fs.mkdirSync(downloadsDir, { recursive: true });
-        }
-
-        const savePath = path.join(downloadsDir, data.filename);
-        fs.writeFileSync(savePath, data.data);
-
-        const eventData = {
-            filename: data.filename,
-            size: data.size,
-            from: data.from,
-            savedPath: savePath,
-            cloudFileId: data.cloudFileId || '',
-            cloudUrl: data.cloudUrl || ''
-        };
-
-        sendToAllWindows('p2p:file-received', eventData);
-    });
-
-    p2pMessenger.on('file_sent', (data) => {
-        sendToAllWindows('p2p:file-sent', data);
-    });
-
-    // 클라우드 파일 이벤트
-    p2pMessenger.on('cloud_file_uploaded', (data) => {
-        sendToAllWindows('cloud:file-uploaded', data);
-    });
-
-    p2pMessenger.on('cloud_file_deleted', (data) => {
-        sendToAllWindows('cloud:file-deleted', data);
-    });
-
-    console.log('[P2P] 메신저 시스템 초기화 완료');
-}
-
-// 호스트 시작
-ipcMain.handle('p2p:startHost', async (event, port, nickname) => {
-    initializeP2PMessenger();
-    return await p2pMessenger.startHost(port, nickname);
-});
-
-// 호스트 중지
-ipcMain.handle('p2p:stopHost', async () => {
-    if (!p2pMessenger) return;
-    return await p2pMessenger.stopHost();
-});
-
-// 서버 연결 (게스트)
-ipcMain.handle('p2p:connect', async (event, host, port, nickname) => {
-    initializeP2PMessenger();
-    return await p2pMessenger.connect(host, port, nickname);
-});
-
-// 연결 해제
-ipcMain.handle('p2p:disconnect', async () => {
-    if (!p2pMessenger) return;
-    return await p2pMessenger.disconnect();
-});
-
-// 메시지 전송
-ipcMain.handle('p2p:sendMessage', (event, content) => {
-    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-    return p2pMessenger.sendMessage(content);
-});
-
-// 파일 전송
-ipcMain.handle('p2p:sendFile', async (event, filePath, cloudInfo) => {
-    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-    return await p2pMessenger.sendFile(filePath, cloudInfo);
-});
-
-// 상태 조회
-ipcMain.handle('p2p:getStatus', () => {
-    if (!p2pMessenger) return { mode: 'offline', nickname: '', port: 9900, connectedUsers: [], userCount: 0 };
-    return p2pMessenger.getStatus();
-});
-
-// 사용자 목록 조회
-ipcMain.handle('p2p:getUsers', () => {
-    if (!p2pMessenger) return [];
-    return p2pMessenger.getUsers();
-});
-
-// 메시지 히스토리 조회
-ipcMain.handle('p2p:getHistory', () => {
-    if (!p2pMessenger) return [];
-    return p2pMessenger.getHistory();
-});
-
-// 파일 선택 다이얼로그
-ipcMain.handle('p2p:selectFile', async (event) => {
-    // 호출한 윈도우를 부모로 사용 (채팅 윈도우에서 호출 시 채팅 윈도우가 부모가 됨)
-    const senderWindow = BrowserWindow.fromWebContents(event.sender);
-    const parentWindow = senderWindow || chatWindow || mainWindow;
-
-    const result = await dialog.showOpenDialog(parentWindow, {
-        properties: ['openFile'],
-        title: '전송할 파일 선택'
-    });
-
-    if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, filePath: null };
-    }
-
-    return { success: true, filePath: result.filePaths[0] };
-});
-
-// P2P 다운로드 폴더 열기
-ipcMain.handle('p2p:openDownloads', () => {
-    const downloadsDir = path.join(getUserDataDir(), 'p2p-downloads');
-    if (!fs.existsSync(downloadsDir)) {
-        fs.mkdirSync(downloadsDir, { recursive: true });
-    }
-    require('electron').shell.openPath(downloadsDir);
-});
-
-// ========================================
-// 클라우드 파일 서버 API
-// ========================================
-
-// 클라우드 상태 조회
-ipcMain.handle('cloud:getStatus', () => {
-    if (!p2pMessenger) return { status: 'stopped' };
-    return p2pMessenger.getCloudStatus();
-});
-
-// 클라우드 파일 목록 조회
-ipcMain.handle('cloud:getFiles', () => {
-    if (!p2pMessenger) return [];
-    return p2pMessenger.getCloudFiles();
-});
-
-// 클라우드에 파일 업로드
-ipcMain.handle('cloud:uploadFile', async (event, filePath) => {
-    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-    return await p2pMessenger.uploadToCloud(filePath);
-});
-
-// 클라우드에서 파일 삭제
-ipcMain.handle('cloud:deleteFile', (event, fileId) => {
-    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-    return p2pMessenger.deleteFromCloud(fileId);
-});
-
-// 클라우드 파일 선택 및 업로드
-ipcMain.handle('cloud:selectAndUpload', async (event) => {
-    // 호출한 윈도우를 부모로 사용
-    const senderWindow = BrowserWindow.fromWebContents(event.sender);
-    const parentWindow = senderWindow || chatWindow || mainWindow;
-
-    const result = await dialog.showOpenDialog(parentWindow, {
-        properties: ['openFile'],
-        title: '클라우드에 업로드할 파일 선택'
-    });
-
-    if (result.canceled || result.filePaths.length === 0) {
-        return { success: false };
-    }
-
-    if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-    const uploadResult = await p2pMessenger.uploadToCloud(result.filePaths[0]);
-    return { success: true, ...uploadResult };
-});
-
-// 클라우드 스토리지 폴더 열기
-ipcMain.handle('cloud:openStorage', () => {
-    if (!p2pMessenger || !p2pMessenger.cloudStoragePath) {
-        const cloudDir = path.join(getUserDataDir(), 'cloud-files');
-        if (!fs.existsSync(cloudDir)) {
-            fs.mkdirSync(cloudDir, { recursive: true });
-        }
-        require('electron').shell.openPath(cloudDir);
-    } else {
-        require('electron').shell.openPath(p2pMessenger.cloudStoragePath);
-    }
-});
-
-// ========================================
-// P2P 채팅 윈도우
-// ========================================
-
-/**
- * 채팅 윈도우 생성
- */
-function createChatWindow() {
-    if (chatWindow) {
-        chatWindow.focus();
-        return chatWindow;
-    }
-
-    const iconPath = process.platform === 'win32'
-        ? path.join(__dirname, 'build', 'icons', 'icon.ico')
-        : path.join(__dirname, 'build', 'icons', 'icon.png');
-
-    chatWindow = new BrowserWindow({
-        width: 900,
-        height: 650,
-        minWidth: 700,
-        minHeight: 500,
-        title: 'P2P 메신저',
-        icon: iconPath,
-        frame: false,
-        backgroundColor: '#1a1a1a',
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload-chat.js')
-        },
-        show: false
-    });
-
-    // HTML 파일 로드
-    chatWindow.loadFile(path.join(__dirname, 'public', 'chat-window.html'));
-
-    chatWindow.once('ready-to-show', () => {
-        chatWindow.show();
-    });
-
-    chatWindow.on('closed', () => {
-        chatWindow = null;
-    });
-
-    return chatWindow;
-}
-
-// 채팅 윈도우 열기
-ipcMain.handle('p2p:openChatWindow', () => {
-    createChatWindow();
-    return { success: true };
-});
-
-// 채팅 윈도우에 1:1 채팅 시작 요청
-ipcMain.handle('p2p:startDirectChatWith', (event, nickname) => {
-    if (chatWindow && !chatWindow.isDestroyed()) {
-        chatWindow.webContents.send('chat:startDirectChat', nickname);
-        chatWindow.focus();
-        return { success: true };
-    }
-    return { success: false, error: '채팅 윈도우가 열려있지 않습니다' };
-});
-
-// 채팅 윈도우에서 특정 채팅방 선택
-ipcMain.handle('p2p:selectRoomInChat', (event, roomId) => {
-    if (chatWindow && !chatWindow.isDestroyed()) {
-        chatWindow.webContents.send('chat:selectRoom', roomId);
-        chatWindow.focus();
-        return { success: true };
-    }
-    return { success: false, error: '채팅 윈도우가 열려있지 않습니다' };
-});
-
-// 채팅 윈도우 컨트롤
-ipcMain.handle('chat:minimize', () => {
-    if (chatWindow) chatWindow.minimize();
-});
-
-ipcMain.handle('chat:maximize', () => {
-    if (chatWindow) {
-        if (chatWindow.isMaximized()) {
-            chatWindow.unmaximize();
-        } else {
-            chatWindow.maximize();
-        }
-    }
-});
-
-ipcMain.handle('chat:close', () => {
-    if (chatWindow) chatWindow.close();
-});
-
-// 알림 표시
-ipcMain.handle('chat:showNotification', (event, title, body) => {
-    const { Notification } = require('electron');
-    if (Notification.isSupported()) {
-        const notification = new Notification({
-            title: title,
-            body: body,
-            icon: path.join(__dirname, 'build', 'icons', 'icon.png'),
-            silent: false
-        });
-        notification.show();
-
-        notification.on('click', () => {
-            if (chatWindow) {
-                chatWindow.show();
-                chatWindow.focus();
-            }
-        });
-    }
-    return { success: true };
-});
-
-// 파일 열기
-ipcMain.handle('chat:openFile', (event, filePath) => {
-    if (filePath && fs.existsSync(filePath)) {
-        shell.openPath(filePath);
-        return { success: true };
-    }
-    return { success: false, error: '파일을 찾을 수 없습니다' };
-});
-
-// ========================================
-// 메신저 데이터베이스 IPC 핸들러
-// ========================================
-
-/**
- * MessengerDB 초기화
- */
-let messengerDBInitializing = null; // 초기화 진행 중 Promise
-
-async function initializeMessengerDB() {
-    // 이미 초기화 완료된 경우
-    if (messengerDB && messengerDB.db) return messengerDB;
-
-    // 초기화 진행 중인 경우 기존 Promise 반환
-    if (messengerDBInitializing) return messengerDBInitializing;
-
-    // 새로운 초기화 시작
-    messengerDBInitializing = (async () => {
-        try {
-            const db = new MessengerDB();
-            const success = await db.initialize();
-            if (success && db.db) {
-                messengerDB = db;
-                console.log('[MessengerDB] 초기화 완료');
-                return messengerDB;
-            } else {
-                console.error('[MessengerDB] 초기화 실패: DB 객체가 null');
-                return null;
-            }
-        } catch (err) {
-            console.error('[MessengerDB] 초기화 오류:', err);
-            return null;
-        } finally {
-            messengerDBInitializing = null;
-        }
-    })();
-
-    return messengerDBInitializing;
-}
-
-// 연락처 관리
-ipcMain.handle('messenger:getContacts', async () => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.getAllContacts();
-});
-
-ipcMain.handle('messenger:addContact', async (event, contact) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    const id = db.addContact(contact);
-    // 모든 윈도우에 연락처 추가 이벤트 전송
-    broadcastToAllWindows('messenger:contactChanged', { action: 'added', contactId: id, contact: { ...contact, id } });
-    return { success: true, id };
-});
-
-ipcMain.handle('messenger:deleteContact', async (event, id) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.deleteContact(id);
-    // 모든 윈도우에 연락처 삭제 이벤트 전송
-    broadcastToAllWindows('messenger:contactChanged', { action: 'deleted', contactId: id });
-    return { success: true };
-});
-
-ipcMain.handle('messenger:updateContactStatus', async (event, id, status) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.updateContactStatus(id, status);
-    return { success: true };
-});
-
-// 그룹 관리
-ipcMain.handle('messenger:getGroups', async () => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.getAllGroups();
-});
-
-ipcMain.handle('messenger:createGroup', async (event, group) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    const id = db.createGroup(group);
-    // 모든 윈도우에 그룹 생성 이벤트 전송
-    broadcastToAllWindows('messenger:groupChanged', { action: 'created', groupId: id, group: { ...group, id } });
-    console.log(`[Messenger] 그룹 생성: ${group.name} (ID: ${id})`);
-    return { success: true, id };
-});
-
-ipcMain.handle('messenger:getGroupMembers', async (event, groupId) => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.getGroupMembers(groupId);
-});
-
-ipcMain.handle('messenger:addGroupMember', async (event, groupId, contactId, role) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.addGroupMember(groupId, contactId, role);
-    return { success: true };
-});
-
-ipcMain.handle('messenger:deleteGroup', async (event, id) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.deleteGroup(id);
-    // 모든 윈도우에 그룹 삭제 이벤트 전송
-    broadcastToAllWindows('messenger:groupChanged', { action: 'deleted', groupId: id });
-    console.log(`[Messenger] 그룹 삭제 (ID: ${id})`);
-    return { success: true };
-});
-
-// 채팅방 관리
-ipcMain.handle('messenger:getRooms', async () => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.getAllRooms();
-});
-
-ipcMain.handle('messenger:createRoom', async (event, room) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    const id = db.createRoom(room);
-    // 모든 윈도우에 채팅방 생성 이벤트 전송
-    broadcastToAllWindows('messenger:roomChanged', { action: 'created', roomId: id, room: { ...room, id } });
-    console.log(`[Messenger] 채팅방 생성: ${room.name || room.type} (ID: ${id})`);
-    return { success: true, id };
-});
-
-ipcMain.handle('messenger:getRoom', async (event, id) => {
-    const db = await initializeMessengerDB();
-    if (!db) return null;
-    return db.getRoom(id);
-});
-
-ipcMain.handle('messenger:getRoomParticipants', async (event, roomId) => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.getRoomParticipants(roomId);
-});
-
-ipcMain.handle('messenger:addRoomParticipant', async (event, roomId, contactId, nickname) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.addRoomParticipant(roomId, contactId, nickname);
-    return { success: true };
-});
-
-ipcMain.handle('messenger:leaveRoom', async (event, roomId, contactId) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.leaveRoom(roomId, contactId);
-    return { success: true };
-});
-
-ipcMain.handle('messenger:updateRoom', async (event, id, updates) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.updateRoom(id, updates);
-    // 모든 윈도우에 채팅방 업데이트 이벤트 전송
-    broadcastToAllWindows('messenger:roomChanged', { action: 'updated', roomId: id, updates });
-    return { success: true };
-});
-
-ipcMain.handle('messenger:deleteRoom', async (event, id) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.deleteRoom(id);
-    // 모든 윈도우에 채팅방 삭제 이벤트 전송
-    broadcastToAllWindows('messenger:roomChanged', { action: 'deleted', roomId: id });
-    console.log(`[Messenger] 채팅방 삭제 (ID: ${id})`);
-    return { success: true };
-});
-
-// 메시지 관리
-ipcMain.handle('messenger:saveMessage', async (event, message) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    const id = db.saveMessage(message);
-    return { success: true, id };
-});
-
-ipcMain.handle('messenger:getRoomMessages', async (event, roomId, limit, offset) => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.getRoomMessages(roomId, limit, offset);
-});
-
-ipcMain.handle('messenger:markAsRead', async (event, roomId, contactId) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.markMessagesAsRead(roomId, contactId);
-    return { success: true };
-});
-
-ipcMain.handle('messenger:searchMessages', async (event, query, roomId) => {
-    const db = await initializeMessengerDB();
-    if (!db) return [];
-    return db.searchMessages(query, roomId);
-});
-
-// 설정 관리
-ipcMain.handle('messenger:getSetting', async (event, key, defaultValue) => {
-    const db = await initializeMessengerDB();
-    if (!db) return defaultValue;
-    return db.getSetting(key, defaultValue);
-});
-
-ipcMain.handle('messenger:setSetting', async (event, key, value) => {
-    const db = await initializeMessengerDB();
-    if (!db) return { success: false, error: 'DB 초기화 실패' };
-    db.setSetting(key, value);
-    return { success: true };
-});
 
 // 앱 종료 시 확장 시스템 정리
 app.on('before-quit', async () => {
@@ -2235,17 +1564,5 @@ app.on('before-quit', async () => {
     }
     if (extensionHost) {
         await extensionHost.shutdown();
-    }
-    // P2P 메신저 정리
-    if (p2pMessenger) {
-        if (p2pMessenger.mode === 'host') {
-            await p2pMessenger.stopHost();
-        } else if (p2pMessenger.mode === 'guest') {
-            await p2pMessenger.disconnect();
-        }
-    }
-    // MessengerDB 정리
-    if (messengerDB) {
-        messengerDB.close();
     }
 });

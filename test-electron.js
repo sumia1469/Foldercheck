@@ -1,16 +1,14 @@
+console.log('Test script starting...');
+console.log('process.type:', process.type);
 const electron = require('electron');
 console.log('electron type:', typeof electron);
-console.log('electron value:', electron);
-console.log('app type:', typeof electron.app);
-console.log('ipcMain type:', typeof electron.ipcMain);
-
-if (typeof electron === 'object') {
-    const { app } = electron;
-    app.whenReady().then(() => {
+console.log('electron keys:', Object.keys(electron).slice(0, 10));
+if (electron.app) {
+    console.log('electron.app exists');
+    electron.app.on('ready', () => {
         console.log('App ready!');
-        app.quit();
+        electron.app.quit();
     });
 } else {
-    console.log('Electron module is not an object - possibly not running in Electron runtime');
-    process.exit(1);
+    console.log('electron.app does not exist');
 }

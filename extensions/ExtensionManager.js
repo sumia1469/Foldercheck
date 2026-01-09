@@ -53,6 +53,19 @@ class ExtensionManager extends EventEmitter {
         this.marketplaceCache = null;
         this.marketplaceCacheTime = 0;
         this.marketplaceCacheDuration = 5 * 60 * 1000; // 5분 캐시
+
+        // 메인 프로세스 모듈 인스턴스 (mainEntry 지원)
+        this.mainModules = new Map();
+
+        // ipcMain 참조 (동적 IPC 핸들러 등록용)
+        this.ipcMain = options.ipcMain || null;
+
+        // mainWindow 참조 (이벤트 전송용)
+        this.mainWindow = options.mainWindow || null;
+
+        // 앱 경로 (getUserDataDir 대체)
+        this.userDataDir = options.userDataDir ||
+            path.join(process.env.LOCALAPPDATA || process.env.HOME, 'docwatch');
     }
 
     /**
@@ -179,14 +192,22 @@ class ExtensionManager extends EventEmitter {
             if (entry.name.startsWith('.')) continue;
 
             const bundledPath = path.join(this.bundledDir, entry.name);
-            const bundledManifestPath = path.join(bundledPath, 'package.json');
+            // manifest.json 또는 package.json 지원
+            let bundledManifestPath = path.join(bundledPath, 'manifest.json');
+            if (!fs.existsSync(bundledManifestPath)) {
+                bundledManifestPath = path.join(bundledPath, 'package.json');
+            }
 
             if (!fs.existsSync(bundledManifestPath)) continue;
 
             try {
                 const bundledManifest = JSON.parse(fs.readFileSync(bundledManifestPath, 'utf8'));
                 const targetPath = path.join(this.extensionsDir, entry.name);
-                const targetManifestPath = path.join(targetPath, 'package.json');
+                // 대상 경로에서도 manifest.json 또는 package.json 확인
+                let targetManifestPath = path.join(targetPath, 'manifest.json');
+                if (!fs.existsSync(targetManifestPath)) {
+                    targetManifestPath = path.join(targetPath, 'package.json');
+                }
 
                 let shouldInstall = false;
 
@@ -194,8 +215,8 @@ class ExtensionManager extends EventEmitter {
                     // 확장 폴더가 없으면 설치
                     shouldInstall = true;
                     console.log(`[ExtensionManager] 번들 확장 설치 (새로 설치): ${entry.name}`);
-                } else if (!fs.existsSync(targetManifestPath)) {
-                    // 폴더는 있지만 package.json이 없으면 재설치
+                } else if (!fs.existsSync(path.join(targetPath, 'manifest.json')) && !fs.existsSync(path.join(targetPath, 'package.json'))) {
+                    // 폴더는 있지만 manifest 파일이 없으면 재설치
                     shouldInstall = true;
                     console.log(`[ExtensionManager] 번들 확장 재설치 (manifest 없음): ${entry.name}`);
                 } else {
@@ -300,7 +321,11 @@ class ExtensionManager extends EventEmitter {
             if (entry.name.startsWith('.')) continue; // 숨김 폴더 무시
 
             const extPath = path.join(this.extensionsDir, entry.name);
-            const manifestPath = path.join(extPath, 'package.json');
+            // manifest.json 또는 package.json 지원
+            let manifestPath = path.join(extPath, 'manifest.json');
+            if (!fs.existsSync(manifestPath)) {
+                manifestPath = path.join(extPath, 'package.json');
+            }
 
             if (fs.existsSync(manifestPath)) {
                 try {
@@ -320,7 +345,8 @@ class ExtensionManager extends EventEmitter {
      * 확장 등록
      */
     async registerExtension(extensionPath, manifest, isBuiltin = false) {
-        const id = manifest.name;
+        // manifest.json의 경우 'id' 필드 사용, package.json의 경우 'name' 필드 사용
+        const id = manifest.id || manifest.name;
 
         // 매니페스트 검증
         if (!this.validateManifest(manifest)) {
@@ -350,8 +376,14 @@ class ExtensionManager extends EventEmitter {
      * 매니페스트 검증
      */
     validateManifest(manifest) {
-        const required = ['name', 'version', 'main'];
+        // manifest.json의 경우 'id' 필드 사용, package.json의 경우 'name' 필드 사용
+        const hasId = manifest.id || manifest.name;
+        const required = ['version', 'main'];
         const missing = required.filter(field => !manifest[field]);
+
+        if (!hasId) {
+            missing.push('id 또는 name');
+        }
 
         if (missing.length > 0) {
             console.warn(`[ExtensionManager] 매니페스트 필수 필드 누락: ${missing.join(', ')}`);
@@ -393,12 +425,16 @@ class ExtensionManager extends EventEmitter {
         this.emit('extension:activating', extension);
 
         try {
-            // Extension Host에서 실행
-            if (!this.extensionHost) {
-                throw new Error('Extension Host가 초기화되지 않았습니다');
+            // 1. 메인 프로세스 모듈 로드 (mainEntry가 있는 경우)
+            if (extension.manifest.mainEntry) {
+                await this.loadMainModule(extension);
             }
 
-            const result = await this.extensionHost.loadExtension(extension);
+            // 2. Extension Host에서 렌더러 모듈 실행 (main이 있는 경우)
+            let result = null;
+            if (extension.manifest.main && this.extensionHost) {
+                result = await this.extensionHost.loadExtension(extension);
+            }
 
             extension.state = 'active';
             extension.exports = result;
@@ -431,7 +467,15 @@ class ExtensionManager extends EventEmitter {
         this.emit('extension:deactivating', extension);
 
         try {
-            await this.extensionHost.unloadExtension(extension);
+            // 1. 메인 프로세스 모듈 언로드
+            if (this.mainModules.has(id)) {
+                await this.unloadMainModule(id);
+            }
+
+            // 2. Extension Host 언로드
+            if (this.extensionHost) {
+                await this.extensionHost.unloadExtension(extension);
+            }
 
             extension.state = 'inactive';
             extension.exports = null;
@@ -445,6 +489,92 @@ class ExtensionManager extends EventEmitter {
             this.emit('extension:error', { extension, error: err });
             throw err;
         }
+    }
+
+    /**
+     * 메인 프로세스 모듈 로드
+     * 확장의 mainEntry 필드에 지정된 모듈을 메인 프로세스에서 직접 실행
+     */
+    async loadMainModule(extension) {
+        const id = extension.id || extension.manifest.id || extension.manifest.name;
+        const mainEntryPath = path.join(extension.path, extension.manifest.mainEntry);
+
+        if (!fs.existsSync(mainEntryPath)) {
+            console.warn(`[ExtensionManager] mainEntry 파일 없음: ${mainEntryPath}`);
+            return null;
+        }
+
+        try {
+            // 캐시 제거 후 로드
+            delete require.cache[require.resolve(mainEntryPath)];
+            const mainModule = require(mainEntryPath);
+
+            // 모듈 컨텍스트 생성
+            const context = {
+                extensionId: id,
+                extensionPath: extension.path,
+                ipcMain: this.ipcMain,
+                mainWindow: this.mainWindow,
+                userDataDir: this.userDataDir,
+                emit: (event, data) => this.emit(`extension:${id}:${event}`, data),
+                getMainWindow: () => this.mainWindow,
+                // Electron 모듈 제공 (확장에서 윈도우 생성 등에 사용)
+                electron: require('electron')
+            };
+
+            // 모듈 활성화
+            let instance = null;
+            if (typeof mainModule.activate === 'function') {
+                instance = await mainModule.activate(context);
+            } else if (typeof mainModule === 'function') {
+                instance = await mainModule(context);
+            }
+
+            this.mainModules.set(id, {
+                module: mainModule,
+                instance,
+                context
+            });
+
+            console.log(`[ExtensionManager] 메인 모듈 로드됨: ${id}`);
+            return instance;
+        } catch (err) {
+            console.error(`[ExtensionManager] 메인 모듈 로드 실패: ${id}`, err);
+            throw err;
+        }
+    }
+
+    /**
+     * 메인 프로세스 모듈 언로드
+     */
+    async unloadMainModule(id) {
+        const moduleInfo = this.mainModules.get(id);
+        if (!moduleInfo) return;
+
+        try {
+            // 모듈 비활성화
+            if (moduleInfo.module && typeof moduleInfo.module.deactivate === 'function') {
+                await moduleInfo.module.deactivate(moduleInfo.context);
+            }
+
+            // 인스턴스 정리
+            if (moduleInfo.instance && typeof moduleInfo.instance.dispose === 'function') {
+                await moduleInfo.instance.dispose();
+            }
+
+            this.mainModules.delete(id);
+            console.log(`[ExtensionManager] 메인 모듈 언로드됨: ${id}`);
+        } catch (err) {
+            console.error(`[ExtensionManager] 메인 모듈 언로드 실패: ${id}`, err);
+        }
+    }
+
+    /**
+     * 메인 모듈 인스턴스 가져오기
+     */
+    getMainModuleInstance(id) {
+        const moduleInfo = this.mainModules.get(id);
+        return moduleInfo ? moduleInfo.instance : null;
     }
 
     /**
@@ -604,13 +734,18 @@ class ExtensionManager extends EventEmitter {
     async installExtension(source) {
         // source가 디렉토리 경로인 경우
         if (fs.existsSync(source) && fs.statSync(source).isDirectory()) {
-            const manifestPath = path.join(source, 'package.json');
+            // manifest.json 또는 package.json 지원
+            let manifestPath = path.join(source, 'manifest.json');
             if (!fs.existsSync(manifestPath)) {
-                throw new Error('package.json을 찾을 수 없습니다');
+                manifestPath = path.join(source, 'package.json');
+            }
+            if (!fs.existsSync(manifestPath)) {
+                throw new Error('manifest.json 또는 package.json을 찾을 수 없습니다');
             }
 
             const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-            const targetDir = path.join(this.extensionsDir, manifest.name);
+            const id = manifest.id || manifest.name;
+            const targetDir = path.join(this.extensionsDir, id);
 
             // 복사
             this.copyDir(source, targetDir);
@@ -858,10 +993,13 @@ class ExtensionManager extends EventEmitter {
             // 임시 파일 삭제
             fs.unlinkSync(tempZipPath);
 
-            // 확장 등록
-            const manifestPath = path.join(targetDir, 'package.json');
+            // 확장 등록 - manifest.json 또는 package.json 지원
+            let manifestPath = path.join(targetDir, 'manifest.json');
             if (!fs.existsSync(manifestPath)) {
-                throw new Error('package.json을 찾을 수 없습니다');
+                manifestPath = path.join(targetDir, 'package.json');
+            }
+            if (!fs.existsSync(manifestPath)) {
+                throw new Error('manifest.json 또는 package.json을 찾을 수 없습니다');
             }
 
             const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));

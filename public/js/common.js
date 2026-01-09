@@ -11696,10 +11696,8 @@ function initExtensionsUI() {
         window.extensionAPI.onExtensionStateChange((data) => {
             console.log('확장 상태 변경:', data);
             loadExtensions();
-            // 확장 활성화 시 동적 메뉴 업데이트
+            // 확장 활성화 시 동적 메뉴 업데이트 (일반적인 시스템)
             updateExtensionMenus();
-            // P2P 메신저 확장 설치 상태에 따라 메뉴 업데이트
-            checkP2PExtensionAndShowMenu();
         });
     }
 
@@ -11718,22 +11716,12 @@ function initExtensionsUI() {
 // R2 마켓플레이스 URL
 const MARKETPLACE_URL = 'https://file.docwatch.app/extensions';
 
-// 확장별 추가 메타데이터 (아이콘, 카테고리 등)
+// 확장별 추가 메타데이터 (아이콘, 카테고리 등) - 마켓플레이스 fallback 용
+// 확장의 manifest.json에서 contributes 정보를 가져오는 것이 우선
+// 이 메타데이터는 마켓플레이스에서 아직 설치되지 않은 확장의 기본 정보를 제공
 const extensionMetadata = {
-    'p2p-messenger': {
-        icon: '💬',
-        publisher: 'DocWatch',
-        categories: ['communication', 'collaboration'],
-        contributes: {
-            menus: [
-                { id: 'messenger', title: 'P2P 메신저', icon: 'message-square', section: 'messenger' }
-            ],
-            settings: [
-                { id: 'p2pMessenger.defaultPort', title: '기본 포트', type: 'number', default: 9900 },
-                { id: 'p2pMessenger.defaultNickname', title: '기본 닉네임', type: 'string', default: '' }
-            ]
-        }
-    }
+    // 확장은 자체 manifest.json에서 contributes를 정의
+    // 여기는 마켓플레이스 fallback 용으로만 사용
 };
 
 let marketplaceData = [];
@@ -12155,6 +12143,7 @@ async function updateExtensionMenus() {
     try {
         const extensions = await window.extensionAPI.getExtensions();
         const activeExtensions = extensions.filter(e => e.state === 'active');
+        const activeExtensionIds = new Set(activeExtensions.map(e => e.id));
 
         // 각 활성 확장의 메뉴 기여 확인
         for (const ext of activeExtensions) {
@@ -12173,20 +12162,23 @@ async function updateExtensionMenus() {
                 addExtensionSettingsCategory(extWithContributes);
             }
 
-            // 사이드바 섹션 등록 (확장에서 제공하는 경우)
-            if (ext.id === 'p2p-messenger') {
-                enableMessengerSection(true);
+            // contributes.menus에서 사이드바 메뉴 동적 생성
+            if (contributes.menus && Array.isArray(contributes.menus)) {
+                for (const menu of contributes.menus) {
+                    if (menu.location === 'sidebar') {
+                        createExtensionSidebarMenu(ext.id, menu);
+                    }
+                }
             }
         }
 
         // 비활성화된 확장의 UI 숨기기 및 설정 메뉴 제거
         const inactiveExtensions = extensions.filter(e => e.state !== 'active');
         for (const ext of inactiveExtensions) {
-            if (ext.id === 'p2p-messenger') {
-                enableMessengerSection(false);
-            }
             // 비활성화된 확장의 설정 메뉴 제거
             removeExtensionSettingsCategory(ext.id);
+            // 비활성화된 확장의 사이드바 메뉴 제거
+            removeExtensionSidebarMenu(ext.id);
         }
 
         // 설치된 확장 수 업데이트
@@ -12200,35 +12192,142 @@ async function updateExtensionMenus() {
     }
 }
 
-// 메신저 섹션 활성화/비활성화
-function enableMessengerSection(enable) {
-    const messengerIcon = document.querySelector('[data-section="messenger"]');
-    const messengerSection = document.getElementById('messenger');
+// 확장 사이드바 메뉴 동적 생성 (일반적인 API - 특정 확장 ID 하드코딩 없음)
+function createExtensionSidebarMenu(extId, menuConfig) {
+    const menuBtnId = `ext-menu-${extId}-${menuConfig.id}`;
+    const sectionId = `ext-section-${extId}`;
 
-    if (enable) {
-        // 활성화: 아이콘과 섹션 표시
-        if (messengerIcon) {
-            messengerIcon.style.display = '';
-            messengerIcon.classList.remove('disabled');
+    // 이미 존재하면 스킵
+    if (document.getElementById(menuBtnId)) {
+        return;
+    }
+
+    // 1. 좌측 activity bar에 메뉴 버튼 추가
+    const activityBarTop = document.querySelector('.activity-bar-top');
+    const extensionsBtn = activityBarTop?.querySelector('[data-section="extensions"]');
+
+    if (activityBarTop && extensionsBtn) {
+        const menuBtn = document.createElement('button');
+        menuBtn.className = 'activity-icon';
+        menuBtn.setAttribute('data-section', sectionId);
+        menuBtn.setAttribute('data-extension-id', extId);
+        menuBtn.id = menuBtnId;
+        menuBtn.title = menuConfig.title || extId;
+
+        // 아이콘 설정 (이모지 또는 SVG)
+        if (menuConfig.icon && menuConfig.icon.length <= 2) {
+            // 이모지 아이콘
+            menuBtn.innerHTML = `<span style="font-size: 18px;">${menuConfig.icon}</span>`;
+        } else {
+            // 기본 SVG 아이콘
+            menuBtn.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>`;
         }
-        if (messengerSection) {
-            messengerSection.dataset.extensionEnabled = 'true';
+
+        activityBarTop.insertBefore(menuBtn, extensionsBtn);
+        menuBtn.addEventListener('click', () => {
+            navigateTo(sectionId);
+        });
+    }
+
+    // 2. 메인 콘텐츠에 섹션 생성 (확장이 자체 UI를 로드할 수 있도록)
+    if (!document.getElementById(sectionId)) {
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            const section = document.createElement('section');
+            section.id = sectionId;
+            section.className = 'content-section';
+            section.style.display = 'none';
+            section.setAttribute('data-extension-id', extId);
+            section.setAttribute('data-extension-enabled', 'true');
+
+            // 확장이 자체 UI를 로드할 컨테이너
+            section.innerHTML = `
+                <div class="extension-section-container" data-extension-id="${extId}">
+                    <div class="extension-loading">
+                        <div class="spinner"></div>
+                        <span>확장 UI 로딩 중...</span>
+                    </div>
+                </div>
+            `;
+            mainContent.appendChild(section);
+
+            // 확장에게 UI 로드 요청
+            loadExtensionUI(extId, section);
         }
-    } else {
-        // 비활성화: 아이콘 숨기기
-        if (messengerIcon) {
-            messengerIcon.style.display = 'none';
+    }
+
+    console.log(`[ExtensionMenu] 확장 메뉴 생성: ${extId} - ${menuConfig.title}`);
+}
+
+// 확장 사이드바 메뉴 제거
+function removeExtensionSidebarMenu(extId) {
+    // 해당 확장의 모든 메뉴 버튼 제거
+    const menuBtns = document.querySelectorAll(`[data-extension-id="${extId}"].activity-icon`);
+    menuBtns.forEach(btn => btn.remove());
+
+    // 해당 확장의 섹션 제거
+    const section = document.querySelector(`section[data-extension-id="${extId}"]`);
+    if (section) {
+        // 현재 해당 섹션이 표시 중이면 대시보드로 이동
+        if (section.style.display !== 'none' || section.classList.contains('active')) {
+            navigateTo('dashboard');
         }
-        if (messengerSection) {
-            messengerSection.dataset.extensionEnabled = 'false';
+        section.remove();
+    }
+
+    console.log(`[ExtensionMenu] 확장 메뉴 제거: ${extId}`);
+}
+
+// 확장 UI 로드 (확장이 자체 제공하는 HTML을 로드)
+async function loadExtensionUI(extId, containerSection) {
+    try {
+        // 확장에게 UI 렌더링 요청 (IPC를 통해)
+        if (window.electronAPI && window.electronAPI.invoke) {
+            const uiResult = await window.electronAPI.invoke('extension:renderUI', extId);
+
+            if (uiResult && uiResult.html) {
+                const container = containerSection.querySelector('.extension-section-container');
+                if (container) {
+                    container.innerHTML = uiResult.html;
+
+                    // 확장이 제공하는 초기화 스크립트 실행
+                    if (uiResult.initScript) {
+                        try {
+                            const initFn = new Function(uiResult.initScript);
+                            initFn();
+                        } catch (scriptErr) {
+                            console.error(`[ExtensionUI] 초기화 스크립트 실행 실패: ${extId}`, scriptErr);
+                        }
+                    }
+                }
+            } else {
+                // 기본 UI (확장이 UI를 제공하지 않는 경우)
+                const container = containerSection.querySelector('.extension-section-container');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="extension-no-ui">
+                            <p>이 확장은 별도의 UI를 제공하지 않습니다.</p>
+                        </div>
+                    `;
+                }
+            }
         }
-        // 현재 메신저 섹션이 활성화되어 있으면 대시보드로 전환
-        const activeSection = document.querySelector('.content-section.active');
-        if (activeSection && activeSection.id === 'messenger') {
-            showSection('dashboard');
+    } catch (err) {
+        console.error(`[ExtensionUI] UI 로드 실패: ${extId}`, err);
+        const container = containerSection.querySelector('.extension-section-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="extension-error">
+                    <p>확장 UI 로드 실패: ${err.message}</p>
+                </div>
+            `;
         }
     }
 }
+
+// (enableMessengerSection 함수 제거됨 - 확장 독립성을 위해 일반적인 createExtensionSidebarMenu/removeExtensionSidebarMenu 사용)
 
 // 확장 설정 카테고리 추가
 function addExtensionSettingsCategory(ext) {
@@ -13656,66 +13755,25 @@ document.addEventListener('DOMContentLoaded', () => {
         loadTelegramSettings();
     }, 500);
 
-    // P2P 메신저 확장 설치 상태 확인 및 메뉴 표시
-    checkP2PExtensionAndShowMenu();
+    // 확장 메뉴 업데이트 (일반적인 시스템 - 특정 확장 하드코딩 없음)
+    if (typeof updateExtensionMenus === 'function') {
+        updateExtensionMenus();
+    }
 });
 
-// P2P 메신저 확장 설치 상태 확인 및 메뉴/섹션 표시
-async function checkP2PExtensionAndShowMenu() {
-    try {
-        // window.extensionAPI.getP2PExtensionStatus()로 확장 설치 상태 확인
-        if (window.extensionAPI && window.extensionAPI.getP2PExtensionStatus) {
-            const status = await window.extensionAPI.getP2PExtensionStatus();
-            console.log('[P2P] 확장 상태:', status);
-
-            if (status && status.loaded) {
-                // 확장이 설치되어 있으면 메뉴와 섹션 표시
-                showP2PMessengerFeature();
-            } else {
-                // 확장 미설치 시 숨김 유지
-                hideP2PMessengerFeature();
-            }
-        } else {
-            // Electron 환경이 아니면 숨김
-            hideP2PMessengerFeature();
-        }
-    } catch (err) {
-        console.error('[P2P] 확장 상태 확인 실패:', err);
-        hideP2PMessengerFeature();
-    }
-}
-
-// P2P 메신저 기능 표시
-function showP2PMessengerFeature() {
-    const menuBtn = document.getElementById('messengerMenuBtn');
-    const section = document.getElementById('messenger');
-
-    if (menuBtn) {
-        menuBtn.style.display = '';
-    }
-    if (section) {
-        section.style.display = '';
-        section.setAttribute('data-extension-enabled', 'true');
-    }
-
-    console.log('[P2P] 메신저 기능 활성화됨');
-}
-
-// P2P 메신저 기능 숨김
-function hideP2PMessengerFeature() {
-    const menuBtn = document.getElementById('messengerMenuBtn');
-    const section = document.getElementById('messenger');
-
-    if (menuBtn) {
-        menuBtn.style.display = 'none';
-    }
-    if (section) {
-        section.style.display = 'none';
-        section.setAttribute('data-extension-enabled', 'false');
-    }
-
-    console.log('[P2P] 메신저 기능 비활성화됨 (확장 미설치)');
-}
+// P2P 메신저 관련 하드코딩 함수들 제거됨
+// - checkP2PExtensionAndShowMenu()
+// - createP2PMessengerFeature()
+// - removeP2PMessengerFeature()
+// - getP2PMessengerSectionHTML()
+// - initializeMessengerSection()
+//
+// 확장 독립성을 위해 일반적인 contributes.menus 시스템 사용:
+// - createExtensionSidebarMenu(extId, menuConfig)
+// - removeExtensionSidebarMenu(extId)
+// - loadExtensionUI(extId, containerSection)
+//
+// 확장은 manifest.json의 contributes 필드로 메뉴/UI를 선언적으로 등록
 
 // ========================================
 // 재시작 모달 함수

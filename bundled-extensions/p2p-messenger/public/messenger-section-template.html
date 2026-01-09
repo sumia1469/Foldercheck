@@ -1,0 +1,292 @@
+<div class="messenger-container">
+    <div class="messenger-header">
+        <h2>P2P 메신저</h2>
+        <p class="messenger-subtitle">폐쇄망 환경에서 안전하게 파일과 메시지를 주고받으세요</p>
+    </div>
+
+    <div class="connection-panel">
+        <div class="connection-status" id="connectionStatus">
+            <span class="status-indicator offline"></span>
+            <span class="status-text">오프라인</span>
+        </div>
+
+        <div class="connection-tabs">
+            <button class="tab-btn active" data-tab="host">호스트 시작</button>
+            <button class="tab-btn" data-tab="join">참가</button>
+        </div>
+
+        <div class="tab-content" id="hostTab">
+            <div class="form-group">
+                <label for="hostNickname">닉네임</label>
+                <input type="text" id="hostNickname" placeholder="닉네임 입력" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label for="hostPort">포트</label>
+                <input type="number" id="hostPort" value="9900" min="1024" max="65535">
+            </div>
+            <button class="primary-btn" id="startHostBtn">호스트 시작</button>
+            <button class="danger-btn" id="stopHostBtn" style="display:none;">호스트 중지</button>
+        </div>
+
+        <div class="tab-content" id="joinTab" style="display:none;">
+            <div class="form-group">
+                <label for="joinNickname">닉네임</label>
+                <input type="text" id="joinNickname" placeholder="닉네임 입력" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label for="joinHost">호스트 주소</label>
+                <input type="text" id="joinHost" placeholder="예: 192.168.1.100">
+            </div>
+            <div class="form-group">
+                <label for="joinPort">포트</label>
+                <input type="number" id="joinPort" value="9900" min="1024" max="65535">
+            </div>
+            <button class="primary-btn" id="joinBtn">참가</button>
+            <button class="danger-btn" id="leaveBtn" style="display:none;">나가기</button>
+        </div>
+    </div>
+
+    <div class="users-panel" id="usersPanel" style="display:none;">
+        <h3>접속자 목록</h3>
+        <div class="users-list" id="usersList"></div>
+    </div>
+
+    <div class="chat-action-buttons" id="chatActionButtons" style="display:none;">
+        <button class="primary-btn" id="openChatWindowBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            채팅창 열기
+        </button>
+    </div>
+</div>
+
+<script>
+(function() {
+    // 탭 전환
+    document.querySelectorAll('.connection-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.connection-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const tabName = this.getAttribute('data-tab');
+            document.getElementById('hostTab').style.display = tabName === 'host' ? '' : 'none';
+            document.getElementById('joinTab').style.display = tabName === 'join' ? '' : 'none';
+        });
+    });
+
+    // 호스트 시작 버튼
+    const startHostBtn = document.getElementById('startHostBtn');
+    if (startHostBtn) {
+        startHostBtn.addEventListener('click', async () => {
+            const nickname = document.getElementById('hostNickname').value.trim();
+            const port = parseInt(document.getElementById('hostPort').value);
+            if (!nickname) {
+                alert('닉네임을 입력해주세요.');
+                return;
+            }
+            try {
+                await window.electronAPI.invoke('p2p:startHost', port, nickname);
+            } catch (err) {
+                console.error('[P2P] 호스트 시작 실패:', err);
+                alert('호스트 시작 실패: ' + err.message);
+            }
+        });
+    }
+
+    // 호스트 중지 버튼
+    const stopHostBtn = document.getElementById('stopHostBtn');
+    if (stopHostBtn) {
+        stopHostBtn.addEventListener('click', async () => {
+            try {
+                await window.electronAPI.invoke('p2p:stopHost');
+            } catch (err) {
+                console.error('[P2P] 호스트 중지 실패:', err);
+            }
+        });
+    }
+
+    // 참가 버튼
+    const joinBtn = document.getElementById('joinBtn');
+    if (joinBtn) {
+        joinBtn.addEventListener('click', async () => {
+            const nickname = document.getElementById('joinNickname').value.trim();
+            const host = document.getElementById('joinHost').value.trim();
+            const port = parseInt(document.getElementById('joinPort').value);
+            if (!nickname || !host) {
+                alert('닉네임과 호스트 주소를 입력해주세요.');
+                return;
+            }
+            try {
+                await window.electronAPI.invoke('p2p:connect', host, port, nickname);
+            } catch (err) {
+                console.error('[P2P] 참가 실패:', err);
+                alert('참가 실패: ' + err.message);
+            }
+        });
+    }
+
+    // 나가기 버튼
+    const leaveBtn = document.getElementById('leaveBtn');
+    if (leaveBtn) {
+        leaveBtn.addEventListener('click', async () => {
+            try {
+                await window.electronAPI.invoke('p2p:disconnect');
+            } catch (err) {
+                console.error('[P2P] 나가기 실패:', err);
+            }
+        });
+    }
+
+    // 채팅창 열기 버튼
+    const openChatWindowBtn = document.getElementById('openChatWindowBtn');
+    if (openChatWindowBtn) {
+        openChatWindowBtn.addEventListener('click', async () => {
+            try {
+                await window.electronAPI.invoke('p2p:openChatWindow');
+            } catch (err) {
+                console.error('[P2P] 채팅창 열기 실패:', err);
+            }
+        });
+    }
+
+    console.log('[P2P Messenger] 섹션 UI 초기화 완료');
+})();
+</script>
+
+<style>
+.messenger-container {
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.messenger-header h2 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+}
+
+.messenger-subtitle {
+    color: var(--text-muted);
+    margin: 0 0 24px 0;
+}
+
+.connection-panel {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-indicator.offline {
+    background: var(--danger);
+}
+
+.status-indicator.online {
+    background: var(--success);
+}
+
+.connection-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.primary-btn, .danger-btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.primary-btn {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.danger-btn {
+    background: var(--danger);
+    color: white;
+}
+
+.users-panel {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.users-panel h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+}
+
+.chat-action-buttons {
+    display: flex;
+    justify-content: center;
+}
+
+.chat-action-buttons .primary-btn {
+    width: auto;
+    padding: 12px 24px;
+}
+</style>

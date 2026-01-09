@@ -2,7 +2,7 @@
   "name": "p2p-messenger",
   "displayName": "P2P 메신저",
   "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "docwatch",
   "license": "pro",
   "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"#667eea\" stroke=\"none\"/><rect x=\"5\" y=\"6\" width=\"8\" height=\"6\" rx=\"1\" fill=\"white\"/><polygon points=\"7,12 7,15 10,12\" fill=\"white\"/><rect x=\"11\" y=\"9\" width=\"8\" height=\"6\" rx=\"1\" fill=\"white\" opacity=\"0.9\"/><polygon points=\"17,15 17,18 14,15\" fill=\"white\" opacity=\"0.9\"/></svg>",
@@ -13,20 +13,22 @@
   },
   "activationEvents": ["*"],
   "main": "extension.js",
+  "mainEntry": "main-entry.js",
   "contributes": {
-    "activityBar": [
+    "menus": [
       {
-        "id": "p2p-messenger",
-        "title": "P2P 메신저",
-        "icon": "$(comment-discussion)",
-        "section": "messenger"
+        "id": "messenger-menu",
+        "title": "메신저",
+        "icon": "💬",
+        "location": "sidebar",
+        "order": 100
       }
     ],
     "sections": [
       {
-        "id": "messenger",
-        "title": "메신저",
-        "icon": "$(comment-discussion)"
+        "id": "messenger-section",
+        "menuId": "messenger-menu",
+        "template": "messenger-section-template"
       }
     ],
     "commands": [

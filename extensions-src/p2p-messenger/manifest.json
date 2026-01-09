@@ -25,5 +25,38 @@
     "messenger-db.js",
     "preload-chat.js",
     "public/**/*"
-  ]
+  ],
+  "contributes": {
+    "menus": [
+      {
+        "id": "messenger-menu",
+        "title": "메신저",
+        "icon": "💬",
+        "location": "sidebar",
+        "order": 100
+      }
+    ],
+    "sections": [
+      {
+        "id": "messenger-section",
+        "menuId": "messenger-menu",
+        "template": "messenger-section-template",
+        "styles": "public/css/messenger.css"
+      }
+    ],
+    "commands": [
+      {
+        "id": "p2p-messenger.openChat",
+        "title": "채팅 열기"
+      },
+      {
+        "id": "p2p-messenger.startHost",
+        "title": "호스트 시작"
+      },
+      {
+        "id": "p2p-messenger.stopHost",
+        "title": "호스트 중지"
+      }
+    ]
+  }
 }

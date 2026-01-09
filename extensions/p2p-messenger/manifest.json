@@ -1,0 +1,112 @@
+{
+  "id": "p2p-messenger",
+  "name": "P2P 메신저",
+  "version": "1.0.3",
+  "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
+  "author": "DocWatch Team",
+  "main": "p2p-messenger.js",
+  "mainEntry": "main-entry.js",
+  "preload": "preload-chat.js",
+  "ui": {
+    "chatWindow": "public/chat-window.html"
+  },
+  "activationEvents": ["*"],
+  "permissions": [
+    "network",
+    "filesystem",
+    "notifications"
+  ],
+  "minAppVersion": "1.0.0",
+  "dependencies": {},
+  "files": [
+    "p2p-messenger.js",
+    "main-entry.js",
+    "messenger-db.js",
+    "preload-chat.js",
+    "public/**/*"
+  ],
+  "contributes": {
+    "menus": [
+      {
+        "id": "messenger-menu",
+        "title": "메신저",
+        "icon": "chat",
+        "location": "sidebar",
+        "order": 100
+      }
+    ],
+    "sections": [
+      {
+        "id": "messenger-section",
+        "menuId": "messenger-menu",
+        "template": "messenger-section-template"
+      }
+    ],
+    "commands": [
+      {
+        "id": "p2p-messenger.startHost",
+        "title": "호스트 시작",
+        "icon": "$(server)"
+      },
+      {
+        "id": "p2p-messenger.stopHost",
+        "title": "호스트 중지",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "id": "p2p-messenger.connect",
+        "title": "서버 연결",
+        "icon": "$(plug)"
+      },
+      {
+        "id": "p2p-messenger.disconnect",
+        "title": "연결 해제",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "id": "p2p-messenger.sendMessage",
+        "title": "메시지 전송",
+        "icon": "$(send)"
+      },
+      {
+        "id": "p2p-messenger.sendFile",
+        "title": "파일 전송",
+        "icon": "$(file)"
+      },
+      {
+        "id": "p2p-messenger.openDownloads",
+        "title": "다운로드 폴더 열기",
+        "icon": "$(folder-opened)"
+      }
+    ],
+    "statusBar": [
+      {
+        "id": "p2p-status",
+        "alignment": "right",
+        "priority": 100,
+        "text": "P2P: 오프라인",
+        "tooltip": "P2P 메신저 상태"
+      }
+    ],
+    "configuration": {
+      "title": "P2P 메신저 설정",
+      "properties": {
+        "p2p-messenger.defaultPort": {
+          "type": "number",
+          "default": 9900,
+          "description": "기본 호스트 포트"
+        },
+        "p2p-messenger.nickname": {
+          "type": "string",
+          "default": "User",
+          "description": "기본 닉네임"
+        },
+        "p2p-messenger.autoReconnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "연결 끊김 시 자동 재연결"
+        }
+      }
+    }
+  }
+}

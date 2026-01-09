@@ -6,10 +6,10 @@
       "version": "1.0.3",
       "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
       "filename": "p2p-messenger-v1.0.3.zip",
-      "size": 49410,
-      "sha256": "79a3356450f2e0267a1dd40142163a429adf1a2c647322fce76aa549ae6b5a0b",
+      "size": 49922,
+      "sha256": "9514344788bc28873785001e7d85a25c3d5a7298684bc3efcb077e82f6a2d14b",
       "minAppVersion": "1.0.0"
     }
   ],
-  "lastUpdated": "2026-01-09T09:25:10.957Z"
+  "lastUpdated": "2026-01-09T09:29:30.151Z"
 }

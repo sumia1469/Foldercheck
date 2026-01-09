@@ -12315,7 +12315,22 @@ async function loadExtensionUI(extId, containerSection) {
             if (uiResult && uiResult.html) {
                 const container = containerSection.querySelector('.extension-section-container');
                 if (container) {
-                    container.innerHTML = uiResult.html;
+                    // HTML에서 script 태그 추출
+                    const scriptMatch = uiResult.html.match(/<script>([\s\S]*?)<\/script>/i);
+                    const htmlWithoutScript = uiResult.html.replace(/<script>[\s\S]*?<\/script>/gi, '');
+
+                    container.innerHTML = htmlWithoutScript;
+
+                    // 스크립트 실행
+                    if (scriptMatch && scriptMatch[1]) {
+                        try {
+                            const scriptFn = new Function(scriptMatch[1]);
+                            scriptFn();
+                            console.log(`[ExtensionUI] 스크립트 실행 완료: ${extId}`);
+                        } catch (scriptErr) {
+                            console.error(`[ExtensionUI] 스크립트 실행 실패: ${extId}`, scriptErr);
+                        }
+                    }
 
                     // 확장이 제공하는 초기화 스크립트 실행
                     if (uiResult.initScript) {

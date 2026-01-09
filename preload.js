@@ -33,7 +33,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     // Electron 환경 확인
-    isElectron: true
+    isElectron: true,
+
+    // 일반 IPC invoke (확장 UI 렌더링 등)
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
 });
 
 // Extension API

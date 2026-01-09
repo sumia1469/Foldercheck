@@ -1389,15 +1389,26 @@ ipcMain.handle('extensions:setSettings', (event, id, settings) => {
 
 // 확장 UI 렌더링 요청 - 확장이 자체 UI HTML을 제공
 ipcMain.handle('extension:renderUI', async (event, extId) => {
-    if (!extensionManager) return null;
+    console.log(`[Extension:renderUI] 요청: ${extId}`);
+    if (!extensionManager) {
+        console.log('[Extension:renderUI] extensionManager가 없음');
+        return null;
+    }
 
     const extension = extensionManager.registry.get(extId);
-    if (!extension) return null;
+    if (!extension) {
+        console.log(`[Extension:renderUI] 확장을 찾을 수 없음: ${extId}`);
+        return null;
+    }
+
+    console.log(`[Extension:renderUI] 확장 경로: ${extension.path}`);
 
     try {
         // 확장의 manifest에서 UI 정보 확인
         const manifest = extension.manifest;
         const contributes = manifest.contributes || {};
+
+        console.log(`[Extension:renderUI] sections:`, JSON.stringify(contributes.sections));
 
         // contributes.sections에서 UI 템플릿 정보 가져오기
         if (contributes.sections && contributes.sections.length > 0) {
@@ -1407,8 +1418,11 @@ ipcMain.handle('extension:renderUI', async (event, extId) => {
             if (section.template) {
                 // 확장 디렉토리에서 HTML 파일 로드
                 const templatePath = path.join(extension.path, 'public', `${section.template}.html`);
+                console.log(`[Extension:renderUI] 템플릿 경로: ${templatePath}`);
+                console.log(`[Extension:renderUI] 파일 존재: ${fs.existsSync(templatePath)}`);
                 if (fs.existsSync(templatePath)) {
                     const html = fs.readFileSync(templatePath, 'utf8');
+                    console.log(`[Extension:renderUI] HTML 로드 성공, 길이: ${html.length}`);
                     return { html, initScript: null };
                 }
             }

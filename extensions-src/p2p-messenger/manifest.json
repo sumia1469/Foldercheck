@@ -28,7 +28,7 @@
       {
         "id": "messenger-menu",
         "title": "메신저",
-        "icon": "💬",
+        "icon": "chat",
         "location": "sidebar",
         "order": 100
       }

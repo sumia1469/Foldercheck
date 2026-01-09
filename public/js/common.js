@@ -2242,7 +2242,7 @@ async function installExtensionFromSidebar(extId) {
             btn.textContent = '설치됨';
             btn.classList.remove('installing');
             btn.classList.add('installed');
-            showToast(`확장이 설치되었습니다. 재시작 후 사용 가능합니다.`, 'success');
+            showToast(`확장이 설치되었습니다.`, 'success');
 
             // 마켓플레이스 캐시 무효화
             marketplaceCache = null;
@@ -2250,6 +2250,9 @@ async function installExtensionFromSidebar(extId) {
             // 사이드바 목록 새로고침
             loadSidebarExtensions();
             loadRecommendedExtensions();
+
+            // 확장 메뉴 즉시 업데이트
+            updateExtensionMenus();
         } else {
             throw new Error('확장 설치 API를 사용할 수 없습니다');
         }

@@ -1005,6 +1005,15 @@ class ExtensionManager extends EventEmitter {
             const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
             await this.registerExtension(targetDir, manifest, false);
 
+            // 설치 후 자동 활성화
+            try {
+                await this.activateExtension(extensionId);
+                console.log(`[ExtensionManager] 확장 자동 활성화 완료: ${extensionId}`);
+            } catch (activateErr) {
+                console.warn(`[ExtensionManager] 확장 자동 활성화 실패: ${extensionId}`, activateErr.message);
+                // 활성화 실패해도 설치는 성공으로 처리
+            }
+
             // 캐시 무효화
             this.marketplaceCache = null;
 

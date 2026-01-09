@@ -12314,15 +12314,19 @@ async function loadExtensionUI(extId, containerSection) {
 
             if (uiResult && uiResult.html) {
                 const container = containerSection.querySelector('.extension-section-container');
+                console.log(`[loadExtensionUI] container 찾음:`, !!container);
                 if (container) {
                     // HTML에서 script 태그 추출
                     const scriptMatch = uiResult.html.match(/<script>([\s\S]*?)<\/script>/i);
+                    console.log(`[loadExtensionUI] scriptMatch 결과:`, !!scriptMatch, scriptMatch ? scriptMatch[1]?.substring(0, 100) : 'null');
                     const htmlWithoutScript = uiResult.html.replace(/<script>[\s\S]*?<\/script>/gi, '');
 
                     container.innerHTML = htmlWithoutScript;
+                    console.log(`[loadExtensionUI] HTML 삽입 완료`);
 
                     // 스크립트 실행
                     if (scriptMatch && scriptMatch[1]) {
+                        console.log(`[loadExtensionUI] 스크립트 실행 시도...`);
                         try {
                             const scriptFn = new Function(scriptMatch[1]);
                             scriptFn();
@@ -12330,6 +12334,8 @@ async function loadExtensionUI(extId, containerSection) {
                         } catch (scriptErr) {
                             console.error(`[ExtensionUI] 스크립트 실행 실패: ${extId}`, scriptErr);
                         }
+                    } else {
+                        console.log(`[loadExtensionUI] 스크립트 태그 없음`);
                     }
 
                     // 확장이 제공하는 초기화 스크립트 실행

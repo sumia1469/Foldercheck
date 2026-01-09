@@ -63,7 +63,7 @@ function deactivate() {
 function setupEventListeners() {
     if (!p2pMessenger) return;
 
-    p2pMessenger.on('statusChanged', (status) => {
+    p2pMessenger.on('status', (status) => {
         broadcast('p2p:status', status);
     });
 

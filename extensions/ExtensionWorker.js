@@ -299,7 +299,7 @@ function createSafeRequire(basePath, perms) {
         allowedBuiltins.push('fs');
     }
     if (perms.includes('network')) {
-        allowedBuiltins.push('http', 'https');
+        allowedBuiltins.push('http', 'https', 'net', 'dgram', 'dns');
     }
     if (perms.includes('crypto')) {
         allowedBuiltins.push('crypto');

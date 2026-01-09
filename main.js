@@ -1205,7 +1205,10 @@ async function initializeExtensions() {
         // Extension Manager 생성
         extensionManager = new ExtensionManager({
             extensionsDir: path.join(getUserDataDir(), 'extensions'),
-            bundledDir: path.join(__dirname, 'bundled-extensions')
+            bundledDir: path.join(__dirname, 'bundled-extensions'),
+            mainWindow: mainWindow,
+            ipcMain: ipcMain,
+            userDataDir: getUserDataDir()
         });
         extensionManager.extensionHost = extensionHost;
 

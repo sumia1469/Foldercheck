@@ -20,11 +20,13 @@ function activate(context) {
     mainWindow = context.mainWindow;
     extensionPath = context.extensionPath;
 
+    console.log('[P2P Extension] 활성화 시작, mainWindow:', !!mainWindow);
+
     // P2PMessenger 인스턴스 생성
     const P2PMessenger = require(path.join(extensionPath, 'p2p-messenger.js'));
     p2pMessenger = new P2PMessenger();
 
-    console.log('[P2P Extension] 활성화됨');
+    console.log('[P2P Extension] 활성화됨, p2pMessenger:', !!p2pMessenger);
 
     // 이벤트 리스너 설정
     setupEventListeners();
@@ -63,7 +65,10 @@ function deactivate() {
 function setupEventListeners() {
     if (!p2pMessenger) return;
 
+    console.log('[P2P Extension] 이벤트 리스너 설정 시작');
+
     p2pMessenger.on('status', (status) => {
+        console.log('[P2P Extension] status 이벤트 발생:', status);
         broadcast('p2p:status', status);
     });
 
@@ -92,8 +97,12 @@ function setupEventListeners() {
  * 메인 윈도우로 이벤트 브로드캐스트
  */
 function broadcast(channel, data) {
+    console.log('[P2P Extension] broadcast 호출:', channel, 'mainWindow:', !!mainWindow);
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send(channel, data);
+        console.log('[P2P Extension] 이벤트 전송 완료:', channel);
+    } else {
+        console.warn('[P2P Extension] mainWindow 없음, 이벤트 전송 실패:', channel);
     }
 }
 

@@ -1,10 +1,11 @@
 {
   "id": "p2p-messenger",
   "name": "P2P 메신저",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
   "author": "DocWatch Team",
   "main": "p2p-messenger.js",
+  "mainEntry": "main-entry.js",
   "preload": "preload-chat.js",
   "ui": {
     "chatWindow": "public/chat-window.html"
@@ -19,6 +20,7 @@
   "dependencies": {},
   "files": [
     "p2p-messenger.js",
+    "main-entry.js",
     "messenger-db.js",
     "preload-chat.js",
     "public/**/*"

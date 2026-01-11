@@ -60,10 +60,21 @@ async function loadMyProfile() {
             if (myProfile) {
                 state.myContactId = myProfile.id;
                 state.nickname = myProfile.nickname;
+            } else {
+                // 프로필이 없으면 기본 프로필 생성
+                const defaultId = `user_${Date.now()}`;
+                const defaultNickname = '사용자';
+                await saveMyProfile({ id: defaultId, nickname: defaultNickname });
+                console.log('기본 프로필 생성:', defaultId, defaultNickname);
             }
         }
     } catch (err) {
         console.error('프로필 로드 실패:', err);
+        // 에러 시에도 기본값 설정
+        if (!state.myContactId) {
+            state.myContactId = `user_${Date.now()}`;
+            state.nickname = '사용자';
+        }
     }
 }
 
@@ -235,29 +246,23 @@ async function sendMessage() {
     const isDirectChat = room && room.type === 'direct';
 
     try {
+        // 메시지 데이터 생성 (공통)
+        const messageData = {
+            id: Date.now(),
+            type: 'chat',
+            nickname: state.nickname || '나',
+            content: content,
+            timestamp: Date.now(),
+            isOwn: true  // 내 메시지 표시
+        };
+
         // P2P 연결 상태에서 그룹 채팅인 경우 P2P로 전송
         if (state.mode !== 'offline' && !isDirectChat) {
-            // 게스트 모드일 때 내 메시지를 바로 화면에 표시
-            // (호스트는 emit으로 처리되므로 게스트만 직접 표시)
-            if (state.mode === 'guest') {
-                const messageData = {
-                    id: Date.now(),
-                    type: 'chat',
-                    nickname: state.nickname || '나',
-                    content: content,
-                    timestamp: Date.now()
-                };
-                addMessage(messageData);
-            }
+            // 내 메시지를 화면에 표시 (호스트/게스트 모두)
+            addMessage(messageData);
             await window.p2pAPI.sendMessage(content);
         } else {
             // 오프라인이거나 1:1 채팅인 경우 로컬에만 저장하고 화면에 표시
-            const messageData = {
-                id: Date.now(),
-                nickname: state.nickname || '나',
-                content: content,
-                timestamp: Date.now()
-            };
             addMessage(messageData);
         }
 
@@ -289,31 +294,79 @@ async function attachFile() {
     }
 
     try {
-        const result = await window.p2pAPI.selectFile();
-        if (result.success && result.filePath) {
-            // 호스트 모드인 경우 클라우드에 업로드
-            if (state.mode === 'host') {
-                try {
-                    const cloudResult = await window.p2pAPI.uploadToCloud(result.filePath);
-                    console.log('클라우드 업로드 완료:', cloudResult);
-
-                    // P2P로 파일 정보 전송 (클라우드 URL 포함)
-                    await window.p2pAPI.sendFile(result.filePath, {
-                        cloudFileId: cloudResult.fileId,
-                        cloudUrl: cloudResult.downloadUrl
-                    });
-                } catch (cloudErr) {
-                    console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
-                    await window.p2pAPI.sendFile(result.filePath);
-                }
+        // selectFile은 파일 정보 객체 또는 파일 경로 문자열을 반환
+        const fileResult = await window.p2pAPI.selectFile();
+        if (fileResult) {
+            // 파일 정보 추출 (객체 또는 문자열 형태 처리)
+            let filePath, filename, fileSize;
+            if (typeof fileResult === 'object') {
+                filePath = fileResult.path || fileResult.filePath;
+                filename = fileResult.name || fileResult.filename || filePath.split(/[/\\]/).pop();
+                fileSize = fileResult.size || 0;
             } else {
-                // 게스트 모드: P2P로만 전송
-                await window.p2pAPI.sendFile(result.filePath);
+                filePath = fileResult;
+                filename = filePath.split(/[/\\]/).pop();
+                fileSize = 0; // 크기를 알 수 없는 경우
+            }
+
+            // 고유 전송 ID 생성
+            const transferId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // 채팅방에 즉시 업로드 상태 표시
+            addFileTransferMessage({
+                id: transferId,
+                filename: filename,
+                size: fileSize,
+                from: state.nickname,
+                direction: 'upload',
+                progress: 0
+            });
+
+            try {
+                // 호스트 모드인 경우 클라우드에 업로드
+                if (state.mode === 'host') {
+                    try {
+                        // 진행률 업데이트 (업로드 시작)
+                        updateFileProgress(transferId, 10);
+
+                        const cloudResult = await window.p2pAPI.uploadToCloud(filePath);
+                        console.log('클라우드 업로드 완료:', cloudResult);
+
+                        // 진행률 업데이트 (클라우드 업로드 완료)
+                        updateFileProgress(transferId, 50);
+
+                        // P2P로 파일 정보 전송 (클라우드 URL 포함)
+                        await window.p2pAPI.sendFile(filePath, {
+                            cloudFileId: cloudResult.fileId,
+                            cloudUrl: cloudResult.downloadUrl
+                        });
+
+                        // 업로드 완료 상태로 변경
+                        updateFileProgress(transferId, 100);
+                        updateFileStatus(transferId, 'completed', '업로드 완료');
+                    } catch (cloudErr) {
+                        console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
+                        updateFileProgress(transferId, 30);
+                        await window.p2pAPI.sendFile(filePath);
+                        updateFileProgress(transferId, 100);
+                        updateFileStatus(transferId, 'completed', '전송 완료');
+                    }
+                } else {
+                    // 게스트 모드: P2P로만 전송
+                    updateFileProgress(transferId, 30);
+                    await window.p2pAPI.sendFile(filePath);
+                    updateFileProgress(transferId, 100);
+                    updateFileStatus(transferId, 'completed', '전송 완료');
+                }
+            } catch (sendErr) {
+                console.error('파일 전송 실패:', sendErr);
+                updateFileStatus(transferId, 'error', '전송 실패');
+                alert('파일 전송 실패: ' + sendErr.message);
             }
         }
     } catch (err) {
         console.error('파일 첨부 실패:', err);
-        alert('파일 전송 실패: ' + err.message);
+        alert('파일 선택 실패: ' + err.message);
     }
 }
 
@@ -335,9 +388,9 @@ function initP2PListeners() {
     // 메시지 수신
     window.p2pAPI.onMessage((data) => {
         console.log('메시지 수신:', data);
-        // 게스트 모드에서 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시
-        if (state.mode === 'guest' && data.nickname === state.nickname) {
-            console.log('게스트 모드: 자신의 메시지 에코 무시');
+        // 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시 (호스트/게스트 모두)
+        if (data.nickname === state.nickname) {
+            console.log('자신의 메시지 에코 무시 (모드:', state.mode, ')');
             return;
         }
         addMessage(data);
@@ -392,6 +445,31 @@ function initP2PListeners() {
         state.mode = 'offline';
         updateConnectionUI(false);
         addSystemMessage('연결이 끊어졌습니다.');
+    });
+
+    // 파일 전송 시작
+    window.p2pAPI.onFileStart((data) => {
+        console.log('파일 전송 시작:', data);
+        // 전송 중 메시지 추가 (진행률 표시용)
+        if (data.transferId) {
+            const direction = data.direction || (data.from === state.nickname ? 'upload' : 'download');
+            addFileTransferMessage({
+                id: data.transferId,
+                filename: data.filename,
+                size: data.size,
+                from: data.from || state.nickname,
+                direction: direction,
+                progress: 0
+            });
+        }
+    });
+
+    // 파일 전송 진행률
+    window.p2pAPI.onFileProgress((data) => {
+        console.log('파일 전송 진행률:', data);
+        if (data.transferId && data.progress !== undefined) {
+            updateFileProgress(data.transferId, data.progress);
+        }
     });
 }
 
@@ -556,7 +634,7 @@ function showEmptyRoomMessage() {
     elements.chatView.classList.add('active');
 
     // 메시지 영역에 안내 메시지 표시
-    elements.messageList.innerHTML = `
+    elements.messagesContainer.innerHTML = `
         <div class="empty-room-notice" style="
             display: flex;
             flex-direction: column;
@@ -586,11 +664,15 @@ function showEmptyRoomMessage() {
 
 // 메시지 추가
 async function addMessage(data) {
-    const isOwn = data.nickname === state.nickname;
+    // isOwn 판단: 닉네임 비교 또는 '나' 표시인 경우
+    const myNickname = state.nickname || '사용자';
+    const senderNickname = data.nickname || '나';
+    const isOwn = senderNickname === myNickname || senderNickname === '나' || data.isOwn === true;
+
     const message = {
         id: data.id || Date.now(),
         type: 'text',
-        sender: data.nickname,
+        sender: senderNickname,
         content: data.content,
         timestamp: data.timestamp || Date.now(),
         isOwn
@@ -605,8 +687,8 @@ async function addMessage(data) {
         try {
             await window.messengerDB.saveMessage({
                 roomId: state.currentRoom,
-                senderId: isOwn ? (state.myContactId || 'self') : `remote_${data.nickname}`,
-                senderNickname: data.nickname || state.nickname,
+                senderId: isOwn ? (state.myContactId || 'self') : `remote_${senderNickname}`,
+                senderNickname: senderNickname,
                 type: 'text',
                 content: data.content
             });
@@ -617,7 +699,7 @@ async function addMessage(data) {
 
     // 알림 (자신의 메시지가 아닌 경우)
     if (!isOwn && document.hidden) {
-        showNotification(data.nickname, data.content);
+        showNotification(senderNickname, data.content);
     }
 }
 
@@ -689,6 +771,91 @@ async function addFileMessage(data) {
     }
 }
 
+// 파일 전송 중 메시지 추가 (진행률 표시용)
+function addFileTransferMessage(data) {
+    const isOwn = data.from === state.nickname || data.direction === 'upload';
+
+    // 이미 같은 ID의 메시지가 있으면 무시 (중복 방지)
+    const existingMsg = state.messages.find(msg => msg.id === data.id);
+    if (existingMsg) {
+        return;
+    }
+
+    const message = {
+        id: data.id,
+        type: 'file',
+        sender: data.from || state.nickname,
+        filename: data.filename,
+        fileSize: data.size,
+        filePath: null,
+        cloudFileId: '',
+        cloudUrl: '',
+        timestamp: Date.now(),
+        isOwn,
+        transferring: true,
+        progress: data.progress || 0,
+        direction: data.direction
+    };
+
+    state.messages.push(message);
+    renderTransferringFile(message);
+    scrollToBottom();
+}
+
+// 전송 중인 파일 렌더링 (진행률 바 포함)
+function renderTransferringFile(msg) {
+    const el = document.createElement('div');
+    el.className = `message ${msg.isOwn ? 'own' : ''}`;
+    el.setAttribute('data-transfer-id', msg.id);
+
+    const time = new Date(msg.timestamp).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    const initial = msg.sender ? msg.sender.charAt(0).toUpperCase() : '?';
+    const fileExt = getFileExtension(msg.filename);
+    const fileType = getFileTypeCategory(fileExt);
+    const fileIcon = getFileTypeIcon(fileType);
+    const statusText = msg.direction === 'upload' ? '업로드 중...' : '다운로드 중...';
+    const statusClass = msg.direction === 'upload' ? 'uploading' : 'downloading';
+
+    el.innerHTML = `
+        <div class="message-avatar">${initial}</div>
+        <div class="message-content">
+            <div class="message-sender">${escapeHtml(msg.sender)}</div>
+            <div class="message-file" data-msg-id="${msg.id}">
+                <div class="file-header">
+                    <div class="file-icon ${fileType}">
+                        ${fileIcon}
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</div>
+                        <div class="file-meta">
+                            <span class="file-type">${fileExt || 'FILE'}</span>
+                            <span class="file-size">${formatFileSize(msg.fileSize)}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="file-status ${statusClass}">
+                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                    </svg>
+                    <span>${statusText}</span>
+                </div>
+                <div class="file-progress" style="display: block;">
+                    <div class="file-progress-bar" style="width: ${msg.progress}%;"></div>
+                </div>
+            </div>
+            <div class="message-meta">
+                <span class="message-time">${time}</span>
+            </div>
+        </div>
+    `;
+
+    elements.messagesContainer.appendChild(el);
+}
+
 // 메시지 렌더링
 function renderMessage(msg) {
     const el = document.createElement('div');
@@ -710,30 +877,80 @@ function renderMessage(msg) {
             filename: msg.filename
         }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
+        // 파일 확장자 및 타입 결정
+        const fileExt = getFileExtension(msg.filename);
+        const fileType = getFileTypeCategory(fileExt);
+        const fileIcon = getFileTypeIcon(fileType);
+
+        // 상태 결정 (업로드/다운로드 완료 여부)
+        const isUploaded = msg.isOwn;
+        const isDownloaded = !!msg.filePath;
+        const hasCloudUrl = !!(msg.cloudUrl || msg.cloudFileId);
+
+        // 상태 텍스트 및 아이콘
+        let statusHtml = '';
+        if (isUploaded && hasCloudUrl) {
+            statusHtml = `
+                <div class="file-status completed">
+                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span>업로드 완료</span>
+                </div>
+            `;
+        } else if (!isUploaded && isDownloaded) {
+            statusHtml = `
+                <div class="file-status completed">
+                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span>다운로드 완료</span>
+                </div>
+            `;
+        } else if (!isUploaded && hasCloudUrl) {
+            statusHtml = `
+                <div class="file-status downloading">
+                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                    <span>다운로드 가능</span>
+                </div>
+            `;
+        }
+
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="message-file" data-file='${fileData}'>
-                    <div class="file-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
-                        </svg>
+                <div class="message-file" data-file='${fileData}' data-msg-id="${msg.id}">
+                    <div class="file-header">
+                        <div class="file-icon ${fileType}">
+                            ${fileIcon}
+                        </div>
+                        <div class="file-info">
+                            <div class="file-name" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</div>
+                            <div class="file-meta">
+                                <span class="file-type">${fileExt || 'FILE'}</span>
+                                <span class="file-size">${formatFileSize(msg.fileSize)}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="file-info">
-                        <div class="file-name">${escapeHtml(msg.filename)}</div>
-                        <div class="file-size">${formatFileSize(msg.fileSize)}</div>
+                    ${statusHtml}
+                    <div class="file-progress" style="display: none;">
+                        <div class="file-progress-bar" style="width: 0%;"></div>
                     </div>
                     <div class="file-actions">
-                        ${msg.filePath ? `<button class="file-action-btn" onclick="openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                             </svg>
+                            <span>열기</span>
                         </button>` : ''}
-                        ${msg.cloudUrl || msg.cloudFileId ? `<button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        ${hasCloudUrl ? `<button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                             </svg>
+                            <span>다운로드</span>
                         </button>` : ''}
                     </div>
                 </div>
@@ -750,11 +967,14 @@ function renderMessage(msg) {
             <span class="message-unread-count" title="${unreadCount}명이 안 읽음">${unreadCount}</span>
         ` : '';
 
+        // 이모티콘 전용 메시지 감지 및 클래스 추가
+        const bubbleClass = getEmojiBubbleClass(msg.content);
+
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="message-bubble">${escapeHtml(msg.content)}</div>
+                <div class="message-bubble ${bubbleClass}">${escapeHtml(msg.content)}</div>
                 <div class="message-meta">
                     ${unreadBadge}
                     <span class="message-time">${time}</span>
@@ -764,6 +984,127 @@ function renderMessage(msg) {
     }
 
     elements.messagesContainer.appendChild(el);
+}
+
+// 이모티콘 전용 메시지인지 확인하고 적절한 클래스 반환
+function getEmojiBubbleClass(content) {
+    if (!content) return '';
+
+    // 이모티콘 패턴 (유니코드 이모지 범위)
+    const emojiRegex = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F1FF}\u{1F200}-\u{1F2FF}\u{FE00}-\u{FEFF}\u{200D}\u{20E3}\s]+$/u;
+
+    // 공백 제거 후 이모티콘만 있는지 확인
+    const trimmed = content.trim();
+    if (!emojiRegex.test(trimmed)) {
+        return ''; // 텍스트가 포함된 경우 일반 버블
+    }
+
+    // 이모티콘 개수 세기 (복합 이모지 고려)
+    const emojiMatches = [...trimmed.matchAll(/\p{Extended_Pictographic}/gu)];
+    const emojiCount = emojiMatches.length;
+
+    if (emojiCount === 1) {
+        return 'emoji-only'; // 단일 이모티콘 - 가장 큰 사이즈
+    } else if (emojiCount <= 3) {
+        return 'emoji-few'; // 2-3개 이모티콘 - 중간 사이즈
+    }
+
+    return ''; // 4개 이상은 일반 사이즈
+}
+
+// 파일 확장자 추출
+function getFileExtension(filename) {
+    if (!filename) return '';
+    const parts = filename.split('.');
+    if (parts.length < 2) return '';
+    return parts[parts.length - 1].toLowerCase();
+}
+
+// 파일 타입 카테고리 결정
+function getFileTypeCategory(ext) {
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'];
+    const videoExts = ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'];
+    const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'];
+    const documentExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'hwp'];
+    const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'bz2'];
+
+    if (imageExts.includes(ext)) return 'image';
+    if (videoExts.includes(ext)) return 'video';
+    if (audioExts.includes(ext)) return 'audio';
+    if (documentExts.includes(ext)) return 'document';
+    if (archiveExts.includes(ext)) return 'archive';
+    return '';
+}
+
+// 파일 타입별 아이콘 SVG 반환
+function getFileTypeIcon(fileType) {
+    const icons = {
+        image: `<svg viewBox="0 0 24 24" fill="white">
+            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        </svg>`,
+        video: `<svg viewBox="0 0 24 24" fill="white">
+            <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
+        </svg>`,
+        audio: `<svg viewBox="0 0 24 24" fill="white">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>`,
+        document: `<svg viewBox="0 0 24 24" fill="white">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>`,
+        archive: `<svg viewBox="0 0 24 24" fill="white">
+            <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 6h-2v2h2v2h-2v2h-2v-2h2v-2h-2v-2h2v-2h-2V8h2v2h2v2z"/>
+        </svg>`,
+        default: `<svg viewBox="0 0 24 24" fill="white">
+            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+        </svg>`
+    };
+    return icons[fileType] || icons.default;
+}
+
+// 파일 전송/수신 진행률 업데이트
+function updateFileProgress(msgId, progress) {
+    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
+    if (fileEl) {
+        const progressContainer = fileEl.querySelector('.file-progress');
+        const progressBar = fileEl.querySelector('.file-progress-bar');
+        if (progressContainer && progressBar) {
+            progressContainer.style.display = 'block';
+            progressBar.style.width = `${progress}%`;
+            if (progress >= 100) {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 1000);
+            }
+        }
+    }
+}
+
+// 파일 상태 업데이트
+function updateFileStatus(msgId, status, message) {
+    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
+    if (fileEl) {
+        const statusEl = fileEl.querySelector('.file-status');
+        if (statusEl) {
+            statusEl.className = `file-status ${status}`;
+
+            // 상태에 따른 아이콘 변경
+            const iconEl = statusEl.querySelector('.file-status-icon');
+            if (iconEl) {
+                if (status === 'completed') {
+                    // 완료 아이콘 (체크마크)
+                    iconEl.innerHTML = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+                } else if (status === 'error') {
+                    // 에러 아이콘
+                    iconEl.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>';
+                }
+            }
+
+            const textEl = statusEl.querySelector('span');
+            if (textEl) {
+                textEl.textContent = message;
+            }
+        }
+    }
 }
 
 // 사용자 목록 업데이트
@@ -1554,6 +1895,9 @@ async function saveRoom() {
 
                 closeModal('roomModal');
                 await loadRooms();
+
+                // 생성된 채팅방 자동 선택
+                selectRoom(result.id);
             } else {
                 alert('채팅방 생성 실패: ' + (result.error || '알 수 없는 오류'));
             }
@@ -1603,7 +1947,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 클라우드 데이터 로드
     await loadCloudData();
+
+    // 기본 그룹 채팅방 자동 생성 및 선택
+    await ensureDefaultGroupRoom();
 });
+
+// 기본 그룹 채팅방이 없으면 생성하고 선택
+async function ensureDefaultGroupRoom() {
+    const DEFAULT_ROOM_ID = 'default-group-room';
+
+    // 이미 기본 채팅방이 있는지 확인
+    let defaultRoom = state.rooms.find(r => r.id === DEFAULT_ROOM_ID);
+
+    if (!defaultRoom && window.messengerDB) {
+        try {
+            // 기본 그룹 채팅방 생성
+            const result = await window.messengerDB.createRoom({
+                id: DEFAULT_ROOM_ID,
+                name: '그룹 채팅',
+                type: 'group',
+                avatar: '💬'
+            });
+
+            if (result && result.success) {
+                console.log('기본 그룹 채팅방 생성됨:', DEFAULT_ROOM_ID);
+                // 채팅방 목록 새로고침
+                await loadRooms();
+                renderRoomList();
+                defaultRoom = state.rooms.find(r => r.id === DEFAULT_ROOM_ID);
+            }
+        } catch (err) {
+            console.error('기본 채팅방 생성 실패:', err);
+        }
+    }
+
+    // 현재 선택된 방이 없으면 기본 방 또는 첫 번째 방 선택
+    if (!state.currentRoom && state.rooms.length > 0) {
+        const roomToSelect = defaultRoom || state.rooms[0];
+        selectRoom(roomToSelect.id);
+        console.log('기본 채팅방 선택됨:', roomToSelect.id);
+    }
+}
 
 // 메인 윈도우 API 이벤트 리스너
 function initChatAPIListeners() {
@@ -2109,7 +2493,7 @@ function renderCloudFileList() {
                 </div>
             </div>
             <div class="cloud-file-actions">
-                <button class="cloud-file-action-btn" onclick="downloadCloudFile('${file.id}')" title="다운로드">
+                <button class="cloud-file-action-btn" onclick="downloadCloudFileFromList('${file.id}')" title="다운로드">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                     </svg>
@@ -2184,8 +2568,8 @@ async function uploadToCloud() {
     }
 }
 
-// 클라우드 파일 다운로드
-async function downloadCloudFile(fileId) {
+// 클라우드 탭에서 파일 다운로드
+async function downloadCloudFileFromList(fileId) {
     try {
         const file = state.cloudFiles.find(f => f.id === fileId);
         if (!file) return;

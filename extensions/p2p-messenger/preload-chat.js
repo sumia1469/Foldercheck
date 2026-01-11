@@ -33,40 +33,40 @@ contextBridge.exposeInMainWorld('chatAPI', {
     isElectron: true
 });
 
-// 메신저 데이터베이스 API
+// 메신저 데이터베이스 API (확장 전용 - 채팅 윈도우에서 사용)
 contextBridge.exposeInMainWorld('messengerDB', {
     // 연락처 관리
-    getContacts: () => ipcRenderer.invoke('messenger:getContacts'),
-    addContact: (contact) => ipcRenderer.invoke('messenger:addContact', contact),
-    deleteContact: (id) => ipcRenderer.invoke('messenger:deleteContact', id),
-    updateContactStatus: (id, status) => ipcRenderer.invoke('messenger:updateContactStatus', id, status),
+    getContacts: () => ipcRenderer.invoke('messenger:getContacts').catch(() => []),
+    addContact: (contact) => ipcRenderer.invoke('messenger:addContact', contact).catch(() => null),
+    deleteContact: (id) => ipcRenderer.invoke('messenger:deleteContact', id).catch(() => false),
+    updateContactStatus: (id, status) => ipcRenderer.invoke('messenger:updateContactStatus', id, status).catch(() => false),
 
     // 그룹 관리
-    getGroups: () => ipcRenderer.invoke('messenger:getGroups'),
-    createGroup: (group) => ipcRenderer.invoke('messenger:createGroup', group),
-    getGroupMembers: (groupId) => ipcRenderer.invoke('messenger:getGroupMembers', groupId),
-    addGroupMember: (groupId, contactId, role) => ipcRenderer.invoke('messenger:addGroupMember', groupId, contactId, role),
-    deleteGroup: (id) => ipcRenderer.invoke('messenger:deleteGroup', id),
+    getGroups: () => ipcRenderer.invoke('messenger:getGroups').catch(() => []),
+    createGroup: (group) => ipcRenderer.invoke('messenger:createGroup', group).catch(() => null),
+    getGroupMembers: (groupId) => ipcRenderer.invoke('messenger:getGroupMembers', groupId).catch(() => []),
+    addGroupMember: (groupId, contactId, role) => ipcRenderer.invoke('messenger:addGroupMember', groupId, contactId, role).catch(() => false),
+    deleteGroup: (id) => ipcRenderer.invoke('messenger:deleteGroup', id).catch(() => false),
 
     // 채팅방 관리
-    getRooms: () => ipcRenderer.invoke('messenger:getRooms'),
-    createRoom: (room) => ipcRenderer.invoke('messenger:createRoom', room),
-    getRoom: (id) => ipcRenderer.invoke('messenger:getRoom', id),
-    getRoomParticipants: (roomId) => ipcRenderer.invoke('messenger:getRoomParticipants', roomId),
-    addRoomParticipant: (roomId, contactId, nickname) => ipcRenderer.invoke('messenger:addRoomParticipant', roomId, contactId, nickname),
-    leaveRoom: (roomId, contactId) => ipcRenderer.invoke('messenger:leaveRoom', roomId, contactId),
-    updateRoom: (id, updates) => ipcRenderer.invoke('messenger:updateRoom', id, updates),
-    deleteRoom: (id) => ipcRenderer.invoke('messenger:deleteRoom', id),
+    getRooms: () => ipcRenderer.invoke('messenger:getRooms').catch(() => []),
+    createRoom: (room) => ipcRenderer.invoke('messenger:createRoom', room).catch(() => null),
+    getRoom: (id) => ipcRenderer.invoke('messenger:getRoom', id).catch(() => null),
+    getRoomParticipants: (roomId) => ipcRenderer.invoke('messenger:getRoomParticipants', roomId).catch(() => []),
+    addRoomParticipant: (roomId, contactId, nickname) => ipcRenderer.invoke('messenger:addRoomParticipant', roomId, contactId, nickname).catch(() => false),
+    leaveRoom: (roomId, contactId) => ipcRenderer.invoke('messenger:leaveRoom', roomId, contactId).catch(() => false),
+    updateRoom: (id, updates) => ipcRenderer.invoke('messenger:updateRoom', id, updates).catch(() => false),
+    deleteRoom: (id) => ipcRenderer.invoke('messenger:deleteRoom', id).catch(() => false),
 
     // 메시지 관리
-    saveMessage: (message) => ipcRenderer.invoke('messenger:saveMessage', message),
-    getRoomMessages: (roomId, limit, offset) => ipcRenderer.invoke('messenger:getRoomMessages', roomId, limit, offset),
-    markAsRead: (roomId, contactId) => ipcRenderer.invoke('messenger:markAsRead', roomId, contactId),
-    searchMessages: (query, roomId) => ipcRenderer.invoke('messenger:searchMessages', query, roomId),
+    saveMessage: (message) => ipcRenderer.invoke('messenger:saveMessage', message).catch(() => null),
+    getRoomMessages: (roomId, limit, offset) => ipcRenderer.invoke('messenger:getRoomMessages', roomId, limit, offset).catch(() => []),
+    markAsRead: (roomId, contactId) => ipcRenderer.invoke('messenger:markAsRead', roomId, contactId).catch(() => false),
+    searchMessages: (query, roomId) => ipcRenderer.invoke('messenger:searchMessages', query, roomId).catch(() => []),
 
     // 설정 관리
-    getSetting: (key, defaultValue) => ipcRenderer.invoke('messenger:getSetting', key, defaultValue),
-    setSetting: (key, value) => ipcRenderer.invoke('messenger:setSetting', key, value),
+    getSetting: (key, defaultValue) => ipcRenderer.invoke('messenger:getSetting', key, defaultValue).catch(() => defaultValue),
+    setSetting: (key, value) => ipcRenderer.invoke('messenger:setSetting', key, value).catch(() => false),
 
     // 데이터 변경 이벤트 수신
     onRoomChanged: (callback) => {
@@ -86,36 +86,36 @@ contextBridge.exposeInMainWorld('messengerDB', {
     }
 });
 
-// P2P Messenger API (메인 윈도우와 동일)
+// P2P Messenger API (확장 전용 - 채팅 윈도우에서 사용)
 contextBridge.exposeInMainWorld('p2pAPI', {
     // 호스트 모드
-    startHost: (port, nickname) => ipcRenderer.invoke('p2p:startHost', port, nickname),
-    stopHost: () => ipcRenderer.invoke('p2p:stopHost'),
+    startHost: (port, nickname) => ipcRenderer.invoke('p2p:startHost', port, nickname).catch(() => ({ success: false })),
+    stopHost: () => ipcRenderer.invoke('p2p:stopHost').catch(() => ({ success: false })),
 
     // 게스트 모드
-    connect: (host, port, nickname) => ipcRenderer.invoke('p2p:connect', host, port, nickname),
-    disconnect: () => ipcRenderer.invoke('p2p:disconnect'),
+    connect: (host, port, nickname) => ipcRenderer.invoke('p2p:connect', host, port, nickname).catch(() => ({ success: false })),
+    disconnect: () => ipcRenderer.invoke('p2p:disconnect').catch(() => ({ success: false })),
 
     // 메시징
-    sendMessage: (content) => ipcRenderer.invoke('p2p:sendMessage', content),
-    getHistory: () => ipcRenderer.invoke('p2p:getHistory'),
+    sendMessage: (content) => ipcRenderer.invoke('p2p:sendMessage', content).catch(() => ({ success: false })),
+    getHistory: () => ipcRenderer.invoke('p2p:getHistory').catch(() => []),
 
     // 파일 전송
-    selectFile: () => ipcRenderer.invoke('p2p:selectFile'),
-    sendFile: (filePath, cloudInfo) => ipcRenderer.invoke('p2p:sendFile', filePath, cloudInfo),
-    openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
+    selectFile: () => ipcRenderer.invoke('p2p:selectFile').catch(() => null),
+    sendFile: (filePath, cloudInfo) => ipcRenderer.invoke('p2p:sendFile', filePath, cloudInfo).catch(() => ({ success: false })),
+    openDownloads: () => ipcRenderer.invoke('p2p:openDownloads').catch(() => null),
 
     // 상태
-    getStatus: () => ipcRenderer.invoke('p2p:getStatus'),
-    getUsers: () => ipcRenderer.invoke('p2p:getUsers'),
+    getStatus: () => ipcRenderer.invoke('p2p:getStatus').catch(() => ({ mode: 'offline', users: [] })),
+    getUsers: () => ipcRenderer.invoke('p2p:getUsers').catch(() => []),
 
     // 클라우드 서버 API
-    getCloudStatus: () => ipcRenderer.invoke('cloud:getStatus'),
-    getCloudFiles: () => ipcRenderer.invoke('cloud:getFiles'),
-    uploadToCloud: (filePath) => ipcRenderer.invoke('cloud:uploadFile', filePath),
-    deleteFromCloud: (fileId) => ipcRenderer.invoke('cloud:deleteFile', fileId),
-    selectAndUploadToCloud: () => ipcRenderer.invoke('cloud:selectAndUpload'),
-    openCloudStorage: () => ipcRenderer.invoke('cloud:openStorage'),
+    getCloudStatus: () => ipcRenderer.invoke('cloud:getStatus').catch(() => ({ status: 'stopped', port: null })),
+    getCloudFiles: () => ipcRenderer.invoke('cloud:getFiles').catch(() => []),
+    uploadToCloud: (filePath) => ipcRenderer.invoke('cloud:uploadFile', filePath).catch(() => ({ success: false })),
+    deleteFromCloud: (fileId) => ipcRenderer.invoke('cloud:deleteFile', fileId).catch(() => ({ success: false })),
+    selectAndUploadToCloud: () => ipcRenderer.invoke('cloud:selectAndUpload').catch(() => null),
+    openCloudStorage: () => ipcRenderer.invoke('cloud:openStorage').catch(() => null),
 
     // 클라우드 이벤트
     onCloudFileUploaded: (callback) => {

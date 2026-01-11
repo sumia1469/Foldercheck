@@ -10,13 +10,14 @@ const path = require('path');
 const fs = require('fs');
 
 let p2pMessenger = null;
+let messengerDB = null;
 let mainWindow = null;
 let extensionPath = null;
 
 /**
  * 확장 활성화
  */
-function activate(context) {
+async function activate(context) {
     mainWindow = context.mainWindow;
     extensionPath = context.extensionPath;
 
@@ -26,7 +27,18 @@ function activate(context) {
     const P2PMessenger = require(path.join(extensionPath, 'p2p-messenger.js'));
     p2pMessenger = new P2PMessenger();
 
-    console.log('[P2P Extension] 활성화됨, p2pMessenger:', !!p2pMessenger);
+    // MessengerDB 인스턴스 생성 및 초기화 (완료될 때까지 대기)
+    const MessengerDB = require(path.join(extensionPath, 'messenger-db.js'));
+    messengerDB = new MessengerDB();
+    try {
+        await messengerDB.initialize();
+        console.log('[P2P Extension] MessengerDB 초기화 완료');
+    } catch (err) {
+        console.error('[P2P Extension] MessengerDB 초기화 실패:', err);
+        // 초기화 실패해도 기본 P2P 기능은 사용 가능
+    }
+
+    console.log('[P2P Extension] 활성화됨, p2pMessenger:', !!p2pMessenger, 'messengerDB:', !!messengerDB?.db);
 
     // 이벤트 리스너 설정
     setupEventListeners();
@@ -56,6 +68,12 @@ function deactivate() {
             p2pMessenger.disconnect();
         }
         p2pMessenger = null;
+    }
+
+    // DB 정리
+    if (messengerDB) {
+        messengerDB.close();
+        messengerDB = null;
     }
 }
 
@@ -110,6 +128,8 @@ function broadcast(channel, data) {
  * IPC 핸들러 등록
  */
 function registerIpcHandlers() {
+    console.log('[P2P Extension] IPC 핸들러 등록 시작...');
+
     // 호스트 시작
     ipcMain.handle('p2p:startHost', async (event, port, nickname) => {
         if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
@@ -150,6 +170,41 @@ function registerIpcHandlers() {
     ipcMain.handle('p2p:sendMessage', async (event, message) => {
         if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
         return p2pMessenger.sendMessage(message);
+    });
+
+    // 파일 선택 다이얼로그 (파일 정보 포함 반환)
+    ipcMain.handle('p2p:selectFile', async () => {
+        const { dialog } = require('electron');
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile'],
+            filters: [
+                { name: '모든 파일', extensions: ['*'] }
+            ]
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+
+        const filePath = result.filePaths[0];
+
+        // 파일 정보 가져오기
+        try {
+            const stats = fs.statSync(filePath);
+            const filename = path.basename(filePath);
+            return {
+                path: filePath,
+                name: filename,
+                size: stats.size
+            };
+        } catch (err) {
+            console.error('파일 정보 조회 실패:', err);
+            // 에러 시에도 경로는 반환 (하위 호환성)
+            return {
+                path: filePath,
+                name: path.basename(filePath),
+                size: 0
+            };
+        }
     });
 
     // 파일 전송
@@ -207,7 +262,157 @@ function registerIpcHandlers() {
         return p2pMessenger.deleteFromCloud(fileId);
     });
 
-    console.log('[P2P Extension] IPC 핸들러 등록 완료');
+    // ============================================
+    // Messenger DB IPC 핸들러
+    // ============================================
+
+    // 연락처 관리
+    ipcMain.handle('messenger:getContacts', () => {
+        if (!messengerDB) return [];
+        return messengerDB.getAllContacts();
+    });
+
+    ipcMain.handle('messenger:addContact', (event, contact) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.addContact(contact);
+    });
+
+    ipcMain.handle('messenger:deleteContact', (event, id) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.deleteContact(id);
+    });
+
+    ipcMain.handle('messenger:updateContactStatus', (event, id, status) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.updateContactStatus(id, status);
+    });
+
+    // 그룹 관리
+    ipcMain.handle('messenger:getGroups', () => {
+        if (!messengerDB) return [];
+        return messengerDB.getAllGroups();
+    });
+
+    ipcMain.handle('messenger:createGroup', (event, group) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.createGroup(group);
+    });
+
+    ipcMain.handle('messenger:getGroupMembers', (event, groupId) => {
+        if (!messengerDB) return [];
+        return messengerDB.getGroupMembers(groupId);
+    });
+
+    ipcMain.handle('messenger:addGroupMember', (event, groupId, contactId, role) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.addGroupMember(groupId, contactId, role);
+    });
+
+    ipcMain.handle('messenger:deleteGroup', (event, id) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.deleteGroup(id);
+    });
+
+    // 채팅방 관리
+    ipcMain.handle('messenger:getRooms', () => {
+        if (!messengerDB) return [];
+        return messengerDB.getAllRooms();
+    });
+
+    ipcMain.handle('messenger:createRoom', (event, room) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.createRoom(room);
+    });
+
+    ipcMain.handle('messenger:getRoom', (event, id) => {
+        if (!messengerDB) return null;
+        return messengerDB.getRoom(id);
+    });
+
+    ipcMain.handle('messenger:getRoomParticipants', (event, roomId) => {
+        if (!messengerDB) return [];
+        return messengerDB.getRoomParticipants(roomId);
+    });
+
+    ipcMain.handle('messenger:addRoomParticipant', (event, roomId, contactId, nickname) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.addRoomParticipant(roomId, contactId, nickname);
+    });
+
+    ipcMain.handle('messenger:leaveRoom', (event, roomId, contactId) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.leaveRoom(roomId, contactId);
+    });
+
+    ipcMain.handle('messenger:updateRoom', (event, id, updates) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.updateRoom(id, updates);
+    });
+
+    ipcMain.handle('messenger:deleteRoom', (event, id) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.deleteRoom(id);
+    });
+
+    // 메시지 관리
+    ipcMain.handle('messenger:saveMessage', (event, message) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.saveMessage(message);
+    });
+
+    ipcMain.handle('messenger:getRoomMessages', (event, roomId, limit, offset) => {
+        if (!messengerDB) return [];
+        return messengerDB.getRoomMessages(roomId, limit, offset);
+    });
+
+    ipcMain.handle('messenger:markAsRead', (event, roomId, contactId) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.markMessagesAsRead(roomId, contactId);
+    });
+
+    ipcMain.handle('messenger:searchMessages', (event, query, roomId) => {
+        if (!messengerDB) return [];
+        return messengerDB.searchMessages(query, roomId);
+    });
+
+    // 설정 관리
+    ipcMain.handle('messenger:getSetting', (event, key, defaultValue) => {
+        if (!messengerDB) return defaultValue;
+        return messengerDB.getSetting(key, defaultValue);
+    });
+
+    ipcMain.handle('messenger:setSetting', (event, key, value) => {
+        if (!messengerDB) throw new Error('MessengerDB가 초기화되지 않았습니다');
+        return messengerDB.setSetting(key, value);
+    });
+
+    // ============================================
+    // Cloud IPC 핸들러
+    // ============================================
+
+    ipcMain.handle('cloud:getStatus', () => {
+        if (!p2pMessenger) return { status: 'stopped', port: null };
+        return p2pMessenger.getCloudStatus ? p2pMessenger.getCloudStatus() : { status: 'stopped', port: null };
+    });
+
+    ipcMain.handle('cloud:getFiles', () => {
+        if (!p2pMessenger) return [];
+        return p2pMessenger.getCloudFiles ? p2pMessenger.getCloudFiles() : [];
+    });
+
+    ipcMain.handle('cloud:uploadFile', async (event, filePath) => {
+        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+        if (!p2pMessenger.uploadToCloud) throw new Error('클라우드 업로드 기능을 사용할 수 없습니다');
+        return await p2pMessenger.uploadToCloud(filePath);
+    });
+
+    ipcMain.handle('cloud:deleteFile', (event, fileId) => {
+        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+        if (!p2pMessenger.deleteFromCloud) throw new Error('클라우드 삭제 기능을 사용할 수 없습니다');
+        return p2pMessenger.deleteFromCloud(fileId);
+    });
+
+    console.log('[P2P Extension] IPC 핸들러 등록 완료 (P2P, Messenger, Cloud)');
 }
 
 /**
@@ -215,9 +420,19 @@ function registerIpcHandlers() {
  */
 function unregisterIpcHandlers() {
     const channels = [
+        // P2P 핸들러
         'p2p:startHost', 'p2p:stopHost', 'p2p:connect', 'p2p:disconnect',
-        'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:sendFile',
-        'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud'
+        'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:selectFile', 'p2p:sendFile',
+        'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
+        // Messenger DB 핸들러
+        'messenger:getContacts', 'messenger:addContact', 'messenger:deleteContact', 'messenger:updateContactStatus',
+        'messenger:getGroups', 'messenger:createGroup', 'messenger:getGroupMembers', 'messenger:addGroupMember', 'messenger:deleteGroup',
+        'messenger:getRooms', 'messenger:createRoom', 'messenger:getRoom', 'messenger:getRoomParticipants',
+        'messenger:addRoomParticipant', 'messenger:leaveRoom', 'messenger:updateRoom', 'messenger:deleteRoom',
+        'messenger:saveMessage', 'messenger:getRoomMessages', 'messenger:markAsRead', 'messenger:searchMessages',
+        'messenger:getSetting', 'messenger:setSetting',
+        // Cloud 핸들러
+        'cloud:getStatus', 'cloud:getFiles', 'cloud:uploadFile', 'cloud:deleteFile'
     ];
 
     channels.forEach(channel => {

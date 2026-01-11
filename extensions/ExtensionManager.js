@@ -505,8 +505,18 @@ class ExtensionManager extends EventEmitter {
         }
 
         try {
-            // 캐시 제거 후 로드
-            delete require.cache[require.resolve(mainEntryPath)];
+            // 확장 경로 내의 모든 모듈 캐시 제거
+            const extensionDir = extension.path;
+            console.log(`[ExtensionManager] 확장 모듈 캐시 제거 시작: ${extensionDir}`);
+
+            Object.keys(require.cache).forEach(cachedPath => {
+                if (cachedPath.startsWith(extensionDir)) {
+                    console.log(`[ExtensionManager] 캐시 제거: ${cachedPath}`);
+                    delete require.cache[cachedPath];
+                }
+            });
+
+            console.log(`[ExtensionManager] 메인 모듈 로드 시작: ${mainEntryPath}`);
             const mainModule = require(mainEntryPath);
 
             // 모듈 컨텍스트 생성
@@ -560,6 +570,17 @@ class ExtensionManager extends EventEmitter {
             // 인스턴스 정리
             if (moduleInfo.instance && typeof moduleInfo.instance.dispose === 'function') {
                 await moduleInfo.instance.dispose();
+            }
+
+            // 확장 경로 내의 모든 모듈 캐시 제거
+            const extensionDir = moduleInfo.context.extensionPath;
+            if (extensionDir) {
+                Object.keys(require.cache).forEach(cachedPath => {
+                    if (cachedPath.startsWith(extensionDir)) {
+                        console.log(`[ExtensionManager] 언로드 시 캐시 제거: ${cachedPath}`);
+                        delete require.cache[cachedPath];
+                    }
+                });
             }
 
             this.mainModules.delete(id);

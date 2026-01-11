@@ -7,6 +7,38 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+// 앱 경로 찾기 (확장에서 메인 앱의 node_modules 접근용)
+function getAppNodeModulesPath() {
+    // Electron 환경에서 앱 경로 찾기
+    try {
+        const { app } = require('electron');
+        if (app) {
+            const appPath = app.getAppPath();
+            // asar 패키지인 경우 처리
+            const basePath = appPath.includes('.asar')
+                ? path.dirname(appPath)
+                : appPath;
+            return path.join(basePath, 'node_modules');
+        }
+    } catch (e) {
+        // electron이 없는 경우
+    }
+
+    // 개발 환경: 현재 위치에서 상위로 올라가며 node_modules 찾기
+    let currentDir = __dirname;
+    for (let i = 0; i < 5; i++) {
+        const nodeModulesPath = path.join(currentDir, 'node_modules');
+        if (fs.existsSync(nodeModulesPath)) {
+            return nodeModulesPath;
+        }
+        const parentDir = path.dirname(currentDir);
+        if (parentDir === currentDir) break;
+        currentDir = parentDir;
+    }
+
+    return null;
+}
+
 // better-sqlite3 사용 (동기식, 빠름)
 let Database;
 try {
@@ -50,21 +82,53 @@ class MessengerDB {
                 this.db.pragma('journal_mode = WAL');
             } else {
                 // sql.js 폴백 (더 느리지만 네이티브 빌드 필요 없음)
-                const initSqlJs = require('sql.js');
+                let initSqlJs;
+
+                // 메인 앱의 node_modules에서 sql.js 찾기
+                const appNodeModules = getAppNodeModulesPath();
+                console.log('[MessengerDB] 앱 node_modules 경로:', appNodeModules);
+
+                if (appNodeModules) {
+                    const sqlJsPath = path.join(appNodeModules, 'sql.js');
+                    console.log('[MessengerDB] sql.js 경로 시도:', sqlJsPath);
+
+                    if (fs.existsSync(sqlJsPath)) {
+                        try {
+                            initSqlJs = require(sqlJsPath);
+                            console.log('[MessengerDB] sql.js 로드 성공 (앱 node_modules)');
+                        } catch (e) {
+                            console.error('[MessengerDB] sql.js 로드 실패 (앱 node_modules):', e.message);
+                        }
+                    }
+                }
+
+                // 기본 require 시도 (fallback)
+                if (!initSqlJs) {
+                    try {
+                        initSqlJs = require('sql.js');
+                        console.log('[MessengerDB] sql.js 로드 성공 (기본 require)');
+                    } catch (e) {
+                        console.error('[MessengerDB] sql.js 로드 실패:', e.message);
+                        throw new Error('sql.js 모듈을 찾을 수 없습니다. npm install sql.js를 실행해주세요.');
+                    }
+                }
 
                 // WASM 파일 경로 설정
                 let wasmPath;
                 try {
-                    // node_modules에서 sql.js wasm 파일 찾기
-                    const sqlJsPath = require.resolve('sql.js');
-                    const sqlJsDir = path.dirname(sqlJsPath);
-
                     // 여러 가능한 경로 확인
-                    const possiblePaths = [
-                        path.join(sqlJsDir, 'dist', 'sql-wasm.wasm'),
-                        path.join(sqlJsDir, 'sql-wasm.wasm'),
+                    const possiblePaths = [];
+
+                    if (appNodeModules) {
+                        possiblePaths.push(
+                            path.join(appNodeModules, 'sql.js', 'dist', 'sql-wasm.wasm'),
+                            path.join(appNodeModules, 'sql.js', 'sql-wasm.wasm')
+                        );
+                    }
+
+                    possiblePaths.push(
                         path.join(__dirname, 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm')
-                    ];
+                    );
 
                     for (const p of possiblePaths) {
                         if (fs.existsSync(p)) {
@@ -351,14 +415,17 @@ class MessengerDB {
         const avatar = contact.avatar || null;
         const status = contact.status || 'offline';
 
-        if (this.isSqlJs) {
-            this.db.run(sql, [id, nickname, ip, port, avatar, status]);
-            this.saveToFile();
-        } else {
-            this.db.prepare(sql).run(id, nickname, ip, port, avatar, status);
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, nickname, ip, port, avatar, status]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, nickname, ip, port, avatar, status);
+            }
+            return { success: true, id: id };
+        } catch (err) {
+            return { success: false, error: err.message };
         }
-
-        return id;
     }
 
     /**
@@ -443,14 +510,17 @@ class MessengerDB {
         const description = group.description || null;
         const avatar = group.avatar || null;
 
-        if (this.isSqlJs) {
-            this.db.run(sql, [id, name, description, avatar]);
-            this.saveToFile();
-        } else {
-            this.db.prepare(sql).run(id, name, description, avatar);
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, name, description, avatar]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, name, description, avatar);
+            }
+            return { success: true, id: id };
+        } catch (err) {
+            return { success: false, error: err.message };
         }
-
-        return id;
     }
 
     /**
@@ -567,14 +637,17 @@ class MessengerDB {
         const name = room.name || null;
         const avatar = room.avatar || null;
 
-        if (this.isSqlJs) {
-            this.db.run(sql, [id, type, name, avatar]);
-            this.saveToFile();
-        } else {
-            this.db.prepare(sql).run(id, type, name, avatar);
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, type, name, avatar]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, type, name, avatar);
+            }
+            return { success: true, id: id };
+        } catch (err) {
+            return { success: false, error: err.message };
         }
-
-        return id;
     }
 
     /**

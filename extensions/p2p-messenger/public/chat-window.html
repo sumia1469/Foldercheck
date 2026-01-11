@@ -836,6 +836,35 @@
             border-top-right-radius: 4px;
         }
 
+        /* 이모티콘 크기 확대 - 메시지 내 이모티콘 */
+        .message-bubble .emoji,
+        .message-bubble span.emoji {
+            font-size: 24px;
+            line-height: 1.2;
+            vertical-align: middle;
+        }
+
+        /* 이모티콘만 있는 메시지 (큰 이모티콘) */
+        .message-bubble.emoji-only {
+            background: transparent !important;
+            padding: 4px 8px;
+            font-size: 48px;
+            line-height: 1.2;
+        }
+
+        /* 2-3개 이모티콘 메시지 */
+        .message-bubble.emoji-few {
+            background: transparent !important;
+            padding: 4px 8px;
+            font-size: 36px;
+            line-height: 1.2;
+        }
+
+        /* 이모티콘 + 텍스트 혼합 메시지에서 이모티콘 강조 */
+        .message-bubble:not(.emoji-only):not(.emoji-few) {
+            font-size: 14px;
+        }
+
         .message-meta {
             display: flex;
             align-items: center;
@@ -868,74 +897,200 @@
         /* 파일 메시지 */
         .message-file {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            flex-direction: column;
+            gap: 8px;
             padding: 12px;
             background: var(--bg-tertiary);
-            border-radius: 8px;
-            min-width: 200px;
+            border-radius: 12px;
+            min-width: 260px;
+            max-width: 320px;
+            border: 1px solid var(--border);
+        }
+
+        .file-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .file-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--accent);
-            border-radius: 8px;
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+        }
+
+        .file-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        /* 파일 타입별 아이콘 색상 */
+        .file-icon.image {
+            background: linear-gradient(135deg, #e91e63 0%, #9c27b0 100%);
+            box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+        }
+
+        .file-icon.video {
+            background: linear-gradient(135deg, #ff5722 0%, #ff9800 100%);
+            box-shadow: 0 2px 8px rgba(255, 87, 34, 0.3);
+        }
+
+        .file-icon.audio {
+            background: linear-gradient(135deg, #00bcd4 0%, #03a9f4 100%);
+            box-shadow: 0 2px 8px rgba(0, 188, 212, 0.3);
+        }
+
+        .file-icon.document {
+            background: linear-gradient(135deg, #2196f3 0%, #3f51b5 100%);
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        .file-icon.archive {
+            background: linear-gradient(135deg, #795548 0%, #607d8b 100%);
+            box-shadow: 0 2px 8px rgba(121, 85, 72, 0.3);
         }
 
         .file-info {
             flex: 1;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
 
         .file-name {
-            font-size: 12px;
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+
+        .file-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
         }
 
         .file-size {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--text-secondary);
+        }
+
+        .file-type {
+            text-transform: uppercase;
+            font-weight: 500;
+            color: var(--accent);
+        }
+
+        /* 파일 상태 표시 */
+        .file-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .file-status.uploading {
+            color: var(--warning);
+        }
+
+        .file-status.downloading {
+            color: var(--accent);
+        }
+
+        .file-status.completed {
+            color: var(--success);
+        }
+
+        .file-status.error {
+            color: var(--danger);
+        }
+
+        .file-status-icon {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* 진행률 바 */
+        .file-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .file-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
+            border-radius: 2px;
+            transition: width 0.3s ease;
         }
 
         /* 파일 액션 버튼 */
         .file-actions {
             display: flex;
-            gap: 4px;
-            margin-left: auto;
+            gap: 6px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .file-action-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 28px;
-            height: 28px;
+            gap: 6px;
+            flex: 1;
+            padding: 8px 12px;
             border: none;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
             cursor: pointer;
             transition: all 0.2s;
+            font-size: 11px;
+            font-weight: 500;
         }
 
         .file-action-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+        }
+
+        .file-action-btn svg {
+            width: 14px;
+            height: 14px;
         }
 
         .file-action-btn.download-btn {
-            background: rgba(46, 204, 113, 0.3);
+            background: rgba(46, 204, 113, 0.2);
+            color: var(--success);
         }
 
         .file-action-btn.download-btn:hover {
-            background: rgba(46, 204, 113, 0.5);
+            background: rgba(46, 204, 113, 0.3);
+        }
+
+        .file-action-btn.open-btn {
+            background: rgba(74, 158, 255, 0.2);
+            color: var(--accent);
+        }
+
+        .file-action-btn.open-btn:hover {
+            background: rgba(74, 158, 255, 0.3);
         }
 
         /* 시스템 메시지 */

@@ -251,6 +251,8 @@ class MessengerDB {
                 file_name TEXT,
                 file_size INTEGER,
                 file_path TEXT,
+                cloud_file_id TEXT, -- 클라우드 파일 ID
+                cloud_url TEXT, -- 클라우드 다운로드 URL
                 reply_to TEXT,
                 is_read INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -382,6 +384,54 @@ class MessengerDB {
             }
         } catch (e) {
             // 업데이트 실패해도 무시 (테이블이 없거나 이미 처리됨)
+        }
+
+        // cloud_file_id, cloud_url 컬럼 마이그레이션
+        this.migrateCloudColumns();
+    }
+
+    /**
+     * cloud_file_id, cloud_url 컬럼 마이그레이션
+     */
+    migrateCloudColumns() {
+        // cloud_file_id 컬럼 존재 여부 확인
+        let hasCloudFileIdColumn = false;
+        try {
+            const checkColSql = "PRAGMA table_info(messages)";
+            if (this.isSqlJs) {
+                const result = this.db.exec(checkColSql);
+                if (result.length > 0) {
+                    const columns = result[0].values.map(v => v[1]);
+                    hasCloudFileIdColumn = columns.includes('cloud_file_id');
+                }
+            } else {
+                const columns = this.db.prepare(checkColSql).all();
+                hasCloudFileIdColumn = columns.some(col => col.name === 'cloud_file_id');
+            }
+        } catch (e) {
+            console.log('[MessengerDB] cloud 컬럼 정보 확인 실패:', e.message);
+        }
+
+        // cloud_file_id 컬럼 추가
+        if (!hasCloudFileIdColumn) {
+            console.log('[MessengerDB] cloud_file_id, cloud_url 컬럼 추가 마이그레이션 실행');
+            try {
+                const alterSql1 = "ALTER TABLE messages ADD COLUMN cloud_file_id TEXT";
+                const alterSql2 = "ALTER TABLE messages ADD COLUMN cloud_url TEXT";
+                if (this.isSqlJs) {
+                    this.db.run(alterSql1);
+                    this.db.run(alterSql2);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql1);
+                    this.db.exec(alterSql2);
+                }
+                console.log('[MessengerDB] cloud_file_id, cloud_url 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] cloud 컬럼 추가 실패:', alterErr.message);
+            }
+        } else {
+            console.log('[MessengerDB] cloud 컬럼이 이미 존재함');
         }
     }
 
@@ -839,10 +889,10 @@ class MessengerDB {
      * 메시지 저장
      */
     saveMessage(message) {
-        const id = message.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const id = message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         const sql = `
-            INSERT INTO messages (id, room_id, sender_id, sender_nickname, type, content, file_name, file_size, file_path, reply_to)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (id, room_id, sender_id, sender_nickname, type, content, file_name, file_size, file_path, cloud_file_id, cloud_url, reply_to)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const roomId = message.roomId || null;
         const senderId = message.senderId || 'unknown'; // 기본값 설정
@@ -852,13 +902,15 @@ class MessengerDB {
         const fileName = message.fileName || null;
         const fileSize = message.fileSize || null;
         const filePath = message.filePath || null;
+        const cloudFileId = message.cloudFileId || null;
+        const cloudUrl = message.cloudUrl || null;
         const replyTo = message.replyTo || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo]);
+            this.db.run(sql, [id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, cloudFileId, cloudUrl, replyTo]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo);
+            this.db.prepare(sql).run(id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, cloudFileId, cloudUrl, replyTo);
         }
 
         // 채팅방 업데이트

@@ -1117,10 +1117,26 @@ function renderMessage(msg) {
         const fileType = getFileTypeCategory(fileExt);
         const fileIcon = getFileTypeIcon(fileType);
 
+        // 이미지 파일 여부 확인
+        const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico'];
+        const isImage = imageExtensions.includes(fileExt.toLowerCase());
+
         // 상태 결정 (업로드/다운로드 완료 여부)
         const isUploaded = msg.isOwn;
         const isDownloaded = !!msg.filePath;
         const hasCloudUrl = !!(msg.cloudUrl || msg.cloudFileId);
+
+        // 이미지 미리보기 URL 결정
+        let imagePreviewUrl = '';
+        if (isImage) {
+            if (msg.filePath) {
+                // 로컬 파일 경로 사용
+                imagePreviewUrl = `file://${msg.filePath}`;
+            } else if (msg.cloudUrl) {
+                // 클라우드 URL 사용
+                imagePreviewUrl = msg.cloudUrl;
+            }
+        }
 
         // 상태 텍스트 및 아이콘
         let statusHtml = '';
@@ -1153,47 +1169,106 @@ function renderMessage(msg) {
             `;
         }
 
-        el.innerHTML = `
-            <div class="message-avatar">${initial}</div>
-            <div class="message-content">
-                <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="message-file" data-file='${fileData}' data-msg-id="${msg.id}">
-                    <div class="file-header">
-                        <div class="file-icon ${fileType}">
-                            ${fileIcon}
-                        </div>
-                        <div class="file-info">
-                            <div class="file-name" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</div>
-                            <div class="file-meta">
-                                <span class="file-type">${fileExt || 'FILE'}</span>
-                                <span class="file-size">${formatFileSize(msg.fileSize)}</span>
+        // 이미지인 경우 Teams 스타일 미리보기로 렌더링
+        if (isImage && imagePreviewUrl) {
+            el.innerHTML = `
+                <div class="message-avatar">${initial}</div>
+                <div class="message-content">
+                    <div class="message-sender">${escapeHtml(msg.sender)}</div>
+                    <div class="message-image-container" data-file='${fileData}' data-msg-id="${msg.id}">
+                        <div class="image-preview-wrapper" onclick="openImageViewer('${escapeHtml(imagePreviewUrl)}', '${escapeHtml(msg.filename)}')">
+                            <img class="message-image-preview" src="${imagePreviewUrl}" alt="${escapeHtml(msg.filename)}"
+                                 onerror="this.parentElement.parentElement.classList.add('image-error'); this.style.display='none';"
+                                 onload="this.parentElement.parentElement.classList.add('image-loaded');" />
+                            <div class="image-loading-placeholder">
+                                <svg class="loading-spinner" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="31.4" stroke-dashoffset="10">
+                                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+                                    </circle>
+                                </svg>
+                            </div>
+                            <div class="image-error-placeholder">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                                </svg>
+                                <span>이미지를 불러올 수 없습니다</span>
+                            </div>
+                            <div class="image-overlay">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                    <path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/>
+                                </svg>
                             </div>
                         </div>
+                        <div class="image-info">
+                            <span class="image-filename" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</span>
+                            <span class="image-size">${formatFileSize(msg.fileSize)}</span>
+                        </div>
+                        ${statusHtml}
+                        <div class="file-actions">
+                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="event.stopPropagation(); openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                                </svg>
+                                <span>열기</span>
+                            </button>` : ''}
+                            ${hasCloudUrl ? `<button class="file-action-btn download-btn" onclick="event.stopPropagation(); downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                </svg>
+                                <span>다운로드</span>
+                            </button>` : ''}
+                        </div>
                     </div>
-                    ${statusHtml}
-                    <div class="file-progress" style="display: none;">
-                        <div class="file-progress-bar" style="width: 0%;"></div>
-                    </div>
-                    <div class="file-actions">
-                        ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
-                            </svg>
-                            <span>열기</span>
-                        </button>` : ''}
-                        ${hasCloudUrl ? `<button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                            </svg>
-                            <span>다운로드</span>
-                        </button>` : ''}
+                    <div class="message-meta">
+                        <span class="message-time">${time}</span>
                     </div>
                 </div>
-                <div class="message-meta">
-                    <span class="message-time">${time}</span>
+            `;
+        } else {
+            // 일반 파일 렌더링 (기존 코드)
+            el.innerHTML = `
+                <div class="message-avatar">${initial}</div>
+                <div class="message-content">
+                    <div class="message-sender">${escapeHtml(msg.sender)}</div>
+                    <div class="message-file" data-file='${fileData}' data-msg-id="${msg.id}">
+                        <div class="file-header">
+                            <div class="file-icon ${fileType}">
+                                ${fileIcon}
+                            </div>
+                            <div class="file-info">
+                                <div class="file-name" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</div>
+                                <div class="file-meta">
+                                    <span class="file-type">${fileExt || 'FILE'}</span>
+                                    <span class="file-size">${formatFileSize(msg.fileSize)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        ${statusHtml}
+                        <div class="file-progress" style="display: none;">
+                            <div class="file-progress-bar" style="width: 0%;"></div>
+                        </div>
+                        <div class="file-actions">
+                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                                </svg>
+                                <span>열기</span>
+                            </button>` : ''}
+                            ${hasCloudUrl ? `<button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                </svg>
+                                <span>다운로드</span>
+                            </button>` : ''}
+                        </div>
+                    </div>
+                    <div class="message-meta">
+                        <span class="message-time">${time}</span>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     } else {
         // 카카오톡 스타일 읽음 표시: 안 읽은 사람 수 (숫자로 표시, 모두 읽으면 숫자 사라짐)
         // msg.unreadCount: 안 읽은 사람 수 (undefined면 기본값 사용)
@@ -1360,6 +1435,11 @@ function updateFileStatus(msgId, status, message, cloudInfo = null) {
                     actionsEl.appendChild(downloadBtn);
                 }
             }
+        }
+
+        // 완료 시 DB에 파일 메시지 저장 (채팅방 이동 후에도 유지되도록)
+        if (status === 'completed') {
+            saveFileMessageToDB(msgId, cloudInfo);
         }
     }
 }
@@ -1691,8 +1771,11 @@ async function loadRoomMessages(roomId) {
                     filename: msg.file_name,
                     fileSize: msg.file_size,
                     filePath: msg.file_path,
+                    cloudFileId: msg.cloud_file_id || '',
+                    cloudUrl: msg.cloud_url || '',
                     timestamp: new Date(msg.created_at).getTime(),
-                    isOwn
+                    isOwn,
+                    transferring: false  // DB에서 로드된 메시지는 전송 완료 상태
                 };
 
                 state.messages.push(message);
@@ -1728,6 +1811,56 @@ async function saveMessageToDB(roomId, message) {
         }
     } catch (err) {
         console.error('메시지 저장 실패:', err);
+    }
+}
+
+// 파일 메시지 DB 저장 (전송 완료 시 호출)
+async function saveFileMessageToDB(msgId, cloudInfo = null) {
+    try {
+        // state.messages에서 해당 메시지 찾기
+        const msg = state.messages.find(m => m.id === msgId);
+        if (!msg) {
+            console.warn('saveFileMessageToDB: 메시지를 찾을 수 없음:', msgId);
+            return;
+        }
+
+        // 현재 채팅방이 없으면 저장하지 않음
+        if (!state.currentRoom) {
+            console.warn('saveFileMessageToDB: 현재 채팅방 없음');
+            return;
+        }
+
+        // 이미 DB에 저장된 메시지인지 확인 (transferring이 false면 이미 저장됨)
+        if (!msg.transferring) {
+            console.log('saveFileMessageToDB: 이미 저장된 메시지:', msgId);
+            return;
+        }
+
+        // 전송 완료 상태로 업데이트
+        msg.transferring = false;
+        if (cloudInfo) {
+            msg.cloudFileId = cloudInfo.cloudFileId || '';
+            msg.cloudUrl = cloudInfo.cloudUrl || '';
+        }
+
+        // DB에 저장
+        if (window.messengerDB) {
+            await window.messengerDB.saveMessage({
+                roomId: state.currentRoom,
+                senderId: state.myContactId || 'self',
+                senderNickname: state.nickname,
+                type: 'file',
+                content: msg.filename || '',
+                fileName: msg.filename,
+                fileSize: msg.fileSize,
+                filePath: msg.filePath || '',
+                cloudFileId: msg.cloudFileId || '',
+                cloudUrl: msg.cloudUrl || ''
+            });
+            console.log('saveFileMessageToDB: 파일 메시지 DB 저장 완료:', msgId);
+        }
+    } catch (err) {
+        console.error('파일 메시지 DB 저장 실패:', err);
     }
 }
 
@@ -1913,6 +2046,106 @@ function initSidebarTabs() {
     document.getElementById('createGroupBtn')?.addEventListener('click', () => {
         openModal('groupModal');
     });
+}
+
+// ============================================
+// 이미지 뷰어
+// ============================================
+
+// 이미지 뷰어 열기
+function openImageViewer(imageUrl, filename) {
+    // 기존 뷰어가 있으면 제거
+    const existingViewer = document.getElementById('imageViewerModal');
+    if (existingViewer) {
+        existingViewer.remove();
+    }
+
+    // 이미지 뷰어 모달 생성
+    const viewer = document.createElement('div');
+    viewer.id = 'imageViewerModal';
+    viewer.className = 'image-viewer-modal';
+    viewer.innerHTML = `
+        <div class="image-viewer-backdrop" onclick="closeImageViewer()"></div>
+        <div class="image-viewer-container">
+            <div class="image-viewer-header">
+                <span class="image-viewer-title" title="${escapeHtml(filename)}">${escapeHtml(filename)}</span>
+                <div class="image-viewer-controls">
+                    <button class="image-viewer-btn" onclick="zoomImage(-0.2)" title="축소">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM7 9h5v1H7z"/>
+                        </svg>
+                    </button>
+                    <button class="image-viewer-btn" onclick="zoomImage(0.2)" title="확대">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zm-2-4h2v2H9V9h2v1h-2z"/>
+                            <path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/>
+                        </svg>
+                    </button>
+                    <button class="image-viewer-btn" onclick="resetZoom()" title="원본 크기">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                        </svg>
+                    </button>
+                    <button class="image-viewer-btn close-btn" onclick="closeImageViewer()" title="닫기">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="image-viewer-body">
+                <img id="viewerImage" src="${imageUrl}" alt="${escapeHtml(filename)}"
+                     style="transform: scale(1);"
+                     ondragstart="return false;" />
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(viewer);
+
+    // ESC 키로 닫기
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            closeImageViewer();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+
+    // 애니메이션을 위해 다음 프레임에서 visible 클래스 추가
+    requestAnimationFrame(() => {
+        viewer.classList.add('visible');
+    });
+}
+
+// 이미지 뷰어 닫기
+function closeImageViewer() {
+    const viewer = document.getElementById('imageViewerModal');
+    if (viewer) {
+        viewer.classList.remove('visible');
+        setTimeout(() => viewer.remove(), 200);
+    }
+}
+
+// 현재 줌 레벨 저장
+let currentZoom = 1;
+
+// 이미지 줌
+function zoomImage(delta) {
+    const img = document.getElementById('viewerImage');
+    if (!img) return;
+
+    currentZoom = Math.max(0.2, Math.min(5, currentZoom + delta));
+    img.style.transform = `scale(${currentZoom})`;
+}
+
+// 줌 리셋
+function resetZoom() {
+    const img = document.getElementById('viewerImage');
+    if (!img) return;
+
+    currentZoom = 1;
+    img.style.transform = 'scale(1)';
 }
 
 // ============================================

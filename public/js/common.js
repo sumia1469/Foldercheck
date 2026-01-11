@@ -11701,6 +11701,14 @@ function initExtensionsUI() {
     if (window.extensionAPI) {
         window.extensionAPI.onExtensionStateChange((data) => {
             console.log('확장 상태 변경:', data);
+
+            // 확장 제거 시 즉시 메뉴 제거 (확장이 더 이상 목록에 없으므로 updateExtensionMenus에서 처리 불가)
+            if (data.type === 'uninstalled' && data.extension?.id) {
+                console.log('[ExtensionMenu] 확장 제거됨, 메뉴 즉시 제거:', data.extension.id);
+                removeExtensionSidebarMenu(data.extension.id);
+                removeExtensionSettingsCategory(data.extension.id);
+            }
+
             loadExtensions();
             // 확장 활성화 시 동적 메뉴 업데이트 (일반적인 시스템)
             updateExtensionMenus();

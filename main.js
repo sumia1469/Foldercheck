@@ -1246,6 +1246,16 @@ async function initializeExtensions() {
             extensionAPI.cleanupExtension(ext.id);
         });
 
+        // 확장 제거 시 renderer에 알림
+        extensionManager.on('extension:uninstalled', ({ id }) => {
+            if (mainWindow) {
+                mainWindow.webContents.send('extension-state-change', {
+                    type: 'uninstalled',
+                    extension: { id }
+                });
+            }
+        });
+
         // Extension Host 이벤트 처리
         extensionHost.on('trigger-activation', async (event) => {
             await extensionManager.activateByEvent(event);

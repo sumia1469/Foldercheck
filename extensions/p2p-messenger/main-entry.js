@@ -13,6 +13,7 @@ let p2pMessenger = null;
 let messengerDB = null;
 let mainWindow = null;
 let extensionPath = null;
+let chatWindow = null; // 채팅 윈도우 참조
 
 /**
  * 확장 활성화
@@ -112,15 +113,25 @@ function setupEventListeners() {
 }
 
 /**
- * 메인 윈도우로 이벤트 브로드캐스트
+ * 모든 윈도우로 이벤트 브로드캐스트 (mainWindow + chatWindow)
  */
 function broadcast(channel, data) {
-    console.log('[P2P Extension] broadcast 호출:', channel, 'mainWindow:', !!mainWindow);
+    console.log('[P2P Extension] broadcast 호출:', channel, 'mainWindow:', !!mainWindow, 'chatWindow:', !!chatWindow);
+
+    // 메인 윈도우로 전송
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send(channel, data);
-        console.log('[P2P Extension] 이벤트 전송 완료:', channel);
-    } else {
-        console.warn('[P2P Extension] mainWindow 없음, 이벤트 전송 실패:', channel);
+        console.log('[P2P Extension] mainWindow로 이벤트 전송:', channel);
+    }
+
+    // 채팅 윈도우로도 전송
+    if (chatWindow && !chatWindow.isDestroyed()) {
+        chatWindow.webContents.send(channel, data);
+        console.log('[P2P Extension] chatWindow로 이벤트 전송:', channel);
+    }
+
+    if (!mainWindow && !chatWindow) {
+        console.warn('[P2P Extension] 윈도우 없음, 이벤트 전송 실패:', channel);
     }
 }
 
@@ -215,6 +226,12 @@ function registerIpcHandlers() {
 
     // 채팅 윈도우 열기
     ipcMain.handle('p2p:openChatWindow', async () => {
+        // 이미 열린 채팅 윈도우가 있으면 포커스
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.focus();
+            return { success: true };
+        }
+
         const chatHtmlPath = path.join(extensionPath, 'public', 'chat-window.html');
         const preloadPath = path.join(extensionPath, 'preload-chat.js');
 
@@ -222,7 +239,7 @@ function registerIpcHandlers() {
             throw new Error('채팅 윈도우 파일을 찾을 수 없습니다');
         }
 
-        const chatWindow = new BrowserWindow({
+        chatWindow = new BrowserWindow({
             width: 900,
             height: 700,
             minWidth: 600,
@@ -232,7 +249,8 @@ function registerIpcHandlers() {
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
-                preload: preloadPath
+                preload: preloadPath,
+                devTools: true
             },
             title: 'P2P 메신저'
         });
@@ -240,8 +258,73 @@ function registerIpcHandlers() {
         // 메뉴바 완전히 제거
         chatWindow.setMenu(null);
 
+        // 윈도우 닫힐 때 참조 정리
+        chatWindow.on('closed', () => {
+            chatWindow = null;
+        });
+
+        // 개발 모드에서 개발자 도구 열기 (Cmd+Option+I 또는 F12로도 열 수 있음)
+        chatWindow.webContents.on('before-input-event', (event, input) => {
+            if (input.key === 'F12' || (input.meta && input.alt && input.key === 'i')) {
+                chatWindow.webContents.toggleDevTools();
+            }
+        });
+
         chatWindow.loadFile(chatHtmlPath);
+        console.log('[P2P Extension] 채팅 윈도우 생성됨');
         return { success: true };
+    });
+
+    // 채팅 윈도우 컨트롤
+    ipcMain.handle('chat:minimize', () => {
+        console.log('[P2P Extension] chat:minimize 호출됨, chatWindow:', !!chatWindow);
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.minimize();
+            return { success: true };
+        }
+        return { success: false, error: 'chatWindow가 없습니다' };
+    });
+
+    ipcMain.handle('chat:maximize', () => {
+        console.log('[P2P Extension] chat:maximize 호출됨, chatWindow:', !!chatWindow);
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            if (chatWindow.isMaximized()) {
+                chatWindow.unmaximize();
+            } else {
+                chatWindow.maximize();
+            }
+            return { success: true };
+        }
+        return { success: false, error: 'chatWindow가 없습니다' };
+    });
+
+    ipcMain.handle('chat:close', () => {
+        console.log('[P2P Extension] chat:close 호출됨, chatWindow:', !!chatWindow);
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.close();
+            return { success: true };
+        }
+        return { success: false, error: 'chatWindow가 없습니다' };
+    });
+
+    // 파일 열기
+    ipcMain.handle('chat:openFile', async (event, filePath) => {
+        const { shell } = require('electron');
+        if (filePath && fs.existsSync(filePath)) {
+            await shell.openPath(filePath);
+            return { success: true };
+        }
+        return { success: false, error: '파일을 찾을 수 없습니다' };
+    });
+
+    // 알림 표시
+    ipcMain.handle('chat:showNotification', async (event, title, body) => {
+        const { Notification } = require('electron');
+        if (Notification.isSupported()) {
+            new Notification({ title, body }).show();
+            return { success: true };
+        }
+        return { success: false };
     });
 
     // 클라우드 파일 목록
@@ -424,6 +507,8 @@ function unregisterIpcHandlers() {
         'p2p:startHost', 'p2p:stopHost', 'p2p:connect', 'p2p:disconnect',
         'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:selectFile', 'p2p:sendFile',
         'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
+        // 채팅 윈도우 컨트롤 핸들러
+        'chat:minimize', 'chat:maximize', 'chat:close', 'chat:openFile', 'chat:showNotification',
         // Messenger DB 핸들러
         'messenger:getContacts', 'messenger:addContact', 'messenger:deleteContact', 'messenger:updateContactStatus',
         'messenger:getGroups', 'messenger:createGroup', 'messenger:getGroupMembers', 'messenger:addGroupMember', 'messenger:deleteGroup',

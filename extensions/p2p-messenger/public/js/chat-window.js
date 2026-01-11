@@ -17,38 +17,64 @@ const state = {
     cloudStatus: { status: 'stopped' } // 클라우드 서버 상태
 };
 
-// DOM 요소
-const elements = {
-    // 상태
-    statusDot: document.getElementById('statusDot'),
-    statusText: document.getElementById('statusText'),
+// DOM 요소 (DOMContentLoaded 후 초기화)
+let elements = {};
 
-    // 연결 상태 패널
-    connectStatusPanel: document.getElementById('connectStatusPanel'),
-    connectionStatusText: document.getElementById('connectionStatusText'),
+// DOM 요소 초기화 함수
+function initElements() {
+    elements = {
+        // 상태
+        statusDot: document.getElementById('statusDot'),
+        statusText: document.getElementById('statusText'),
 
-    // 채팅
-    roomList: document.getElementById('roomList'),
-    emptyState: document.getElementById('emptyState'),
-    chatView: document.getElementById('chatView'),
-    chatAvatar: document.getElementById('chatAvatar'),
-    chatName: document.getElementById('chatName'),
-    chatStatus: document.getElementById('chatStatus'),
-    messagesContainer: document.getElementById('messagesContainer'),
-    messageInput: document.getElementById('messageInput'),
-    sendBtn: document.getElementById('sendBtn'),
-    attachBtn: document.getElementById('attachBtn'),
+        // 연결 상태 패널
+        connectStatusPanel: document.getElementById('connectStatusPanel'),
+        connectionStatusText: document.getElementById('connectionStatusText'),
 
-    // 사용자
-    usersPanel: document.getElementById('usersPanel'),
-    usersBtn: document.getElementById('usersBtn'),
-    usersList: document.getElementById('usersList'),
-    userCount: document.getElementById('userCount'),
+        // 채팅
+        roomList: document.getElementById('roomList'),
+        emptyState: document.getElementById('emptyState'),
+        chatView: document.getElementById('chatView'),
+        chatAvatar: document.getElementById('chatAvatar'),
+        chatName: document.getElementById('chatName'),
+        chatStatus: document.getElementById('chatStatus'),
+        messagesContainer: document.getElementById('messagesContainer'),
+        messageInput: document.getElementById('messageInput'),
+        sendBtn: document.getElementById('sendBtn'),
+        attachBtn: document.getElementById('attachBtn'),
 
-    // 타이핑
-    typingIndicator: document.getElementById('typingIndicator'),
-    typingText: document.getElementById('typingText')
-};
+        // 사용자
+        usersPanel: document.getElementById('usersPanel'),
+        usersBtn: document.getElementById('usersBtn'),
+        usersList: document.getElementById('usersList'),
+        userCount: document.getElementById('userCount'),
+
+        // 타이핑
+        typingIndicator: document.getElementById('typingIndicator'),
+        typingText: document.getElementById('typingText')
+    };
+
+    // 요소 초기화 확인 로그
+    console.log('[ChatWindow] DOM 요소 초기화 완료:');
+    console.log('  - attachBtn:', !!elements.attachBtn);
+    console.log('  - sendBtn:', !!elements.sendBtn);
+    console.log('  - messageInput:', !!elements.messageInput);
+    console.log('  - messagesContainer:', !!elements.messagesContainer);
+    console.log('  - chatView:', !!elements.chatView);
+    console.log('  - emptyState:', !!elements.emptyState);
+    console.log('  - roomList:', !!elements.roomList);
+
+    // 누락된 요소 경고
+    const missingElements = [];
+    if (!elements.attachBtn) missingElements.push('attachBtn');
+    if (!elements.messagesContainer) missingElements.push('messagesContainer');
+    if (!elements.chatView) missingElements.push('chatView');
+    if (!elements.emptyState) missingElements.push('emptyState');
+
+    if (missingElements.length > 0) {
+        console.error('[ChatWindow] 누락된 DOM 요소:', missingElements);
+    }
+}
 
 // 초기화는 파일 끝의 DOMContentLoaded에서 처리
 
@@ -118,17 +144,71 @@ async function checkP2PStatus() {
 
 // 타이틀바 컨트롤
 function initTitlebar() {
-    document.getElementById('minimizeBtn').addEventListener('click', () => {
-        window.chatAPI?.minimize();
-    });
+    console.log('[ChatWindow] initTitlebar 시작');
+    console.log('[ChatWindow] chatAPI:', window.chatAPI);
+    console.log('[ChatWindow] chatAPI.close:', window.chatAPI?.close);
 
-    document.getElementById('maximizeBtn').addEventListener('click', () => {
-        window.chatAPI?.maximize();
-    });
+    const minimizeBtn = document.getElementById('minimizeBtn');
+    const maximizeBtn = document.getElementById('maximizeBtn');
+    const closeBtn = document.getElementById('closeBtn');
 
-    document.getElementById('closeBtn').addEventListener('click', () => {
-        window.chatAPI?.close();
-    });
+    console.log('[ChatWindow] 버튼 요소:', { minimizeBtn: !!minimizeBtn, maximizeBtn: !!maximizeBtn, closeBtn: !!closeBtn });
+
+    if (minimizeBtn) {
+        minimizeBtn.addEventListener('click', async () => {
+            console.log('[ChatWindow] 최소화 버튼 클릭');
+            try {
+                if (window.chatAPI && typeof window.chatAPI.minimize === 'function') {
+                    const result = await window.chatAPI.minimize();
+                    console.log('[ChatWindow] minimize 결과:', result);
+                } else {
+                    console.error('[ChatWindow] chatAPI.minimize 없음:', window.chatAPI);
+                }
+            } catch (err) {
+                console.error('[ChatWindow] minimize 에러:', err);
+            }
+        });
+    } else {
+        console.error('[ChatWindow] minimizeBtn 요소 없음');
+    }
+
+    if (maximizeBtn) {
+        maximizeBtn.addEventListener('click', async () => {
+            console.log('[ChatWindow] 최대화 버튼 클릭');
+            try {
+                if (window.chatAPI && typeof window.chatAPI.maximize === 'function') {
+                    const result = await window.chatAPI.maximize();
+                    console.log('[ChatWindow] maximize 결과:', result);
+                } else {
+                    console.error('[ChatWindow] chatAPI.maximize 없음:', window.chatAPI);
+                }
+            } catch (err) {
+                console.error('[ChatWindow] maximize 에러:', err);
+            }
+        });
+    } else {
+        console.error('[ChatWindow] maximizeBtn 요소 없음');
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', async () => {
+            console.log('[ChatWindow] 닫기 버튼 클릭');
+            try {
+                if (window.chatAPI && typeof window.chatAPI.close === 'function') {
+                    const result = await window.chatAPI.close();
+                    console.log('[ChatWindow] close 결과:', result);
+                } else {
+                    console.error('[ChatWindow] chatAPI.close 없음:', window.chatAPI);
+                    // 폴백: 윈도우 직접 닫기 시도
+                    window.close();
+                }
+            } catch (err) {
+                console.error('[ChatWindow] close 에러:', err);
+            }
+        });
+    } else {
+        console.error('[ChatWindow] closeBtn 요소 없음');
+    }
 }
 
 // 탭 전환
@@ -206,29 +286,59 @@ function updateConnectionUI(connected) {
 
 // 채팅 초기화
 function initChat() {
-    // 메시지 입력
-    elements.messageInput.addEventListener('input', () => {
-        elements.sendBtn.disabled = !elements.messageInput.value.trim();
-        autoResize(elements.messageInput);
-    });
+    console.log('[ChatWindow] initChat 시작');
+    console.log('[ChatWindow] elements.messageInput:', !!elements.messageInput);
+    console.log('[ChatWindow] elements.sendBtn:', !!elements.sendBtn);
+    console.log('[ChatWindow] elements.attachBtn:', !!elements.attachBtn);
+    console.log('[ChatWindow] elements.usersBtn:', !!elements.usersBtn);
 
-    elements.messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
+    // 메시지 입력
+    if (elements.messageInput) {
+        elements.messageInput.addEventListener('input', () => {
+            if (elements.sendBtn) {
+                elements.sendBtn.disabled = !elements.messageInput.value.trim();
+            }
+            autoResize(elements.messageInput);
+        });
+
+        elements.messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    } else {
+        console.error('[ChatWindow] messageInput 요소 없음');
+    }
 
     // 전송 버튼
-    elements.sendBtn.addEventListener('click', sendMessage);
+    if (elements.sendBtn) {
+        elements.sendBtn.addEventListener('click', sendMessage);
+    } else {
+        console.error('[ChatWindow] sendBtn 요소 없음');
+    }
 
     // 파일 첨부
-    elements.attachBtn.addEventListener('click', attachFile);
+    if (elements.attachBtn) {
+        elements.attachBtn.addEventListener('click', async () => {
+            console.log('[ChatWindow] 파일 첨부 버튼 클릭됨!');
+            console.log('[ChatWindow] p2pAPI 존재:', !!window.p2pAPI);
+            console.log('[ChatWindow] 현재 상태:', { mode: state.mode, nickname: state.nickname, currentRoom: state.currentRoom });
+            await attachFile();
+        });
+        console.log('[ChatWindow] attachBtn 이벤트 리스너 등록 완료');
+    } else {
+        console.error('[ChatWindow] attachBtn 요소를 찾을 수 없습니다!');
+    }
 
     // 사용자 패널 토글
-    elements.usersBtn.addEventListener('click', () => {
-        elements.usersPanel.classList.toggle('visible');
-    });
+    if (elements.usersBtn && elements.usersPanel) {
+        elements.usersBtn.addEventListener('click', () => {
+            elements.usersPanel.classList.toggle('visible');
+        });
+    } else {
+        console.error('[ChatWindow] usersBtn 또는 usersPanel 요소 없음');
+    }
 }
 
 // 메시지 전송
@@ -288,14 +398,30 @@ async function sendMessage() {
 
 // 파일 첨부 (클라우드 업로드 + P2P 전송)
 async function attachFile() {
+    console.log('=== [attachFile] 함수 호출됨 ===');
+    console.log('[attachFile] 현재 상태:', { mode: state.mode, nickname: state.nickname, currentRoom: state.currentRoom });
+    console.log('[attachFile] p2pAPI 존재:', !!window.p2pAPI);
+    console.log('[attachFile] p2pAPI.selectFile 존재:', !!(window.p2pAPI && window.p2pAPI.selectFile));
+    console.log('[attachFile] elements.chatView 존재:', !!elements.chatView);
+    console.log('[attachFile] elements.messagesContainer 존재:', !!elements.messagesContainer);
+
+    if (!window.p2pAPI) {
+        console.error('[attachFile] p2pAPI가 없습니다!');
+        alert('P2P API가 초기화되지 않았습니다.');
+        return;
+    }
+
     if (state.mode === 'offline') {
+        console.log('[attachFile] 오프라인 상태 - 파일 첨부 불가');
         alert('먼저 연결하세요.');
         return;
     }
 
     try {
+        console.log('[attachFile] 파일 선택 다이얼로그 열기...');
         // selectFile은 파일 정보 객체 또는 파일 경로 문자열을 반환
         const fileResult = await window.p2pAPI.selectFile();
+        console.log('[attachFile] 파일 선택 결과:', fileResult);
         if (fileResult) {
             // 파일 정보 추출 (객체 또는 문자열 형태 처리)
             let filePath, filename, fileSize;
@@ -310,9 +436,38 @@ async function attachFile() {
             }
 
             // 고유 전송 ID 생성
-            const transferId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const transferId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+            console.log('[attachFile] 파일 정보:', { transferId, filePath, filename, fileSize, nickname: state.nickname });
+
+            // 채팅 탭으로 전환 (다른 탭에 있을 경우)
+            const chatsTab = document.querySelector('[data-tab="chats"]');
+            console.log('[attachFile] 채팅 탭:', !!chatsTab, 'active:', chatsTab?.classList.contains('active'));
+            if (chatsTab && !chatsTab.classList.contains('active')) {
+                console.log('[attachFile] 채팅 탭으로 전환');
+                chatsTab.click();
+            }
+
+            // 채팅방이 선택되어 있지 않으면 기본 방 선택
+            console.log('[attachFile] 현재 채팅방:', state.currentRoom);
+            if (!state.currentRoom) {
+                console.log('[attachFile] 기본 채팅방 생성 중...');
+                await ensureDefaultGroupRoom();
+                console.log('[attachFile] 기본 채팅방 생성 후:', state.currentRoom);
+            }
+
+            // 채팅 뷰가 안 보이면 표시
+            console.log('[attachFile] chatView 확인:', elements.chatView);
+            if (elements.chatView && !elements.chatView.classList.contains('active')) {
+                console.log('[attachFile] chatView 표시');
+                showChatView();
+            }
+
+            console.log('[attachFile] chatView 상태:', elements.chatView?.classList.contains('active'));
+            console.log('[attachFile] messagesContainer:', elements.messagesContainer);
 
             // 채팅방에 즉시 업로드 상태 표시
+            console.log('[attachFile] addFileTransferMessage 호출...');
             addFileTransferMessage({
                 id: transferId,
                 filename: filename,
@@ -321,6 +476,8 @@ async function attachFile() {
                 direction: 'upload',
                 progress: 0
             });
+
+            console.log('[attachFile] 파일 메시지 추가 완료');
 
             try {
                 // 호스트 모드인 경우 클라우드에 업로드
@@ -341,9 +498,12 @@ async function attachFile() {
                             cloudUrl: cloudResult.downloadUrl
                         });
 
-                        // 업로드 완료 상태로 변경
+                        // 업로드 완료 상태로 변경 (다운로드 버튼 추가)
                         updateFileProgress(transferId, 100);
-                        updateFileStatus(transferId, 'completed', '업로드 완료');
+                        updateFileStatus(transferId, 'completed', '업로드 완료', {
+                            cloudFileId: cloudResult.fileId,
+                            filename: filename
+                        });
                     } catch (cloudErr) {
                         console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
                         updateFileProgress(transferId, 30);
@@ -359,13 +519,15 @@ async function attachFile() {
                     updateFileStatus(transferId, 'completed', '전송 완료');
                 }
             } catch (sendErr) {
-                console.error('파일 전송 실패:', sendErr);
+                console.error('[attachFile] 파일 전송 실패:', sendErr);
                 updateFileStatus(transferId, 'error', '전송 실패');
                 alert('파일 전송 실패: ' + sendErr.message);
             }
+        } else {
+            console.log('[attachFile] 파일 선택 취소됨');
         }
     } catch (err) {
-        console.error('파일 첨부 실패:', err);
+        console.error('[attachFile] 파일 첨부 실패:', err);
         alert('파일 선택 실패: ' + err.message);
     }
 }
@@ -419,24 +581,39 @@ function initP2PListeners() {
         addSystemMessage(`${data.nickname}님이 퇴장했습니다.`);
     });
 
-    // 파일 수신
+    // 파일 수신 완료
     window.p2pAPI.onFileReceived((data) => {
-        console.log('파일 수신:', data);
-        addFileMessage(data);
+        console.log('파일 수신 완료:', data);
+        // transferId가 있으면 기존 다운로드 중 메시지를 업데이트
+        if (data.transferId) {
+            updateFileProgress(data.transferId, 100);
+            updateFileStatus(data.transferId, 'completed', '다운로드 완료');
+            // 로컬 파일 경로 추가 (열기 버튼 활성화)
+            if (data.savedPath) {
+                updateFileLocalPath(data.transferId, data.savedPath);
+            }
+        } else {
+            // transferId가 없는 경우 새 메시지 추가
+            addFileMessage(data);
+        }
     });
 
     // 파일 전송 완료
     window.p2pAPI.onFileSent((data) => {
         console.log('파일 전송 완료:', data);
-        // 내가 보낸 파일을 채팅방에 표시
-        addFileMessage({
-            filename: data.filename,
-            size: data.size,
-            from: state.nickname, // 내 닉네임
-            savedPath: null, // 로컬 파일 경로 없음 (전송한 파일)
-            cloudFileId: data.cloudFileId || '',
-            cloudUrl: data.cloudUrl || ''
-        });
+        // transferId가 있으면 기존 전송 중 메시지를 업데이트
+        if (data.transferId) {
+            updateFileProgress(data.transferId, 100);
+            updateFileStatus(data.transferId, 'completed', '전송 완료');
+            // 클라우드 정보가 있으면 파일 메시지에 추가
+            if (data.cloudFileId || data.cloudUrl) {
+                updateFileCloudInfo(data.transferId, data.cloudFileId, data.cloudUrl);
+            }
+        } else {
+            // transferId가 없는 경우 (이전 방식 호환)
+            // 이미 attachFile에서 표시했으므로 중복 추가하지 않음
+            console.log('파일 전송 완료 (transferId 없음):', data.filename);
+        }
     });
 
     // 연결 끊김
@@ -618,8 +795,22 @@ function updateChatHeader(room) {
 
 // 채팅 뷰 표시
 function showChatView() {
-    elements.emptyState.style.display = 'none';
-    elements.chatView.classList.add('active');
+    console.log('[showChatView] 호출됨');
+    console.log('[showChatView] elements.emptyState:', !!elements.emptyState);
+    console.log('[showChatView] elements.chatView:', !!elements.chatView);
+
+    if (elements.emptyState) {
+        elements.emptyState.style.display = 'none';
+    } else {
+        console.error('[showChatView] emptyState 요소 없음');
+    }
+
+    if (elements.chatView) {
+        elements.chatView.classList.add('active');
+        console.log('[showChatView] chatView.active 추가됨');
+    } else {
+        console.error('[showChatView] chatView 요소 없음');
+    }
 }
 
 // 채팅 뷰 숨김
@@ -773,11 +964,18 @@ async function addFileMessage(data) {
 
 // 파일 전송 중 메시지 추가 (진행률 표시용)
 function addFileTransferMessage(data) {
+    console.log('[addFileTransferMessage] 호출됨:', data);
+    console.log('[addFileTransferMessage] state.nickname:', state.nickname);
+    console.log('[addFileTransferMessage] elements.messagesContainer:', !!elements.messagesContainer);
+    console.log('[addFileTransferMessage] elements.chatView:', !!elements.chatView);
+
     const isOwn = data.from === state.nickname || data.direction === 'upload';
+    console.log('[addFileTransferMessage] isOwn:', isOwn);
 
     // 이미 같은 ID의 메시지가 있으면 무시 (중복 방지)
     const existingMsg = state.messages.find(msg => msg.id === data.id);
     if (existingMsg) {
+        console.log('[addFileTransferMessage] 중복 메시지, 무시:', data.id);
         return;
     }
 
@@ -798,12 +996,36 @@ function addFileTransferMessage(data) {
     };
 
     state.messages.push(message);
+    console.log('[addFileTransferMessage] 메시지 추가됨, 총 메시지 수:', state.messages.length);
+
+    // chatView가 active가 아니면 활성화
+    if (elements.chatView && !elements.chatView.classList.contains('active')) {
+        console.log('[addFileTransferMessage] chatView 활성화');
+        showChatView();
+    }
+
     renderTransferringFile(message);
     scrollToBottom();
 }
 
 // 전송 중인 파일 렌더링 (진행률 바 포함)
 function renderTransferringFile(msg) {
+    console.log('[renderTransferringFile] 호출됨:', msg);
+    console.log('[renderTransferringFile] elements.messagesContainer:', elements.messagesContainer);
+
+    if (!elements.messagesContainer) {
+        console.error('[renderTransferringFile] messagesContainer가 없습니다! elements 상태:', elements);
+        // messagesContainer를 다시 찾아봄
+        const container = document.getElementById('messagesContainer');
+        if (container) {
+            console.log('[renderTransferringFile] messagesContainer를 직접 찾음');
+            elements.messagesContainer = container;
+        } else {
+            console.error('[renderTransferringFile] DOM에서도 messagesContainer를 찾을 수 없음');
+            return;
+        }
+    }
+
     const el = document.createElement('div');
     el.className = `message ${msg.isOwn ? 'own' : ''}`;
     el.setAttribute('data-transfer-id', msg.id);
@@ -820,11 +1042,19 @@ function renderTransferringFile(msg) {
     const statusText = msg.direction === 'upload' ? '업로드 중...' : '다운로드 중...';
     const statusClass = msg.direction === 'upload' ? 'uploading' : 'downloading';
 
+    // 파일 데이터 JSON (나중에 버튼 추가 시 사용)
+    const fileData = JSON.stringify({
+        filePath: msg.filePath || '',
+        cloudFileId: msg.cloudFileId || '',
+        cloudUrl: msg.cloudUrl || '',
+        filename: msg.filename
+    }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
     el.innerHTML = `
         <div class="message-avatar">${initial}</div>
         <div class="message-content">
             <div class="message-sender">${escapeHtml(msg.sender)}</div>
-            <div class="message-file" data-msg-id="${msg.id}">
+            <div class="message-file" data-msg-id="${msg.id}" data-file="${fileData}">
                 <div class="file-header">
                     <div class="file-icon ${fileType}">
                         ${fileIcon}
@@ -846,6 +1076,9 @@ function renderTransferringFile(msg) {
                 <div class="file-progress" style="display: block;">
                     <div class="file-progress-bar" style="width: ${msg.progress}%;"></div>
                 </div>
+                <div class="file-actions">
+                    <!-- 전송 완료 후 버튼이 동적으로 추가됨 -->
+                </div>
             </div>
             <div class="message-meta">
                 <span class="message-time">${time}</span>
@@ -854,6 +1087,8 @@ function renderTransferringFile(msg) {
     `;
 
     elements.messagesContainer.appendChild(el);
+    console.log('파일 메시지 DOM에 추가됨:', el);
+    scrollToBottom();
 }
 
 // 메시지 렌더링
@@ -1080,7 +1315,8 @@ function updateFileProgress(msgId, progress) {
 }
 
 // 파일 상태 업데이트
-function updateFileStatus(msgId, status, message) {
+function updateFileStatus(msgId, status, message, cloudInfo = null) {
+    console.log('updateFileStatus:', { msgId, status, message, cloudInfo });
     const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
     if (fileEl) {
         const statusEl = fileEl.querySelector('.file-status');
@@ -1103,6 +1339,105 @@ function updateFileStatus(msgId, status, message) {
             if (textEl) {
                 textEl.textContent = message;
             }
+        }
+
+        // 완료 시 클라우드 정보가 있으면 다운로드 버튼 추가
+        if (status === 'completed' && cloudInfo) {
+            const actionsEl = fileEl.querySelector('.file-actions');
+            if (actionsEl && !actionsEl.querySelector('.download-btn')) {
+                const { cloudFileId, filename } = cloudInfo;
+                if (cloudFileId) {
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'file-action-btn download-btn';
+                    downloadBtn.title = '다운로드';
+                    downloadBtn.onclick = () => downloadCloudFile(cloudFileId, filename);
+                    downloadBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                        <span>다운로드</span>
+                    `;
+                    actionsEl.appendChild(downloadBtn);
+                }
+            }
+        }
+    }
+}
+
+// 파일 메시지에 로컬 파일 경로 추가 (열기 버튼 활성화)
+function updateFileLocalPath(msgId, filePath) {
+    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
+    if (fileEl) {
+        try {
+            // data 속성 업데이트
+            let fileData = JSON.parse(fileEl.getAttribute('data-file') || '{}');
+            fileData.filePath = filePath;
+            fileEl.setAttribute('data-file', JSON.stringify(fileData));
+
+            // 열기 버튼이 없으면 추가
+            const actionsEl = fileEl.querySelector('.file-actions');
+            if (actionsEl && !actionsEl.querySelector('.open-btn') && filePath) {
+                const openBtn = document.createElement('button');
+                openBtn.className = 'file-action-btn open-btn';
+                openBtn.title = '파일 열기';
+                openBtn.onclick = () => openLocalFile(filePath);
+                openBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                    </svg>
+                    <span>열기</span>
+                `;
+                // 열기 버튼을 다운로드 버튼 앞에 추가
+                actionsEl.insertBefore(openBtn, actionsEl.firstChild);
+            }
+
+            // state에도 업데이트
+            const stateMsg = state.messages.find(m => m.id === msgId);
+            if (stateMsg) {
+                stateMsg.filePath = filePath;
+            }
+        } catch (err) {
+            console.error('파일 로컬 경로 업데이트 실패:', err);
+        }
+    }
+}
+
+// 파일 메시지에 클라우드 정보 추가 (다운로드 버튼 활성화)
+function updateFileCloudInfo(msgId, cloudFileId, cloudUrl) {
+    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
+    if (fileEl) {
+        // data 속성 업데이트
+        try {
+            let fileData = JSON.parse(fileEl.getAttribute('data-file') || '{}');
+            fileData.cloudFileId = cloudFileId || '';
+            fileData.cloudUrl = cloudUrl || '';
+            fileEl.setAttribute('data-file', JSON.stringify(fileData));
+
+            // 다운로드 버튼이 없으면 추가
+            const actionsEl = fileEl.querySelector('.file-actions');
+            if (actionsEl && !actionsEl.querySelector('.download-btn') && (cloudFileId || cloudUrl)) {
+                const filename = fileData.filename || '';
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'file-action-btn download-btn';
+                downloadBtn.title = '다운로드';
+                downloadBtn.onclick = () => downloadCloudFile(cloudFileId, filename);
+                downloadBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                    <span>다운로드</span>
+                `;
+                actionsEl.appendChild(downloadBtn);
+            }
+
+            // state에도 업데이트
+            const stateMsg = state.messages.find(m => m.id === msgId);
+            if (stateMsg) {
+                stateMsg.cloudFileId = cloudFileId;
+                stateMsg.cloudUrl = cloudUrl;
+            }
+        } catch (err) {
+            console.error('파일 클라우드 정보 업데이트 실패:', err);
         }
     }
 }
@@ -1913,8 +2248,15 @@ async function saveRoom() {
 // ============================================
 
 // DOMContentLoaded 이벤트에 사이드바 탭 초기화 추가
-const originalDOMContentLoaded = document.addEventListener;
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[ChatWindow] DOMContentLoaded 시작');
+    console.log('[ChatWindow] chatAPI 존재:', !!window.chatAPI);
+    console.log('[ChatWindow] p2pAPI 존재:', !!window.p2pAPI);
+    console.log('[ChatWindow] messengerDB 존재:', !!window.messengerDB);
+
+    // DOM 요소 먼저 초기화 (가장 먼저 실행!)
+    initElements();
+
     initTitlebar();
     initTabs();
     initSidebarTabs();

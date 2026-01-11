@@ -1,0 +1,8 @@
+{
+  "id": "p2p-messenger",
+  "name": "P2P 메신저",
+  "version": "1.0.8",
+  "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
+  "sha256": "9f3392a7ba05191c3dd10d8b5259e566ad02796e67a322d8954b50dddcb099aa",
+  "minAppVersion": "1.0.0"
+}

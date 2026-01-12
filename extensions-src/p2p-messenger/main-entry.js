@@ -306,6 +306,38 @@ function registerIpcHandlers() {
         return { success: false };
     });
 
+    // 이미지 파일을 Base64로 읽기 (file:// 프로토콜 대신 사용)
+    ipcMain.handle('chat:readImageAsBase64', async (event, filePath) => {
+        try {
+            if (!filePath || !fs.existsSync(filePath)) {
+                return { success: false, error: '파일을 찾을 수 없습니다' };
+            }
+
+            // 파일 확장자로 MIME 타입 결정
+            const ext = path.extname(filePath).toLowerCase().slice(1);
+            const mimeTypes = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'gif': 'image/gif',
+                'bmp': 'image/bmp',
+                'webp': 'image/webp',
+                'svg': 'image/svg+xml'
+            };
+            const mimeType = mimeTypes[ext] || 'image/png';
+
+            // 파일을 Base64로 읽기
+            const imageBuffer = fs.readFileSync(filePath);
+            const base64 = imageBuffer.toString('base64');
+            const dataUrl = `data:${mimeType};base64,${base64}`;
+
+            return { success: true, dataUrl };
+        } catch (err) {
+            console.error('[P2P Extension] 이미지 읽기 실패:', err);
+            return { success: false, error: err.message };
+        }
+    });
+
     // 파일 열기
     ipcMain.handle('chat:openFile', async (event, filePath) => {
         if (filePath && fs.existsSync(filePath)) {
@@ -575,7 +607,7 @@ function unregisterIpcHandlers() {
         'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:sendFile',
         'p2p:selectFile', 'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
         'p2p:openDownloads',
-        'chat:minimize', 'chat:maximize', 'chat:close', 'chat:showNotification',
+        'chat:minimize', 'chat:maximize', 'chat:close', 'chat:showNotification', 'chat:readImageAsBase64',
         'chat:openFile', 'chat:openFileFolder', 'chat:downloadAndOpenFile',
         'cloud:getStatus', 'cloud:getFiles', 'cloud:uploadFile', 'cloud:deleteFile', 'cloud:selectAndUpload', 'cloud:openStorage',
         'messenger:getContacts', 'messenger:addContact', 'messenger:deleteContact', 'messenger:updateContactStatus',

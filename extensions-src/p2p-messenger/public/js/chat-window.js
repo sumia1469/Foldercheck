@@ -811,10 +811,14 @@ function renderMessage(msg) {
         const hasCloudFile = msg.cloudUrl || msg.cloudFileId;
 
         // 이미지 미리보기 URL 결정
+        // 로컬 파일은 file:// 프로토콜 대신 Base64로 로드함 (Electron 보안 정책)
         let imagePreviewUrl = '';
+        let needsBase64Load = false;
         if (isImage) {
             if (hasLocalFile) {
-                imagePreviewUrl = `file://${msg.filePath.replace(/\\/g, '/')}`;
+                // 로컬 파일은 나중에 Base64로 로드
+                imagePreviewUrl = '';
+                needsBase64Load = true;
             } else if (msg.cloudUrl) {
                 imagePreviewUrl = msg.cloudUrl;
             } else if (hasCloudFile) {
@@ -830,9 +834,10 @@ function renderMessage(msg) {
                 <div class="message-content">
                     <div class="message-sender">${escapeHtml(msg.sender)}</div>
                     <div class="message-image-container" data-file='${fileData}'>
-                        <div class="image-preview-wrapper" onclick="openImageViewer('${escapeHtml(imagePreviewUrl)}', '${escapeHtml(msg.filename)}')">
+                        <div class="image-preview-wrapper" onclick="openImageViewer('${escapeHtml(imagePreviewUrl)}', '${escapeHtml(msg.filename)}', '${hasLocalFile ? escapeHtml(msg.filePath).replace(/\\/g, '\\\\') : ''}')">
                             <img class="message-image-preview"
-                                 src="${hasLocalFile ? imagePreviewUrl : ''}"
+                                 src=""
+                                 data-local-path="${hasLocalFile ? escapeHtml(msg.filePath) : ''}"
                                  data-cloud-id="${msg.cloudFileId || ''}"
                                  data-filename="${escapeHtml(msg.filename)}"
                                  alt="${escapeHtml(msg.filename)}"
@@ -884,8 +889,12 @@ function renderMessage(msg) {
                 </div>
             `;
 
-            // 클라우드 이미지인 경우 URL을 동적으로 로드
-            if (!hasLocalFile && hasCloudFile) {
+            // 이미지 로드 처리
+            if (needsBase64Load && hasLocalFile) {
+                // 로컬 파일: Base64로 로드
+                loadLocalImageAsBase64(el.querySelector('.message-image-preview'), msg.filePath);
+            } else if (!hasLocalFile && hasCloudFile) {
+                // 클라우드 이미지: URL을 동적으로 로드
                 loadCloudImagePreview(el.querySelector('.message-image-preview'), msg.cloudFileId, msg.filename);
             }
         } else {
@@ -1116,6 +1125,24 @@ function openFile(filePath) {
     }
 }
 
+// 로컬 이미지를 Base64로 로드
+async function loadLocalImageAsBase64(imgElement, filePath) {
+    if (!imgElement || !filePath) return;
+
+    try {
+        if (window.chatAPI?.readImageAsBase64) {
+            const result = await window.chatAPI.readImageAsBase64(filePath);
+            if (result.success && result.dataUrl) {
+                imgElement.src = result.dataUrl;
+                return true;
+            }
+        }
+    } catch (err) {
+        console.error('로컬 이미지 로드 실패:', err);
+    }
+    return false;
+}
+
 // 클라우드 이미지 미리보기 로드
 async function loadCloudImagePreview(imgElement, cloudFileId, filename) {
     if (!imgElement || !cloudFileId) return;
@@ -1143,7 +1170,7 @@ async function loadCloudImagePreview(imgElement, cloudFileId, filename) {
 }
 
 // 이미지 뷰어 열기
-function openImageViewer(imageUrl, filename) {
+function openImageViewer(imageUrl, filename, localFilePath) {
     // 모달 생성
     const modal = document.createElement('div');
     modal.className = 'image-viewer-modal';
@@ -1159,8 +1186,14 @@ function openImageViewer(imageUrl, filename) {
                 </button>
             </div>
             <div class="image-viewer-body">
-                <img src="${imageUrl.startsWith('cloud://') ? '' : imageUrl}" alt="${escapeHtml(filename)}"
-                     data-cloud-url="${imageUrl}" />
+                <div class="image-loading-placeholder">
+                    <div class="loading-spinner"></div>
+                </div>
+                <img src="" alt="${escapeHtml(filename)}"
+                     data-cloud-url="${imageUrl}"
+                     data-local-path="${localFilePath || ''}"
+                     style="display: none;"
+                     onload="this.style.display='block'; this.previousElementSibling.style.display='none';" />
             </div>
             <div class="image-viewer-footer">
                 <button class="image-viewer-btn" onclick="downloadImageFromViewer('${escapeHtml(imageUrl)}', '${escapeHtml(filename)}')">
@@ -1175,13 +1208,20 @@ function openImageViewer(imageUrl, filename) {
 
     document.body.appendChild(modal);
 
-    // 클라우드 URL인 경우 실제 URL로 변환
-    if (imageUrl.startsWith('cloud://')) {
-        const img = modal.querySelector('.image-viewer-body img');
+    const img = modal.querySelector('.image-viewer-body img');
+
+    // 로컬 파일인 경우 Base64로 로드
+    if (localFilePath) {
+        loadLocalImageAsBase64(img, localFilePath);
+    } else if (imageUrl.startsWith('cloud://')) {
+        // 클라우드 URL인 경우 실제 URL로 변환
         const parts = imageUrl.replace('cloud://', '').split('/');
         const cloudFileId = parts[0];
         const fname = decodeURIComponent(parts.slice(1).join('/'));
         loadCloudImagePreview(img, cloudFileId, fname);
+    } else if (imageUrl) {
+        // 일반 URL
+        img.src = imageUrl;
     }
 
     // ESC 키로 닫기

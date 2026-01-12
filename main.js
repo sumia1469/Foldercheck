@@ -693,6 +693,18 @@ function createWindow() {
     // 개발 시 DevTools 열기 (필요 시 주석 해제)
     // mainWindow.webContents.openDevTools();
 
+    // 개발자 도구 열기 차단 (프로덕션에서만)
+    if (isPackaged) {
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            // F12, Ctrl+Shift+I, Cmd+Option+I 차단
+            if (input.key === 'F12' ||
+                (input.control && input.shift && input.key.toLowerCase() === 'i') ||
+                (input.meta && input.alt && input.key.toLowerCase() === 'i')) {
+                event.preventDefault();
+            }
+        });
+    }
+
     mainWindow.on('close', (event) => {
         if (!app.isQuitting) {
             event.preventDefault();

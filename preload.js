@@ -36,7 +36,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isElectron: true,
 
     // 일반 IPC invoke (확장 UI 렌더링 등)
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+
+    // Ollama 엔진 다운로드 API
+    downloadOllamaEngine: () => ipcRenderer.invoke('ollama:downloadEngine'),
+    getOllamaDownloadProgress: () => ipcRenderer.invoke('ollama:downloadProgress'),
+    startOllamaEngine: () => ipcRenderer.invoke('ollama:startEngine')
 });
 
 // Extension API
@@ -204,7 +209,7 @@ contextBridge.exposeInMainWorld('p2pAPI', {
     disconnect: () => ipcRenderer.invoke('p2p:disconnect').catch(() => ({ success: false })),
 
     // 메시징
-    sendMessage: (content) => ipcRenderer.invoke('p2p:sendMessage', content).catch(() => ({ success: false })),
+    sendMessage: (content, options = {}) => ipcRenderer.invoke('p2p:sendMessage', content, options).catch(() => ({ success: false })),
     getHistory: () => ipcRenderer.invoke('p2p:getHistory').catch(() => []),
 
     // 파일 전송

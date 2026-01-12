@@ -189,9 +189,9 @@ function registerIpcHandlers() {
     });
 
     // 메시지 전송
-    ipcMain.handle('p2p:sendMessage', async (event, message) => {
+    ipcMain.handle('p2p:sendMessage', async (event, content, options = {}) => {
         if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
-        return p2pMessenger.sendMessage(message);
+        return p2pMessenger.sendMessage(content, options);
     });
 
     // 파일 전송

@@ -310,34 +310,40 @@ async function sendMessage() {
     const replyTo = state.replyTo ? state.replyTo.id : null;
     const replyPreview = state.replyTo ? state.replyTo.preview : null;
 
+    // 메시지 데이터 준비
+    const messageData = {
+        id: Date.now(),
+        type: 'chat',
+        nickname: state.nickname || '나',
+        content: content,
+        timestamp: Date.now(),
+        replyTo,
+        replyPreview,
+        roomId: state.currentRoom
+    };
+
     try {
-        // P2P 연결 상태에서 그룹 채팅인 경우 P2P로 전송
-        if (state.mode !== 'offline' && !isDirectChat) {
-            // 게스트 모드일 때 내 메시지를 바로 화면에 표시
-            // (호스트는 emit으로 처리되므로 게스트만 직접 표시)
-            if (state.mode === 'guest') {
-                const messageData = {
-                    id: Date.now(),
-                    type: 'chat',
-                    nickname: state.nickname || '나',
-                    content: content,
-                    timestamp: Date.now(),
-                    replyTo,
-                    replyPreview
-                };
+        // P2P 연결 상태에서만 전송
+        if (state.mode !== 'offline') {
+            // 1:1 채팅인 경우 대상 닉네임 추출
+            let targetNickname = null;
+            if (isDirectChat) {
+                // room.name 또는 room.targetNickname에서 대상 닉네임 추출
+                targetNickname = room.targetNickname || room.name;
+            }
+
+            // 내 메시지를 바로 화면에 표시 (게스트 모드 또는 1:1 채팅)
+            if (state.mode === 'guest' || isDirectChat) {
                 addMessage(messageData);
             }
-            await window.p2pAPI.sendMessage(content);
+
+            // P2P로 전송 (그룹 채팅 또는 1:1 채팅 모두)
+            await window.p2pAPI.sendMessage(content, {
+                targetNickname: targetNickname,
+                roomId: state.currentRoom
+            });
         } else {
-            // 오프라인이거나 1:1 채팅인 경우 로컬에만 저장하고 화면에 표시
-            const messageData = {
-                id: Date.now(),
-                nickname: state.nickname || '나',
-                content: content,
-                timestamp: Date.now(),
-                replyTo,
-                replyPreview
-            };
+            // 오프라인인 경우 로컬에만 저장하고 화면에 표시
             addMessage(messageData);
         }
 
@@ -349,16 +355,8 @@ async function sendMessage() {
         autoResize(elements.messageInput);
     } catch (err) {
         console.error('메시지 전송 실패:', err);
-        // 에러 발생 시에도 로컬에 저장 (게스트 모드가 아닐 때만)
-        if (state.mode !== 'guest') {
-            const messageData = {
-                id: Date.now(),
-                nickname: state.nickname || '나',
-                content: content,
-                timestamp: Date.now(),
-                replyTo,
-                replyPreview
-            };
+        // 에러 발생 시에도 로컬에 저장 (아직 화면에 표시 안된 경우만)
+        if (state.mode !== 'guest' && !isDirectChat) {
             addMessage(messageData);
         }
         clearReplyTo();
@@ -419,13 +417,63 @@ function initP2PListeners() {
     });
 
     // 메시지 수신
-    window.p2pAPI.onMessage((data) => {
+    window.p2pAPI.onMessage(async (data) => {
         console.log('메시지 수신:', data);
         // 게스트 모드에서 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시
         if (state.mode === 'guest' && data.nickname === state.nickname) {
             console.log('게스트 모드: 자신의 메시지 에코 무시');
             return;
         }
+
+        // 1:1 채팅 메시지인 경우
+        if (data.targetNickname) {
+            // 발신자와의 1:1 채팅방 roomId 계산 (양쪽에서 동일한 ID)
+            const sortedNames = [state.nickname, data.nickname].sort();
+            const directRoomId = `direct_${sortedNames[0]}_${sortedNames[1]}`.replace(/\s+/g, '_');
+
+            // 해당 채팅방이 없으면 자동 생성
+            let room = state.rooms.find(r => r.id === directRoomId);
+            if (!room) {
+                console.log('1:1 채팅방 자동 생성:', directRoomId);
+                // 채팅방 생성
+                if (window.messengerDB) {
+                    await window.messengerDB.createRoom({
+                        id: directRoomId,
+                        type: 'direct',
+                        name: data.nickname,
+                        targetNickname: data.nickname
+                    });
+                }
+                // 채팅방 목록에 추가
+                addRoom({
+                    id: directRoomId,
+                    name: data.nickname,
+                    type: 'direct',
+                    targetNickname: data.nickname,
+                    unread: 0
+                });
+                room = state.rooms.find(r => r.id === directRoomId);
+            }
+
+            // 현재 해당 채팅방이 선택되어 있지 않으면 알림
+            if (state.currentRoom !== directRoomId) {
+                // unread 카운트 증가
+                if (room) room.unread = (room.unread || 0) + 1;
+                renderRoomList();
+
+                // 데스크톱 알림
+                if (window.chatAPI?.showNotification) {
+                    window.chatAPI.showNotification(
+                        `${data.nickname}님의 메시지`,
+                        data.content.substring(0, 50)
+                    );
+                }
+            }
+
+            // 메시지에 roomId 설정하여 추가
+            data.roomId = directRoomId;
+        }
+
         addMessage(data);
     });
 
@@ -701,18 +749,25 @@ async function addMessage(data) {
         timestamp: data.timestamp || Date.now(),
         isOwn,
         replyTo: data.replyTo || null,
-        replyPreview: data.replyPreview || null
+        replyPreview: data.replyPreview || null,
+        roomId: data.roomId || null
     };
 
-    state.messages.push(message);
-    renderMessage(message);
-    scrollToBottom();
+    // 메시지의 roomId 결정 (1:1 메시지는 data.roomId, 그룹 채팅은 state.currentRoom)
+    const targetRoomId = data.roomId || state.currentRoom;
+
+    // 현재 선택된 채팅방의 메시지인 경우에만 화면에 표시
+    if (targetRoomId === state.currentRoom) {
+        state.messages.push(message);
+        renderMessage(message);
+        scrollToBottom();
+    }
 
     // DB에 메시지 저장
-    if (state.currentRoom && window.messengerDB) {
+    if (targetRoomId && window.messengerDB) {
         try {
             await window.messengerDB.saveMessage({
-                roomId: state.currentRoom,
+                roomId: targetRoomId,
                 senderId: isOwn ? (state.myContactId || 'self') : `remote_${data.nickname}`,
                 senderNickname: data.nickname || state.nickname,
                 type: 'text',
@@ -1088,14 +1143,28 @@ function updateUsersList() {
 async function startDirectChat(nickname) {
     if (nickname === state.nickname) return; // 자신과는 채팅 불가
 
-    const roomId = `direct_${nickname.replace(/\s+/g, '_')}_${Date.now()}`;
+    // 고정된 roomId 생성 (상대방 닉네임 기반 - 중복 방지)
+    // 양쪽에서 동일한 roomId를 사용하도록 정렬하여 생성
+    const sortedNames = [state.nickname, nickname].sort();
+    const roomId = `direct_${sortedNames[0]}_${sortedNames[1]}`.replace(/\s+/g, '_');
+
+    // 기존 채팅방이 있는지 확인
+    const existingRoom = state.rooms.find(r => r.id === roomId);
+    if (existingRoom) {
+        // 기존 채팅방으로 이동
+        document.querySelector('[data-tab="chats"]')?.click();
+        selectRoom(roomId);
+        elements.usersPanel.classList.remove('visible');
+        return;
+    }
 
     // 채팅방 생성
     if (window.messengerDB) {
         await window.messengerDB.createRoom({
             id: roomId,
             type: 'direct',
-            name: nickname
+            name: nickname,
+            targetNickname: nickname // 상대방 닉네임 저장
         });
 
         if (state.myContactId) {
@@ -1108,6 +1177,7 @@ async function startDirectChat(nickname) {
         id: roomId,
         name: nickname,
         type: 'direct',
+        targetNickname: nickname,
         unread: 0
     });
 

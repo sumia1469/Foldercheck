@@ -535,6 +535,168 @@ function stopEmbeddedOllama() {
     }
 }
 
+// Ollama 다운로드 URL (플랫폼별)
+const OLLAMA_DOWNLOAD_URLS = {
+    win32: 'https://github.com/ollama/ollama/releases/download/v0.5.7/ollama-windows-amd64.zip',
+    darwin: 'https://github.com/ollama/ollama/releases/download/v0.5.7/ollama-darwin',
+    linux: 'https://github.com/ollama/ollama/releases/download/v0.5.7/ollama-linux-amd64'
+};
+
+// Ollama 다운로드 진행 상태
+let ollamaEngineDownloadProgress = {
+    downloading: false,
+    progress: 0,
+    status: '',
+    error: null
+};
+
+// Ollama 엔진 다운로드
+async function downloadOllamaEngine() {
+    if (ollamaEngineDownloadProgress.downloading) {
+        throw new Error('이미 다운로드 중입니다.');
+    }
+
+    const platform = process.platform;
+    const downloadUrl = OLLAMA_DOWNLOAD_URLS[platform];
+
+    if (!downloadUrl) {
+        throw new Error(`지원하지 않는 플랫폼입니다: ${platform}`);
+    }
+
+    ollamaEngineDownloadProgress = {
+        downloading: true,
+        progress: 0,
+        status: '다운로드 준비 중...',
+        error: null
+    };
+
+    const ollamaDir = getEmbeddedOllamaPath();
+    const tempDir = path.join(os.tmpdir(), 'ollama-download');
+
+    try {
+        // 디렉토리 생성
+        if (!fs.existsSync(ollamaDir)) {
+            fs.mkdirSync(ollamaDir, { recursive: true });
+        }
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const https = require('https');
+        const AdmZip = require('adm-zip');
+
+        // 다운로드 파일 경로
+        const isZip = downloadUrl.endsWith('.zip');
+        const downloadPath = path.join(tempDir, isZip ? 'ollama.zip' : 'ollama');
+
+        console.log(`[Ollama Download] 다운로드 시작: ${downloadUrl}`);
+        ollamaEngineDownloadProgress.status = '다운로드 중...';
+
+        // 파일 다운로드 (리다이렉트 처리)
+        await new Promise((resolve, reject) => {
+            const downloadFile = (url, redirectCount = 0) => {
+                if (redirectCount > 5) {
+                    reject(new Error('리다이렉트 횟수 초과'));
+                    return;
+                }
+
+                const protocol = url.startsWith('https') ? https : require('http');
+                protocol.get(url, (res) => {
+                    // 리다이렉트 처리
+                    if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+                        downloadFile(res.headers.location, redirectCount + 1);
+                        return;
+                    }
+
+                    if (res.statusCode !== 200) {
+                        reject(new Error(`다운로드 실패: ${res.statusCode}`));
+                        return;
+                    }
+
+                    const totalSize = parseInt(res.headers['content-length'], 10) || 0;
+                    let downloadedSize = 0;
+
+                    const writeStream = fs.createWriteStream(downloadPath);
+                    res.pipe(writeStream);
+
+                    res.on('data', (chunk) => {
+                        downloadedSize += chunk.length;
+                        if (totalSize > 0) {
+                            ollamaEngineDownloadProgress.progress = Math.round((downloadedSize / totalSize) * 100);
+                            ollamaEngineDownloadProgress.status = `다운로드 중... (${Math.round(downloadedSize / 1024 / 1024)}MB / ${Math.round(totalSize / 1024 / 1024)}MB)`;
+                        }
+                    });
+
+                    writeStream.on('finish', () => {
+                        writeStream.close();
+                        resolve();
+                    });
+
+                    writeStream.on('error', reject);
+                }).on('error', reject);
+            };
+
+            downloadFile(downloadUrl);
+        });
+
+        ollamaEngineDownloadProgress.status = '압축 해제 중...';
+        ollamaEngineDownloadProgress.progress = 95;
+
+        // 압축 해제 또는 파일 복사
+        if (isZip) {
+            console.log('[Ollama Download] ZIP 압축 해제 중...');
+            const zip = new AdmZip(downloadPath);
+            zip.extractAllTo(ollamaDir, true);
+
+            // Windows의 경우 ollama.exe가 루트에 있는지 확인
+            const ollamaExe = path.join(ollamaDir, 'ollama.exe');
+            if (!fs.existsSync(ollamaExe)) {
+                // 서브 디렉토리에서 찾기
+                const entries = zip.getEntries();
+                for (const entry of entries) {
+                    if (entry.entryName.endsWith('ollama.exe')) {
+                        const srcPath = path.join(ollamaDir, entry.entryName);
+                        if (fs.existsSync(srcPath) && srcPath !== ollamaExe) {
+                            fs.copyFileSync(srcPath, ollamaExe);
+                        }
+                        break;
+                    }
+                }
+            }
+        } else {
+            // macOS/Linux: 바이너리 복사 및 실행 권한 부여
+            const ollamaBinary = path.join(ollamaDir, 'ollama');
+            fs.copyFileSync(downloadPath, ollamaBinary);
+            fs.chmodSync(ollamaBinary, 0o755);
+        }
+
+        // 임시 파일 정리
+        try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch (e) {
+            console.log('[Ollama Download] 임시 파일 정리 실패:', e.message);
+        }
+
+        ollamaEngineDownloadProgress.downloading = false;
+        ollamaEngineDownloadProgress.progress = 100;
+        ollamaEngineDownloadProgress.status = '설치 완료';
+
+        console.log('[Ollama Download] 설치 완료!');
+
+        // Ollama 시작
+        console.log('[Ollama Download] Ollama 시작 중...');
+        await startEmbeddedOllama();
+
+        return { success: true };
+
+    } catch (err) {
+        console.error('[Ollama Download] 오류:', err.message);
+        ollamaEngineDownloadProgress.downloading = false;
+        ollamaEngineDownloadProgress.error = err.message;
+        throw err;
+    }
+}
+
 // 포트 사용 중인 프로세스 종료 (크로스 플랫폼)
 function killProcessOnPort(port) {
     try {
@@ -927,6 +1089,31 @@ ipcMain.handle('check-for-updates', async () => {
 // IPC 핸들러: 현재 버전 가져오기
 ipcMain.handle('get-app-version', () => {
     return app.getVersion();
+});
+
+// IPC 핸들러: Ollama 엔진 다운로드 시작
+ipcMain.handle('ollama:downloadEngine', async () => {
+    try {
+        await downloadOllamaEngine();
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+// IPC 핸들러: Ollama 엔진 다운로드 진행 상황
+ipcMain.handle('ollama:downloadProgress', () => {
+    return ollamaEngineDownloadProgress;
+});
+
+// IPC 핸들러: Ollama 엔진 시작
+ipcMain.handle('ollama:startEngine', async () => {
+    try {
+        const started = await startEmbeddedOllama();
+        return { success: started };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
 });
 
 // 단일 인스턴스 실행

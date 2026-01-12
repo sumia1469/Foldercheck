@@ -115,7 +115,7 @@ contextBridge.exposeInMainWorld('p2pAPI', {
     disconnect: () => ipcRenderer.invoke('p2p:disconnect'),
 
     // 메시징
-    sendMessage: (content) => ipcRenderer.invoke('p2p:sendMessage', content),
+    sendMessage: (content, options = {}) => ipcRenderer.invoke('p2p:sendMessage', content, options),
     getHistory: () => ipcRenderer.invoke('p2p:getHistory'),
 
     // 파일 전송

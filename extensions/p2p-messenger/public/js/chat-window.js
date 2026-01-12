@@ -69,6 +69,9 @@ function isOpenableFileType(filename) {
     return openableTypes.includes(ext);
 }
 
+// 리액션 이모지 목록
+const REACTIONS = ['👍', '❤️', '😊', '😮', '😢', '👏'];
+
 // 상태 관리
 const state = {
     mode: 'offline', // offline, host, guest
@@ -81,67 +84,43 @@ const state = {
     contacts: [],    // 연락처 목록
     groups: [],      // 그룹 목록
     cloudFiles: [],  // 클라우드 파일 목록
-    cloudStatus: { status: 'stopped' } // 클라우드 서버 상태
+    cloudStatus: { status: 'stopped' }, // 클라우드 서버 상태
+    replyTo: null,   // 회신 대상 메시지
+    mentionQuery: '' // @멘션 검색어
 };
 
-// DOM 요소 (DOMContentLoaded 후 초기화)
-let elements = {};
+// DOM 요소
+const elements = {
+    // 상태
+    statusDot: document.getElementById('statusDot'),
+    statusText: document.getElementById('statusText'),
 
-// DOM 요소 초기화 함수
-function initElements() {
-    elements = {
-        // 상태
-        statusDot: document.getElementById('statusDot'),
-        statusText: document.getElementById('statusText'),
+    // 연결 상태 패널
+    connectStatusPanel: document.getElementById('connectStatusPanel'),
+    connectionStatusText: document.getElementById('connectionStatusText'),
 
-        // 연결 상태 패널
-        connectStatusPanel: document.getElementById('connectStatusPanel'),
-        connectionStatusText: document.getElementById('connectionStatusText'),
+    // 채팅
+    roomList: document.getElementById('roomList'),
+    emptyState: document.getElementById('emptyState'),
+    chatView: document.getElementById('chatView'),
+    chatAvatar: document.getElementById('chatAvatar'),
+    chatName: document.getElementById('chatName'),
+    chatStatus: document.getElementById('chatStatus'),
+    messagesContainer: document.getElementById('messagesContainer'),
+    messageInput: document.getElementById('messageInput'),
+    sendBtn: document.getElementById('sendBtn'),
+    attachBtn: document.getElementById('attachBtn'),
 
-        // 채팅
-        roomList: document.getElementById('roomList'),
-        emptyState: document.getElementById('emptyState'),
-        chatView: document.getElementById('chatView'),
-        chatAvatar: document.getElementById('chatAvatar'),
-        chatName: document.getElementById('chatName'),
-        chatStatus: document.getElementById('chatStatus'),
-        messagesContainer: document.getElementById('messagesContainer'),
-        messageInput: document.getElementById('messageInput'),
-        sendBtn: document.getElementById('sendBtn'),
-        attachBtn: document.getElementById('attachBtn'),
+    // 사용자
+    usersPanel: document.getElementById('usersPanel'),
+    usersBtn: document.getElementById('usersBtn'),
+    usersList: document.getElementById('usersList'),
+    userCount: document.getElementById('userCount'),
 
-        // 사용자
-        usersPanel: document.getElementById('usersPanel'),
-        usersBtn: document.getElementById('usersBtn'),
-        usersList: document.getElementById('usersList'),
-        userCount: document.getElementById('userCount'),
-
-        // 타이핑
-        typingIndicator: document.getElementById('typingIndicator'),
-        typingText: document.getElementById('typingText')
-    };
-
-    // 요소 초기화 확인 로그
-    console.log('[ChatWindow] DOM 요소 초기화 완료:');
-    console.log('  - attachBtn:', !!elements.attachBtn);
-    console.log('  - sendBtn:', !!elements.sendBtn);
-    console.log('  - messageInput:', !!elements.messageInput);
-    console.log('  - messagesContainer:', !!elements.messagesContainer);
-    console.log('  - chatView:', !!elements.chatView);
-    console.log('  - emptyState:', !!elements.emptyState);
-    console.log('  - roomList:', !!elements.roomList);
-
-    // 누락된 요소 경고
-    const missingElements = [];
-    if (!elements.attachBtn) missingElements.push('attachBtn');
-    if (!elements.messagesContainer) missingElements.push('messagesContainer');
-    if (!elements.chatView) missingElements.push('chatView');
-    if (!elements.emptyState) missingElements.push('emptyState');
-
-    if (missingElements.length > 0) {
-        console.error('[ChatWindow] 누락된 DOM 요소:', missingElements);
-    }
-}
+    // 타이핑
+    typingIndicator: document.getElementById('typingIndicator'),
+    typingText: document.getElementById('typingText')
+};
 
 // 초기화는 파일 끝의 DOMContentLoaded에서 처리
 
@@ -153,21 +132,10 @@ async function loadMyProfile() {
             if (myProfile) {
                 state.myContactId = myProfile.id;
                 state.nickname = myProfile.nickname;
-            } else {
-                // 프로필이 없으면 기본 프로필 생성
-                const defaultId = `user_${Date.now()}`;
-                const defaultNickname = '사용자';
-                await saveMyProfile({ id: defaultId, nickname: defaultNickname });
-                console.log('기본 프로필 생성:', defaultId, defaultNickname);
             }
         }
     } catch (err) {
         console.error('프로필 로드 실패:', err);
-        // 에러 시에도 기본값 설정
-        if (!state.myContactId) {
-            state.myContactId = `user_${Date.now()}`;
-            state.nickname = '사용자';
-        }
     }
 }
 
@@ -211,71 +179,17 @@ async function checkP2PStatus() {
 
 // 타이틀바 컨트롤
 function initTitlebar() {
-    console.log('[ChatWindow] initTitlebar 시작');
-    console.log('[ChatWindow] chatAPI:', window.chatAPI);
-    console.log('[ChatWindow] chatAPI.close:', window.chatAPI?.close);
+    document.getElementById('minimizeBtn').addEventListener('click', () => {
+        window.chatAPI?.minimize();
+    });
 
-    const minimizeBtn = document.getElementById('minimizeBtn');
-    const maximizeBtn = document.getElementById('maximizeBtn');
-    const closeBtn = document.getElementById('closeBtn');
+    document.getElementById('maximizeBtn').addEventListener('click', () => {
+        window.chatAPI?.maximize();
+    });
 
-    console.log('[ChatWindow] 버튼 요소:', { minimizeBtn: !!minimizeBtn, maximizeBtn: !!maximizeBtn, closeBtn: !!closeBtn });
-
-    if (minimizeBtn) {
-        minimizeBtn.addEventListener('click', async () => {
-            console.log('[ChatWindow] 최소화 버튼 클릭');
-            try {
-                if (window.chatAPI && typeof window.chatAPI.minimize === 'function') {
-                    const result = await window.chatAPI.minimize();
-                    console.log('[ChatWindow] minimize 결과:', result);
-                } else {
-                    console.error('[ChatWindow] chatAPI.minimize 없음:', window.chatAPI);
-                }
-            } catch (err) {
-                console.error('[ChatWindow] minimize 에러:', err);
-            }
-        });
-    } else {
-        console.error('[ChatWindow] minimizeBtn 요소 없음');
-    }
-
-    if (maximizeBtn) {
-        maximizeBtn.addEventListener('click', async () => {
-            console.log('[ChatWindow] 최대화 버튼 클릭');
-            try {
-                if (window.chatAPI && typeof window.chatAPI.maximize === 'function') {
-                    const result = await window.chatAPI.maximize();
-                    console.log('[ChatWindow] maximize 결과:', result);
-                } else {
-                    console.error('[ChatWindow] chatAPI.maximize 없음:', window.chatAPI);
-                }
-            } catch (err) {
-                console.error('[ChatWindow] maximize 에러:', err);
-            }
-        });
-    } else {
-        console.error('[ChatWindow] maximizeBtn 요소 없음');
-    }
-
-    if (closeBtn) {
-        closeBtn.addEventListener('click', async () => {
-            console.log('[ChatWindow] 닫기 버튼 클릭');
-            try {
-                if (window.chatAPI && typeof window.chatAPI.close === 'function') {
-                    const result = await window.chatAPI.close();
-                    console.log('[ChatWindow] close 결과:', result);
-                } else {
-                    console.error('[ChatWindow] chatAPI.close 없음:', window.chatAPI);
-                    // 폴백: 윈도우 직접 닫기 시도
-                    window.close();
-                }
-            } catch (err) {
-                console.error('[ChatWindow] close 에러:', err);
-            }
-        });
-    } else {
-        console.error('[ChatWindow] closeBtn 요소 없음');
-    }
+    document.getElementById('closeBtn').addEventListener('click', () => {
+        window.chatAPI?.close();
+    });
 }
 
 // 탭 전환
@@ -353,59 +267,29 @@ function updateConnectionUI(connected) {
 
 // 채팅 초기화
 function initChat() {
-    console.log('[ChatWindow] initChat 시작');
-    console.log('[ChatWindow] elements.messageInput:', !!elements.messageInput);
-    console.log('[ChatWindow] elements.sendBtn:', !!elements.sendBtn);
-    console.log('[ChatWindow] elements.attachBtn:', !!elements.attachBtn);
-    console.log('[ChatWindow] elements.usersBtn:', !!elements.usersBtn);
-
     // 메시지 입력
-    if (elements.messageInput) {
-        elements.messageInput.addEventListener('input', () => {
-            if (elements.sendBtn) {
-                elements.sendBtn.disabled = !elements.messageInput.value.trim();
-            }
-            autoResize(elements.messageInput);
-        });
+    elements.messageInput.addEventListener('input', () => {
+        elements.sendBtn.disabled = !elements.messageInput.value.trim();
+        autoResize(elements.messageInput);
+    });
 
-        elements.messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    } else {
-        console.error('[ChatWindow] messageInput 요소 없음');
-    }
+    elements.messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
 
     // 전송 버튼
-    if (elements.sendBtn) {
-        elements.sendBtn.addEventListener('click', sendMessage);
-    } else {
-        console.error('[ChatWindow] sendBtn 요소 없음');
-    }
+    elements.sendBtn.addEventListener('click', sendMessage);
 
     // 파일 첨부
-    if (elements.attachBtn) {
-        elements.attachBtn.addEventListener('click', async () => {
-            console.log('[ChatWindow] 파일 첨부 버튼 클릭됨!');
-            console.log('[ChatWindow] p2pAPI 존재:', !!window.p2pAPI);
-            console.log('[ChatWindow] 현재 상태:', { mode: state.mode, nickname: state.nickname, currentRoom: state.currentRoom });
-            await attachFile();
-        });
-        console.log('[ChatWindow] attachBtn 이벤트 리스너 등록 완료');
-    } else {
-        console.error('[ChatWindow] attachBtn 요소를 찾을 수 없습니다!');
-    }
+    elements.attachBtn.addEventListener('click', attachFile);
 
     // 사용자 패널 토글
-    if (elements.usersBtn && elements.usersPanel) {
-        elements.usersBtn.addEventListener('click', () => {
-            elements.usersPanel.classList.toggle('visible');
-        });
-    } else {
-        console.error('[ChatWindow] usersBtn 또는 usersPanel 요소 없음');
-    }
+    elements.usersBtn.addEventListener('click', () => {
+        elements.usersPanel.classList.toggle('visible');
+    });
 }
 
 // 메시지 전송
@@ -422,42 +306,60 @@ async function sendMessage() {
     const room = state.rooms.find(r => r.id === state.currentRoom);
     const isDirectChat = room && room.type === 'direct';
 
-    try {
-        // 메시지 데이터 생성 (공통)
-        const messageData = {
-            id: Date.now(),
-            type: 'chat',
-            nickname: state.nickname || '나',
-            content: content,
-            timestamp: Date.now(),
-            isOwn: true  // 내 메시지 표시
-        };
+    // 회신 정보 가져오기
+    const replyTo = state.replyTo ? state.replyTo.id : null;
+    const replyPreview = state.replyTo ? state.replyTo.preview : null;
 
-        // P2P 연결 상태에서 그룹 채팅인 경우 P2P로 전송
-        if (state.mode !== 'offline' && !isDirectChat) {
-            // 내 메시지를 화면에 표시 (호스트/게스트 모두)
-            addMessage(messageData);
-            await window.p2pAPI.sendMessage(content);
+    // 메시지 데이터 준비
+    const messageData = {
+        id: Date.now(),
+        type: 'chat',
+        nickname: state.nickname || '나',
+        content: content,
+        timestamp: Date.now(),
+        replyTo,
+        replyPreview,
+        roomId: state.currentRoom
+    };
+
+    try {
+        // P2P 연결 상태에서만 전송
+        if (state.mode !== 'offline') {
+            // 1:1 채팅인 경우 대상 닉네임 추출
+            let targetNickname = null;
+            if (isDirectChat) {
+                // room.name 또는 room.targetNickname에서 대상 닉네임 추출
+                targetNickname = room.targetNickname || room.name;
+            }
+
+            // 내 메시지를 바로 화면에 표시 (게스트 모드 또는 1:1 채팅)
+            if (state.mode === 'guest' || isDirectChat) {
+                addMessage(messageData);
+            }
+
+            // P2P로 전송 (그룹 채팅 또는 1:1 채팅 모두)
+            await window.p2pAPI.sendMessage(content, {
+                targetNickname: targetNickname,
+                roomId: state.currentRoom
+            });
         } else {
-            // 오프라인이거나 1:1 채팅인 경우 로컬에만 저장하고 화면에 표시
+            // 오프라인인 경우 로컬에만 저장하고 화면에 표시
             addMessage(messageData);
         }
+
+        // 회신 바 초기화
+        clearReplyTo();
 
         elements.messageInput.value = '';
         elements.sendBtn.disabled = true;
         autoResize(elements.messageInput);
     } catch (err) {
         console.error('메시지 전송 실패:', err);
-        // 에러 발생 시에도 로컬에 저장 (게스트 모드가 아닐 때만)
-        if (state.mode !== 'guest') {
-            const messageData = {
-                id: Date.now(),
-                nickname: state.nickname || '나',
-                content: content,
-                timestamp: Date.now()
-            };
+        // 에러 발생 시에도 로컬에 저장 (아직 화면에 표시 안된 경우만)
+        if (state.mode !== 'guest' && !isDirectChat) {
             addMessage(messageData);
         }
+        clearReplyTo();
         elements.messageInput.value = '';
         elements.sendBtn.disabled = true;
     }
@@ -465,137 +367,37 @@ async function sendMessage() {
 
 // 파일 첨부 (클라우드 업로드 + P2P 전송)
 async function attachFile() {
-    console.log('=== [attachFile] 함수 호출됨 ===');
-    console.log('[attachFile] 현재 상태:', { mode: state.mode, nickname: state.nickname, currentRoom: state.currentRoom });
-    console.log('[attachFile] p2pAPI 존재:', !!window.p2pAPI);
-    console.log('[attachFile] p2pAPI.selectFile 존재:', !!(window.p2pAPI && window.p2pAPI.selectFile));
-    console.log('[attachFile] elements.chatView 존재:', !!elements.chatView);
-    console.log('[attachFile] elements.messagesContainer 존재:', !!elements.messagesContainer);
-
-    if (!window.p2pAPI) {
-        console.error('[attachFile] p2pAPI가 없습니다!');
-        alert('P2P API가 초기화되지 않았습니다.');
-        return;
-    }
-
     if (state.mode === 'offline') {
-        console.log('[attachFile] 오프라인 상태 - 파일 첨부 불가');
         alert('먼저 연결하세요.');
         return;
     }
 
     try {
-        console.log('[attachFile] 파일 선택 다이얼로그 열기...');
-        // selectFile은 파일 정보 객체 또는 파일 경로 문자열을 반환
-        const fileResult = await window.p2pAPI.selectFile();
-        console.log('[attachFile] 파일 선택 결과:', fileResult);
-        if (fileResult) {
-            // 파일 정보 추출 (객체 또는 문자열 형태 처리)
-            let filePath, filename, fileSize;
-            if (typeof fileResult === 'object') {
-                filePath = fileResult.path || fileResult.filePath;
-                filename = fileResult.name || fileResult.filename || filePath.split(/[/\\]/).pop();
-                fileSize = fileResult.size || 0;
-            } else {
-                filePath = fileResult;
-                filename = filePath.split(/[/\\]/).pop();
-                fileSize = 0; // 크기를 알 수 없는 경우
-            }
+        const result = await window.p2pAPI.selectFile();
+        if (result.success && result.filePath) {
+            // 호스트 모드인 경우 클라우드에 업로드
+            if (state.mode === 'host') {
+                try {
+                    const cloudResult = await window.p2pAPI.uploadToCloud(result.filePath);
+                    console.log('클라우드 업로드 완료:', cloudResult);
 
-            // 고유 전송 ID 생성
-            const transferId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-            console.log('[attachFile] 파일 정보:', { transferId, filePath, filename, fileSize, nickname: state.nickname });
-
-            // 채팅 탭으로 전환 (다른 탭에 있을 경우)
-            const chatsTab = document.querySelector('[data-tab="chats"]');
-            console.log('[attachFile] 채팅 탭:', !!chatsTab, 'active:', chatsTab?.classList.contains('active'));
-            if (chatsTab && !chatsTab.classList.contains('active')) {
-                console.log('[attachFile] 채팅 탭으로 전환');
-                chatsTab.click();
-            }
-
-            // 채팅방이 선택되어 있지 않으면 기본 방 선택
-            console.log('[attachFile] 현재 채팅방:', state.currentRoom);
-            if (!state.currentRoom) {
-                console.log('[attachFile] 기본 채팅방 생성 중...');
-                await ensureDefaultGroupRoom();
-                console.log('[attachFile] 기본 채팅방 생성 후:', state.currentRoom);
-            }
-
-            // 채팅 뷰가 안 보이면 표시
-            console.log('[attachFile] chatView 확인:', elements.chatView);
-            if (elements.chatView && !elements.chatView.classList.contains('active')) {
-                console.log('[attachFile] chatView 표시');
-                showChatView();
-            }
-
-            console.log('[attachFile] chatView 상태:', elements.chatView?.classList.contains('active'));
-            console.log('[attachFile] messagesContainer:', elements.messagesContainer);
-
-            // 채팅방에 즉시 업로드 상태 표시
-            console.log('[attachFile] addFileTransferMessage 호출...');
-            addFileTransferMessage({
-                id: transferId,
-                filename: filename,
-                size: fileSize,
-                from: state.nickname,
-                direction: 'upload',
-                progress: 0
-            });
-
-            console.log('[attachFile] 파일 메시지 추가 완료');
-
-            try {
-                // 호스트 모드인 경우 클라우드에 업로드
-                if (state.mode === 'host') {
-                    try {
-                        // 진행률 업데이트 (업로드 시작)
-                        updateFileProgress(transferId, 10);
-
-                        const cloudResult = await window.p2pAPI.uploadToCloud(filePath);
-                        console.log('클라우드 업로드 완료:', cloudResult);
-
-                        // 진행률 업데이트 (클라우드 업로드 완료)
-                        updateFileProgress(transferId, 50);
-
-                        // P2P로 파일 정보 전송 (클라우드 URL 포함)
-                        await window.p2pAPI.sendFile(filePath, {
-                            cloudFileId: cloudResult.fileId,
-                            cloudUrl: cloudResult.downloadUrl
-                        });
-
-                        // 업로드 완료 상태로 변경 (다운로드 버튼 추가)
-                        updateFileProgress(transferId, 100);
-                        updateFileStatus(transferId, 'completed', '업로드 완료', {
-                            cloudFileId: cloudResult.fileId,
-                            filename: filename
-                        });
-                    } catch (cloudErr) {
-                        console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
-                        updateFileProgress(transferId, 30);
-                        await window.p2pAPI.sendFile(filePath);
-                        updateFileProgress(transferId, 100);
-                        updateFileStatus(transferId, 'completed', '전송 완료');
-                    }
-                } else {
-                    // 게스트 모드: P2P로만 전송
-                    updateFileProgress(transferId, 30);
-                    await window.p2pAPI.sendFile(filePath);
-                    updateFileProgress(transferId, 100);
-                    updateFileStatus(transferId, 'completed', '전송 완료');
+                    // P2P로 파일 정보 전송 (클라우드 URL 포함)
+                    await window.p2pAPI.sendFile(result.filePath, {
+                        cloudFileId: cloudResult.fileId,
+                        cloudUrl: cloudResult.downloadUrl
+                    });
+                } catch (cloudErr) {
+                    console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
+                    await window.p2pAPI.sendFile(result.filePath);
                 }
-            } catch (sendErr) {
-                console.error('[attachFile] 파일 전송 실패:', sendErr);
-                updateFileStatus(transferId, 'error', '전송 실패');
-                alert('파일 전송 실패: ' + sendErr.message);
+            } else {
+                // 게스트 모드: P2P로만 전송
+                await window.p2pAPI.sendFile(result.filePath);
             }
-        } else {
-            console.log('[attachFile] 파일 선택 취소됨');
         }
     } catch (err) {
-        console.error('[attachFile] 파일 첨부 실패:', err);
-        alert('파일 선택 실패: ' + err.message);
+        console.error('파일 첨부 실패:', err);
+        alert('파일 전송 실패: ' + err.message);
     }
 }
 
@@ -615,13 +417,63 @@ function initP2PListeners() {
     });
 
     // 메시지 수신
-    window.p2pAPI.onMessage((data) => {
+    window.p2pAPI.onMessage(async (data) => {
         console.log('메시지 수신:', data);
-        // 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시 (호스트/게스트 모두)
-        if (data.nickname === state.nickname) {
-            console.log('자신의 메시지 에코 무시 (모드:', state.mode, ')');
+        // 게스트 모드에서 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시
+        if (state.mode === 'guest' && data.nickname === state.nickname) {
+            console.log('게스트 모드: 자신의 메시지 에코 무시');
             return;
         }
+
+        // 1:1 채팅 메시지인 경우
+        if (data.targetNickname) {
+            // 발신자와의 1:1 채팅방 roomId 계산 (양쪽에서 동일한 ID)
+            const sortedNames = [state.nickname, data.nickname].sort();
+            const directRoomId = `direct_${sortedNames[0]}_${sortedNames[1]}`.replace(/\s+/g, '_');
+
+            // 해당 채팅방이 없으면 자동 생성
+            let room = state.rooms.find(r => r.id === directRoomId);
+            if (!room) {
+                console.log('1:1 채팅방 자동 생성:', directRoomId);
+                // 채팅방 생성
+                if (window.messengerDB) {
+                    await window.messengerDB.createRoom({
+                        id: directRoomId,
+                        type: 'direct',
+                        name: data.nickname,
+                        targetNickname: data.nickname
+                    });
+                }
+                // 채팅방 목록에 추가
+                addRoom({
+                    id: directRoomId,
+                    name: data.nickname,
+                    type: 'direct',
+                    targetNickname: data.nickname,
+                    unread: 0
+                });
+                room = state.rooms.find(r => r.id === directRoomId);
+            }
+
+            // 현재 해당 채팅방이 선택되어 있지 않으면 알림
+            if (state.currentRoom !== directRoomId) {
+                // unread 카운트 증가
+                if (room) room.unread = (room.unread || 0) + 1;
+                renderRoomList();
+
+                // 데스크톱 알림
+                if (window.chatAPI?.showNotification) {
+                    window.chatAPI.showNotification(
+                        `${data.nickname}님의 메시지`,
+                        data.content.substring(0, 50)
+                    );
+                }
+            }
+
+            // 메시지에 roomId 설정하여 추가
+            data.roomId = directRoomId;
+        }
+
         addMessage(data);
     });
 
@@ -648,39 +500,24 @@ function initP2PListeners() {
         addSystemMessage(`${data.nickname}님이 퇴장했습니다.`);
     });
 
-    // 파일 수신 완료
+    // 파일 수신
     window.p2pAPI.onFileReceived((data) => {
-        console.log('파일 수신 완료:', data);
-        // transferId가 있으면 기존 다운로드 중 메시지를 업데이트
-        if (data.transferId) {
-            updateFileProgress(data.transferId, 100);
-            updateFileStatus(data.transferId, 'completed', '다운로드 완료');
-            // 로컬 파일 경로 추가 (열기 버튼 활성화)
-            if (data.savedPath) {
-                updateFileLocalPath(data.transferId, data.savedPath);
-            }
-        } else {
-            // transferId가 없는 경우 새 메시지 추가
-            addFileMessage(data);
-        }
+        console.log('파일 수신:', data);
+        addFileMessage(data);
     });
 
     // 파일 전송 완료
     window.p2pAPI.onFileSent((data) => {
         console.log('파일 전송 완료:', data);
-        // transferId가 있으면 기존 전송 중 메시지를 업데이트
-        if (data.transferId) {
-            updateFileProgress(data.transferId, 100);
-            updateFileStatus(data.transferId, 'completed', '전송 완료');
-            // 클라우드 정보가 있으면 파일 메시지에 추가
-            if (data.cloudFileId || data.cloudUrl) {
-                updateFileCloudInfo(data.transferId, data.cloudFileId, data.cloudUrl);
-            }
-        } else {
-            // transferId가 없는 경우 (이전 방식 호환)
-            // 이미 attachFile에서 표시했으므로 중복 추가하지 않음
-            console.log('파일 전송 완료 (transferId 없음):', data.filename);
-        }
+        // 내가 보낸 파일을 채팅방에 표시
+        addFileMessage({
+            filename: data.filename,
+            size: data.size,
+            from: state.nickname, // 내 닉네임
+            savedPath: null, // 로컬 파일 경로 없음 (전송한 파일)
+            cloudFileId: data.cloudFileId || '',
+            cloudUrl: data.cloudUrl || ''
+        });
     });
 
     // 연결 끊김
@@ -689,31 +526,6 @@ function initP2PListeners() {
         state.mode = 'offline';
         updateConnectionUI(false);
         addSystemMessage('연결이 끊어졌습니다.');
-    });
-
-    // 파일 전송 시작
-    window.p2pAPI.onFileStart((data) => {
-        console.log('파일 전송 시작:', data);
-        // 전송 중 메시지 추가 (진행률 표시용)
-        if (data.transferId) {
-            const direction = data.direction || (data.from === state.nickname ? 'upload' : 'download');
-            addFileTransferMessage({
-                id: data.transferId,
-                filename: data.filename,
-                size: data.size,
-                from: data.from || state.nickname,
-                direction: direction,
-                progress: 0
-            });
-        }
-    });
-
-    // 파일 전송 진행률
-    window.p2pAPI.onFileProgress((data) => {
-        console.log('파일 전송 진행률:', data);
-        if (data.transferId && data.progress !== undefined) {
-            updateFileProgress(data.transferId, data.progress);
-        }
     });
 }
 
@@ -797,21 +609,41 @@ function renderRoomList() {
 
         return `
             <div class="room-item ${room.id === state.currentRoom ? 'active' : ''}"
-                 data-room-id="${room.id}" onclick="selectRoom('${room.id}')">
-                <div class="room-avatar" style="background: ${avatarBg}; display: flex; align-items: center; justify-content: center;">
-                    ${isGroup ? icon : `<span>${icon}</span>`}
+                 data-room-id="${room.id}">
+                <div class="room-item-content" onclick="selectRoom('${room.id}')">
+                    <div class="room-avatar" style="background: ${avatarBg}; display: flex; align-items: center; justify-content: center;">
+                        ${isGroup ? icon : `<span>${icon}</span>`}
+                    </div>
+                    <div class="room-info">
+                        <div class="room-name">${escapeHtml(room.name)}</div>
+                        <div class="room-preview">${escapeHtml(room.lastMessage || (isGroup ? '그룹 채팅' : '1:1 채팅'))}</div>
+                    </div>
+                    <div class="room-meta">
+                        <div class="room-time">${room.lastTime || ''}</div>
+                        ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
+                    </div>
                 </div>
-                <div class="room-info">
-                    <div class="room-name">${escapeHtml(room.name)}</div>
-                    <div class="room-preview">${escapeHtml(room.lastMessage || (isGroup ? '그룹 채팅' : '1:1 채팅'))}</div>
-                </div>
-                <div class="room-meta">
-                    <div class="room-time">${room.lastTime || ''}</div>
-                    ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
-                </div>
+                <button class="room-delete-btn" onclick="event.stopPropagation(); confirmDeleteRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')" title="채팅방 삭제">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                </button>
             </div>
         `;
     }).join('');
+}
+
+// 채팅방 삭제 확인
+async function confirmDeleteRoom(roomId, roomName) {
+    if (!confirm(`'${roomName}' 채팅방을 삭제하시겠습니까?`)) return;
+
+    try {
+        await deleteRoom(roomId);
+        showToast('채팅방이 삭제되었습니다.');
+    } catch (err) {
+        console.error('채팅방 삭제 실패:', err);
+        alert('채팅방 삭제 실패: ' + err.message);
+    }
 }
 
 // 채팅방 선택
@@ -862,22 +694,8 @@ function updateChatHeader(room) {
 
 // 채팅 뷰 표시
 function showChatView() {
-    console.log('[showChatView] 호출됨');
-    console.log('[showChatView] elements.emptyState:', !!elements.emptyState);
-    console.log('[showChatView] elements.chatView:', !!elements.chatView);
-
-    if (elements.emptyState) {
-        elements.emptyState.style.display = 'none';
-    } else {
-        console.error('[showChatView] emptyState 요소 없음');
-    }
-
-    if (elements.chatView) {
-        elements.chatView.classList.add('active');
-        console.log('[showChatView] chatView.active 추가됨');
-    } else {
-        console.error('[showChatView] chatView 요소 없음');
-    }
+    elements.emptyState.style.display = 'none';
+    elements.chatView.classList.add('active');
 }
 
 // 채팅 뷰 숨김
@@ -892,7 +710,7 @@ function showEmptyRoomMessage() {
     elements.chatView.classList.add('active');
 
     // 메시지 영역에 안내 메시지 표시
-    elements.messagesContainer.innerHTML = `
+    elements.messageList.innerHTML = `
         <div class="empty-room-notice" style="
             display: flex;
             flex-direction: column;
@@ -922,33 +740,40 @@ function showEmptyRoomMessage() {
 
 // 메시지 추가
 async function addMessage(data) {
-    // isOwn 판단: 닉네임 비교 또는 '나' 표시인 경우
-    const myNickname = state.nickname || '사용자';
-    const senderNickname = data.nickname || '나';
-    const isOwn = senderNickname === myNickname || senderNickname === '나' || data.isOwn === true;
-
+    const isOwn = data.nickname === state.nickname;
     const message = {
         id: data.id || Date.now(),
         type: 'text',
-        sender: senderNickname,
+        sender: data.nickname,
         content: data.content,
         timestamp: data.timestamp || Date.now(),
-        isOwn
+        isOwn,
+        replyTo: data.replyTo || null,
+        replyPreview: data.replyPreview || null,
+        roomId: data.roomId || null
     };
 
-    state.messages.push(message);
-    renderMessage(message);
-    scrollToBottom();
+    // 메시지의 roomId 결정 (1:1 메시지는 data.roomId, 그룹 채팅은 state.currentRoom)
+    const targetRoomId = data.roomId || state.currentRoom;
+
+    // 현재 선택된 채팅방의 메시지인 경우에만 화면에 표시
+    if (targetRoomId === state.currentRoom) {
+        state.messages.push(message);
+        renderMessage(message);
+        scrollToBottom();
+    }
 
     // DB에 메시지 저장
-    if (state.currentRoom && window.messengerDB) {
+    if (targetRoomId && window.messengerDB) {
         try {
             await window.messengerDB.saveMessage({
-                roomId: state.currentRoom,
-                senderId: isOwn ? (state.myContactId || 'self') : `remote_${senderNickname}`,
-                senderNickname: senderNickname,
+                roomId: targetRoomId,
+                senderId: isOwn ? (state.myContactId || 'self') : `remote_${data.nickname}`,
+                senderNickname: data.nickname || state.nickname,
                 type: 'text',
-                content: data.content
+                content: data.content,
+                replyTo: data.replyTo || null,
+                replyPreview: data.replyPreview || null
             });
         } catch (err) {
             console.error('메시지 저장 실패:', err);
@@ -957,7 +782,7 @@ async function addMessage(data) {
 
     // 알림 (자신의 메시지가 아닌 경우)
     if (!isOwn && document.hidden) {
-        showNotification(senderNickname, data.content);
+        showNotification(data.nickname, data.content);
     }
 }
 
@@ -1029,135 +854,6 @@ async function addFileMessage(data) {
     }
 }
 
-// 파일 전송 중 메시지 추가 (진행률 표시용)
-function addFileTransferMessage(data) {
-    console.log('[addFileTransferMessage] 호출됨:', data);
-    console.log('[addFileTransferMessage] state.nickname:', state.nickname);
-    console.log('[addFileTransferMessage] elements.messagesContainer:', !!elements.messagesContainer);
-    console.log('[addFileTransferMessage] elements.chatView:', !!elements.chatView);
-
-    const isOwn = data.from === state.nickname || data.direction === 'upload';
-    console.log('[addFileTransferMessage] isOwn:', isOwn);
-
-    // 이미 같은 ID의 메시지가 있으면 무시 (중복 방지)
-    const existingMsg = state.messages.find(msg => msg.id === data.id);
-    if (existingMsg) {
-        console.log('[addFileTransferMessage] 중복 메시지, 무시:', data.id);
-        return;
-    }
-
-    const message = {
-        id: data.id,
-        type: 'file',
-        sender: data.from || state.nickname,
-        filename: data.filename,
-        fileSize: data.size,
-        filePath: null,
-        cloudFileId: '',
-        cloudUrl: '',
-        timestamp: Date.now(),
-        isOwn,
-        transferring: true,
-        progress: data.progress || 0,
-        direction: data.direction
-    };
-
-    state.messages.push(message);
-    console.log('[addFileTransferMessage] 메시지 추가됨, 총 메시지 수:', state.messages.length);
-
-    // chatView가 active가 아니면 활성화
-    if (elements.chatView && !elements.chatView.classList.contains('active')) {
-        console.log('[addFileTransferMessage] chatView 활성화');
-        showChatView();
-    }
-
-    renderTransferringFile(message);
-    scrollToBottom();
-}
-
-// 전송 중인 파일 렌더링 (진행률 바 포함)
-function renderTransferringFile(msg) {
-    console.log('[renderTransferringFile] 호출됨:', msg);
-    console.log('[renderTransferringFile] elements.messagesContainer:', elements.messagesContainer);
-
-    if (!elements.messagesContainer) {
-        console.error('[renderTransferringFile] messagesContainer가 없습니다! elements 상태:', elements);
-        // messagesContainer를 다시 찾아봄
-        const container = document.getElementById('messagesContainer');
-        if (container) {
-            console.log('[renderTransferringFile] messagesContainer를 직접 찾음');
-            elements.messagesContainer = container;
-        } else {
-            console.error('[renderTransferringFile] DOM에서도 messagesContainer를 찾을 수 없음');
-            return;
-        }
-    }
-
-    const el = document.createElement('div');
-    el.className = `message ${msg.isOwn ? 'own' : ''}`;
-    el.setAttribute('data-transfer-id', msg.id);
-
-    const time = new Date(msg.timestamp).toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-
-    const initial = msg.sender ? msg.sender.charAt(0).toUpperCase() : '?';
-    const fileExt = getFileExtension(msg.filename);
-    const fileType = getFileTypeCategory(fileExt);
-    const fileIcon = getFileTypeIcon(fileType);
-    const statusText = msg.direction === 'upload' ? '업로드 중...' : '다운로드 중...';
-    const statusClass = msg.direction === 'upload' ? 'uploading' : 'downloading';
-
-    // 파일 데이터 JSON (나중에 버튼 추가 시 사용)
-    const fileData = JSON.stringify({
-        filePath: msg.filePath || '',
-        cloudFileId: msg.cloudFileId || '',
-        cloudUrl: msg.cloudUrl || '',
-        filename: msg.filename
-    }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-
-    el.innerHTML = `
-        <div class="message-avatar">${initial}</div>
-        <div class="message-content">
-            <div class="message-sender">${escapeHtml(msg.sender)}</div>
-            <div class="message-file" data-msg-id="${msg.id}" data-file="${fileData}">
-                <div class="file-header">
-                    <div class="file-icon ${fileType}">
-                        ${fileIcon}
-                    </div>
-                    <div class="file-info">
-                        <div class="file-name" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</div>
-                        <div class="file-meta">
-                            <span class="file-type">${fileExt || 'FILE'}</span>
-                            <span class="file-size">${formatFileSize(msg.fileSize)}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="file-status ${statusClass}">
-                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-                    </svg>
-                    <span>${statusText}</span>
-                </div>
-                <div class="file-progress" style="display: block;">
-                    <div class="file-progress-bar" style="width: ${msg.progress}%;"></div>
-                </div>
-                <div class="file-actions">
-                    <!-- 전송 완료 후 버튼이 동적으로 추가됨 -->
-                </div>
-            </div>
-            <div class="message-meta">
-                <span class="message-time">${time}</span>
-            </div>
-        </div>
-    `;
-
-    elements.messagesContainer.appendChild(el);
-    console.log('파일 메시지 DOM에 추가됨:', el);
-    scrollToBottom();
-}
-
 // 메시지 렌더링
 function renderMessage(msg) {
     const el = document.createElement('div');
@@ -1171,6 +867,15 @@ function renderMessage(msg) {
     const initial = msg.sender ? msg.sender.charAt(0).toUpperCase() : '?';
 
     if (msg.type === 'file') {
+        // 파일 타입 정보 가져오기
+        const fileTypeInfo = getFileTypeInfo(msg.filename);
+        const canOpenDirectly = isOpenableFileType(msg.filename);
+
+        // 이미지 파일 여부 확인
+        const ext = msg.filename.split('.').pop().toLowerCase();
+        const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
+        const isImage = imageExtensions.includes(ext);
+
         // 파일 데이터 준비 (JSON으로 인코딩하여 onclick에서 사용)
         const fileData = JSON.stringify({
             filePath: msg.filePath || '',
@@ -1179,89 +884,51 @@ function renderMessage(msg) {
             filename: msg.filename
         }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-        // 파일 확장자 및 타입 결정
-        const fileExt = getFileExtension(msg.filename);
-        const fileType = getFileTypeCategory(fileExt);
-        const fileIcon = getFileTypeIcon(fileType);
-
-        // 이미지 파일 여부 확인
-        const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico'];
-        const isImage = imageExtensions.includes(fileExt.toLowerCase());
-
-        // 상태 결정 (업로드/다운로드 완료 여부)
-        const isUploaded = msg.isOwn;
-        const isDownloaded = !!msg.filePath;
-        const hasCloudUrl = !!(msg.cloudUrl || msg.cloudFileId);
+        // 로컬 파일이 있으면 바로 열기, 없으면 클라우드에서 다운로드 후 열기
+        const hasLocalFile = msg.filePath && msg.filePath.length > 0;
+        const hasCloudFile = msg.cloudUrl || msg.cloudFileId;
 
         // 이미지 미리보기 URL 결정
+        // 로컬 파일은 file:// 프로토콜 대신 Base64로 로드함 (Electron 보안 정책)
         let imagePreviewUrl = '';
+        let needsBase64Load = false;
         if (isImage) {
-            if (msg.filePath) {
-                // 로컬 파일 경로 사용
-                imagePreviewUrl = `file://${msg.filePath}`;
+            if (hasLocalFile) {
+                // 로컬 파일은 나중에 Base64로 로드
+                imagePreviewUrl = '';
+                needsBase64Load = true;
             } else if (msg.cloudUrl) {
-                // 클라우드 URL 사용
                 imagePreviewUrl = msg.cloudUrl;
+            } else if (hasCloudFile) {
+                // 클라우드 파일 ID로 URL 구성 (동적으로 결정)
+                imagePreviewUrl = `cloud://${msg.cloudFileId}/${encodeURIComponent(msg.filename)}`;
             }
         }
 
-        // 상태 텍스트 및 아이콘
-        let statusHtml = '';
-        if (isUploaded && hasCloudUrl) {
-            statusHtml = `
-                <div class="file-status completed">
-                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                    </svg>
-                    <span>업로드 완료</span>
-                </div>
-            `;
-        } else if (!isUploaded && isDownloaded) {
-            statusHtml = `
-                <div class="file-status completed">
-                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                    </svg>
-                    <span>다운로드 완료</span>
-                </div>
-            `;
-        } else if (!isUploaded && hasCloudUrl) {
-            statusHtml = `
-                <div class="file-status downloading">
-                    <svg class="file-status-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
-                    <span>다운로드 가능</span>
-                </div>
-            `;
-        }
-
-        // 이미지인 경우 Teams 스타일 미리보기로 렌더링
-        if (isImage && imagePreviewUrl) {
+        // 이미지인 경우 미리보기로 렌더링
+        if (isImage && (hasLocalFile || hasCloudFile)) {
             el.innerHTML = `
                 <div class="message-avatar">${initial}</div>
                 <div class="message-content">
                     <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                    <div class="message-image-container" data-file='${fileData}' data-msg-id="${msg.id}">
-                        <div class="image-preview-wrapper" onclick="openImageViewer('${escapeHtml(imagePreviewUrl)}', '${escapeHtml(msg.filename)}')">
-                            <img class="message-image-preview" src="${imagePreviewUrl}" alt="${escapeHtml(msg.filename)}"
+                    <div class="message-image-container" data-file='${fileData}'>
+                        <div class="image-preview-wrapper" onclick="openImageViewer('${escapeHtml(imagePreviewUrl)}', '${escapeHtml(msg.filename)}', '${hasLocalFile ? escapeHtml(msg.filePath).replace(/\\/g, '\\\\') : ''}')">
+                            <img class="message-image-preview"
+                                 src=""
+                                 data-local-path="${hasLocalFile ? escapeHtml(msg.filePath) : ''}"
+                                 data-cloud-id="${msg.cloudFileId || ''}"
+                                 data-filename="${escapeHtml(msg.filename)}"
+                                 alt="${escapeHtml(msg.filename)}"
                                  onerror="this.parentElement.parentElement.classList.add('image-error'); this.style.display='none';"
                                  onload="this.parentElement.parentElement.classList.add('image-loaded');" />
                             <div class="image-loading-placeholder">
-                                <svg class="loading-spinner" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="31.4" stroke-dashoffset="10">
-                                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
-                                    </circle>
-                                </svg>
+                                <div class="loading-spinner"></div>
                             </div>
                             <div class="image-error-placeholder">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                                </svg>
                                 <span>이미지를 불러올 수 없습니다</span>
                             </div>
                             <div class="image-overlay">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
                                     <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                                     <path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/>
                                 </svg>
@@ -1271,31 +938,26 @@ function renderMessage(msg) {
                             <span class="image-filename" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</span>
                             <span class="image-size">${formatFileSize(msg.fileSize)}</span>
                         </div>
-                        ${statusHtml}
                         <div class="file-actions">
-                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="event.stopPropagation(); openLocalFile('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="파일 열기">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
+                            ${hasLocalFile ? `<button class="file-action-btn open-btn" onclick="event.stopPropagation(); openLocalFile('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="바로 열기">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                                 </svg>
-                                <span>열기</span>
                             </button>` : ''}
-                            ${hasCloudUrl && !msg.filePath ? `<button class="file-action-btn download-open-btn" onclick="event.stopPropagation(); downloadAndOpenFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드 후 열기">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
+                            ${hasCloudFile && !hasLocalFile ? `<button class="file-action-btn download-open-btn" onclick="event.stopPropagation(); downloadAndOpenFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드 후 열기">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                                 </svg>
-                                <span>열기</span>
                             </button>` : ''}
-                            ${hasCloudUrl ? `<button class="file-action-btn download-btn" onclick="event.stopPropagation(); downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
+                            ${hasCloudFile ? `<button class="file-action-btn download-btn" onclick="event.stopPropagation(); downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                                 </svg>
-                                <span>다운로드</span>
                             </button>` : ''}
-                            ${msg.filePath ? `<button class="file-action-btn folder-btn" onclick="event.stopPropagation(); openFileFolder('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="폴더 열기">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
+                            ${hasLocalFile ? `<button class="file-action-btn folder-btn" onclick="event.stopPropagation(); openFileFolder('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="폴더 열기">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
                                 </svg>
-                                <span>폴더</span>
                             </button>` : ''}
                         </div>
                     </div>
@@ -1304,54 +966,69 @@ function renderMessage(msg) {
                     </div>
                 </div>
             `;
+
+            // 이미지 로드 처리
+            if (needsBase64Load && hasLocalFile) {
+                // 로컬 파일: Base64로 로드
+                loadLocalImageAsBase64(el.querySelector('.message-image-preview'), msg.filePath);
+            } else if (!hasLocalFile && hasCloudFile) {
+                // 클라우드 이미지: URL을 동적으로 로드
+                loadCloudImagePreview(el.querySelector('.message-image-preview'), msg.cloudFileId, msg.filename);
+            }
         } else {
-            // 일반 파일 렌더링 (기존 코드)
+            // 일반 파일 렌더링
+            // 바로 열기 버튼 (로컬 파일 있을 때)
+            const openLocalBtn = hasLocalFile && canOpenDirectly ? `
+                <button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="바로 열기">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                    </svg>
+                </button>` : '';
+
+            // 다운로드 후 열기 버튼 (클라우드 파일이고 로컬 없을 때)
+            const downloadAndOpenBtn = hasCloudFile && !hasLocalFile && canOpenDirectly ? `
+                <button class="file-action-btn download-open-btn" onclick="downloadAndOpenFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드 후 열기">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                    </svg>
+                </button>` : '';
+
+            // 다운로드 버튼 (클라우드 파일 있을 때)
+            const downloadBtn = hasCloudFile ? `
+                <button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </button>` : '';
+
+            // 폴더 열기 버튼 (로컬 파일 있을 때)
+            const openFolderBtn = hasLocalFile ? `
+                <button class="file-action-btn folder-btn" onclick="openFileFolder('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="폴더 열기">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                    </svg>
+                </button>` : '';
+
             el.innerHTML = `
                 <div class="message-avatar">${initial}</div>
                 <div class="message-content">
                     <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                    <div class="message-file" data-file='${fileData}' data-msg-id="${msg.id}">
-                        <div class="file-header">
-                            <div class="file-icon ${fileType}">
-                                ${fileIcon}
-                            </div>
-                            <div class="file-info">
-                                <div class="file-name" title="${escapeHtml(msg.filename)}">${escapeHtml(msg.filename)}</div>
-                                <div class="file-meta">
-                                    <span class="file-type">${fileExt || 'FILE'}</span>
-                                    <span class="file-size">${formatFileSize(msg.fileSize)}</span>
-                                </div>
-                            </div>
+                    <div class="message-file" data-file='${fileData}' style="border-left: 3px solid ${fileTypeInfo.color};">
+                        <div class="file-icon" style="background: ${fileTypeInfo.color};">
+                            <span style="font-size: 18px;">${fileTypeInfo.icon}</span>
                         </div>
-                        ${statusHtml}
-                        <div class="file-progress" style="display: none;">
-                            <div class="file-progress-bar" style="width: 0%;"></div>
+                        <div class="file-info">
+                            <div class="file-name">${escapeHtml(msg.filename)}</div>
+                            <div class="file-meta">
+                                <span class="file-type-label" style="color: ${fileTypeInfo.color};">${fileTypeInfo.label}</span>
+                                <span class="file-size">${formatFileSize(msg.fileSize)}</span>
+                            </div>
                         </div>
                         <div class="file-actions">
-                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="파일 열기">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
-                                </svg>
-                                <span>열기</span>
-                            </button>` : ''}
-                            ${hasCloudUrl && !msg.filePath ? `<button class="file-action-btn download-open-btn" onclick="downloadAndOpenFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드 후 열기">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
-                                </svg>
-                                <span>열기</span>
-                            </button>` : ''}
-                            ${hasCloudUrl ? `<button class="file-action-btn download-btn" onclick="downloadCloudFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                                </svg>
-                                <span>다운로드</span>
-                            </button>` : ''}
-                            ${msg.filePath ? `<button class="file-action-btn folder-btn" onclick="openFileFolder('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="폴더 열기">
-                                <svg viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-                                </svg>
-                                <span>폴더</span>
-                            </button>` : ''}
+                            ${openLocalBtn}
+                            ${downloadAndOpenBtn}
+                            ${downloadBtn}
+                            ${openFolderBtn}
                         </div>
                     </div>
                     <div class="message-meta">
@@ -1368,249 +1045,75 @@ function renderMessage(msg) {
             <span class="message-unread-count" title="${unreadCount}명이 안 읽음">${unreadCount}</span>
         ` : '';
 
-        // 이모티콘 전용 메시지 감지 및 클래스 추가
-        const bubbleClass = getEmojiBubbleClass(msg.content);
+        // 이모지만 있는 메시지인지 확인
+        const content = msg.content || '';
+        const emojiRegex = /^(?:[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|\s)+$/u;
+        const isEmojiOnly = emojiRegex.test(content.trim());
+
+        // 이모지 개수 세기 (이모지만 있는 경우)
+        let emojiCount = 0;
+        if (isEmojiOnly) {
+            const matches = content.match(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu);
+            emojiCount = matches ? matches.length : 0;
+        }
+
+        // 버블 클래스 결정
+        let bubbleClass = 'message-bubble';
+        if (isEmojiOnly) {
+            bubbleClass += ' emoji-only';
+            if (emojiCount > 3) {
+                bubbleClass += ' many-emojis';
+            }
+        }
+
+        // 회신 대상 메시지가 있으면 표시
+        const replyPreview = msg.replyTo ? `
+            <div class="reply-preview" onclick="scrollToMessage('${escapeHtml(msg.replyTo)}')">
+                <div class="reply-bar"></div>
+                <div class="reply-content">${escapeHtml(msg.replyPreview || '원본 메시지')}</div>
+            </div>
+        ` : '';
+
+        // @멘션 처리
+        const contentWithMentions = formatMentions(msg.content || '');
 
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="message-bubble ${bubbleClass}">${escapeHtml(msg.content)}</div>
+                ${replyPreview}
+                <div class="${bubbleClass}">${contentWithMentions}</div>
+                <div class="message-reactions" id="reactions-${msg.id}"></div>
                 <div class="message-meta">
                     ${unreadBadge}
                     <span class="message-time">${time}</span>
                 </div>
             </div>
+            <div class="message-actions">
+                <button class="msg-action-btn reaction-btn" onclick="showReactionPicker('${msg.id}')" title="리액션">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                    </svg>
+                </button>
+                <button class="msg-action-btn reply-btn" onclick="setReplyTo('${msg.id}', '${escapeHtml(msg.sender)}', '${escapeHtml((msg.content || '').substring(0, 50))}')" title="회신">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
+                    </svg>
+                </button>
+                <button class="msg-action-btn quote-btn" onclick="quoteMessage('${msg.id}', '${escapeHtml(msg.sender)}', '${escapeHtml((msg.content || '').replace(/'/g, "\\'"))}')" title="인용">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/>
+                    </svg>
+                </button>
+            </div>
         `;
+
+        // 리액션 표시
+        el.setAttribute('data-message-id', msg.id);
+        loadMessageReactions(msg.id);
     }
 
     elements.messagesContainer.appendChild(el);
-}
-
-// 이모티콘 전용 메시지인지 확인하고 적절한 클래스 반환
-function getEmojiBubbleClass(content) {
-    if (!content) return '';
-
-    // 이모티콘 패턴 (유니코드 이모지 범위)
-    const emojiRegex = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F1FF}\u{1F200}-\u{1F2FF}\u{FE00}-\u{FEFF}\u{200D}\u{20E3}\s]+$/u;
-
-    // 공백 제거 후 이모티콘만 있는지 확인
-    const trimmed = content.trim();
-    if (!emojiRegex.test(trimmed)) {
-        return ''; // 텍스트가 포함된 경우 일반 버블
-    }
-
-    // 이모티콘 개수 세기 (복합 이모지 고려)
-    const emojiMatches = [...trimmed.matchAll(/\p{Extended_Pictographic}/gu)];
-    const emojiCount = emojiMatches.length;
-
-    if (emojiCount === 1) {
-        return 'emoji-only'; // 단일 이모티콘 - 가장 큰 사이즈
-    } else if (emojiCount <= 3) {
-        return 'emoji-few'; // 2-3개 이모티콘 - 중간 사이즈
-    }
-
-    return ''; // 4개 이상은 일반 사이즈
-}
-
-// 파일 확장자 추출
-function getFileExtension(filename) {
-    if (!filename) return '';
-    const parts = filename.split('.');
-    if (parts.length < 2) return '';
-    return parts[parts.length - 1].toLowerCase();
-}
-
-// 파일 타입 카테고리 결정
-function getFileTypeCategory(ext) {
-    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'];
-    const videoExts = ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'];
-    const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'];
-    const documentExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'hwp'];
-    const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'bz2'];
-
-    if (imageExts.includes(ext)) return 'image';
-    if (videoExts.includes(ext)) return 'video';
-    if (audioExts.includes(ext)) return 'audio';
-    if (documentExts.includes(ext)) return 'document';
-    if (archiveExts.includes(ext)) return 'archive';
-    return '';
-}
-
-// 파일 타입별 아이콘 SVG 반환
-function getFileTypeIcon(fileType) {
-    const icons = {
-        image: `<svg viewBox="0 0 24 24" fill="white">
-            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-        </svg>`,
-        video: `<svg viewBox="0 0 24 24" fill="white">
-            <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
-        </svg>`,
-        audio: `<svg viewBox="0 0 24 24" fill="white">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>`,
-        document: `<svg viewBox="0 0 24 24" fill="white">
-            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-        </svg>`,
-        archive: `<svg viewBox="0 0 24 24" fill="white">
-            <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-2 6h-2v2h2v2h-2v2h-2v-2h2v-2h-2v-2h2v-2h-2V8h2v2h2v2z"/>
-        </svg>`,
-        default: `<svg viewBox="0 0 24 24" fill="white">
-            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
-        </svg>`
-    };
-    return icons[fileType] || icons.default;
-}
-
-// 파일 전송/수신 진행률 업데이트
-function updateFileProgress(msgId, progress) {
-    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
-    if (fileEl) {
-        const progressContainer = fileEl.querySelector('.file-progress');
-        const progressBar = fileEl.querySelector('.file-progress-bar');
-        if (progressContainer && progressBar) {
-            progressContainer.style.display = 'block';
-            progressBar.style.width = `${progress}%`;
-            if (progress >= 100) {
-                setTimeout(() => {
-                    progressContainer.style.display = 'none';
-                }, 1000);
-            }
-        }
-    }
-}
-
-// 파일 상태 업데이트
-function updateFileStatus(msgId, status, message, cloudInfo = null) {
-    console.log('updateFileStatus:', { msgId, status, message, cloudInfo });
-    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
-    if (fileEl) {
-        const statusEl = fileEl.querySelector('.file-status');
-        if (statusEl) {
-            statusEl.className = `file-status ${status}`;
-
-            // 상태에 따른 아이콘 변경
-            const iconEl = statusEl.querySelector('.file-status-icon');
-            if (iconEl) {
-                if (status === 'completed') {
-                    // 완료 아이콘 (체크마크)
-                    iconEl.innerHTML = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
-                } else if (status === 'error') {
-                    // 에러 아이콘
-                    iconEl.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>';
-                }
-            }
-
-            const textEl = statusEl.querySelector('span');
-            if (textEl) {
-                textEl.textContent = message;
-            }
-        }
-
-        // 완료 시 클라우드 정보가 있으면 다운로드 버튼 추가
-        if (status === 'completed' && cloudInfo) {
-            const actionsEl = fileEl.querySelector('.file-actions');
-            if (actionsEl && !actionsEl.querySelector('.download-btn')) {
-                const { cloudFileId, filename } = cloudInfo;
-                if (cloudFileId) {
-                    const downloadBtn = document.createElement('button');
-                    downloadBtn.className = 'file-action-btn download-btn';
-                    downloadBtn.title = '다운로드';
-                    downloadBtn.onclick = () => downloadCloudFile(cloudFileId, filename);
-                    downloadBtn.innerHTML = `
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                        </svg>
-                        <span>다운로드</span>
-                    `;
-                    actionsEl.appendChild(downloadBtn);
-                }
-            }
-        }
-
-        // 완료 시 DB에 파일 메시지 저장 (채팅방 이동 후에도 유지되도록)
-        if (status === 'completed') {
-            saveFileMessageToDB(msgId, cloudInfo);
-        }
-    }
-}
-
-// 파일 메시지에 로컬 파일 경로 추가 (열기 버튼 활성화)
-function updateFileLocalPath(msgId, filePath) {
-    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
-    if (fileEl) {
-        try {
-            // data 속성 업데이트
-            let fileData = JSON.parse(fileEl.getAttribute('data-file') || '{}');
-            fileData.filePath = filePath;
-            fileEl.setAttribute('data-file', JSON.stringify(fileData));
-
-            // 열기 버튼이 없으면 추가
-            const actionsEl = fileEl.querySelector('.file-actions');
-            if (actionsEl && !actionsEl.querySelector('.open-btn') && filePath) {
-                const openBtn = document.createElement('button');
-                openBtn.className = 'file-action-btn open-btn';
-                openBtn.title = '파일 열기';
-                openBtn.onclick = () => openLocalFile(filePath);
-                openBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
-                    </svg>
-                    <span>열기</span>
-                `;
-                // 열기 버튼을 다운로드 버튼 앞에 추가
-                actionsEl.insertBefore(openBtn, actionsEl.firstChild);
-            }
-
-            // state에도 업데이트
-            const stateMsg = state.messages.find(m => m.id === msgId);
-            if (stateMsg) {
-                stateMsg.filePath = filePath;
-            }
-        } catch (err) {
-            console.error('파일 로컬 경로 업데이트 실패:', err);
-        }
-    }
-}
-
-// 파일 메시지에 클라우드 정보 추가 (다운로드 버튼 활성화)
-function updateFileCloudInfo(msgId, cloudFileId, cloudUrl) {
-    const fileEl = document.querySelector(`.message-file[data-msg-id="${msgId}"]`);
-    if (fileEl) {
-        // data 속성 업데이트
-        try {
-            let fileData = JSON.parse(fileEl.getAttribute('data-file') || '{}');
-            fileData.cloudFileId = cloudFileId || '';
-            fileData.cloudUrl = cloudUrl || '';
-            fileEl.setAttribute('data-file', JSON.stringify(fileData));
-
-            // 다운로드 버튼이 없으면 추가
-            const actionsEl = fileEl.querySelector('.file-actions');
-            if (actionsEl && !actionsEl.querySelector('.download-btn') && (cloudFileId || cloudUrl)) {
-                const filename = fileData.filename || '';
-                const downloadBtn = document.createElement('button');
-                downloadBtn.className = 'file-action-btn download-btn';
-                downloadBtn.title = '다운로드';
-                downloadBtn.onclick = () => downloadCloudFile(cloudFileId, filename);
-                downloadBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
-                    <span>다운로드</span>
-                `;
-                actionsEl.appendChild(downloadBtn);
-            }
-
-            // state에도 업데이트
-            const stateMsg = state.messages.find(m => m.id === msgId);
-            if (stateMsg) {
-                stateMsg.cloudFileId = cloudFileId;
-                stateMsg.cloudUrl = cloudUrl;
-            }
-        } catch (err) {
-            console.error('파일 클라우드 정보 업데이트 실패:', err);
-        }
-    }
 }
 
 // 사용자 목록 업데이트
@@ -1640,14 +1143,28 @@ function updateUsersList() {
 async function startDirectChat(nickname) {
     if (nickname === state.nickname) return; // 자신과는 채팅 불가
 
-    const roomId = `direct_${nickname.replace(/\s+/g, '_')}_${Date.now()}`;
+    // 고정된 roomId 생성 (상대방 닉네임 기반 - 중복 방지)
+    // 양쪽에서 동일한 roomId를 사용하도록 정렬하여 생성
+    const sortedNames = [state.nickname, nickname].sort();
+    const roomId = `direct_${sortedNames[0]}_${sortedNames[1]}`.replace(/\s+/g, '_');
+
+    // 기존 채팅방이 있는지 확인
+    const existingRoom = state.rooms.find(r => r.id === roomId);
+    if (existingRoom) {
+        // 기존 채팅방으로 이동
+        document.querySelector('[data-tab="chats"]')?.click();
+        selectRoom(roomId);
+        elements.usersPanel.classList.remove('visible');
+        return;
+    }
 
     // 채팅방 생성
     if (window.messengerDB) {
         await window.messengerDB.createRoom({
             id: roomId,
             type: 'direct',
-            name: nickname
+            name: nickname,
+            targetNickname: nickname // 상대방 닉네임 저장
         });
 
         if (state.myContactId) {
@@ -1660,6 +1177,7 @@ async function startDirectChat(nickname) {
         id: roomId,
         name: nickname,
         type: 'direct',
+        targetNickname: nickname,
         unread: 0
     });
 
@@ -1731,6 +1249,144 @@ function autoResize(textarea) {
 function openFile(filePath) {
     if (filePath && window.chatAPI?.openFile) {
         window.chatAPI.openFile(filePath);
+    }
+}
+
+// 로컬 이미지를 Base64로 로드
+async function loadLocalImageAsBase64(imgElement, filePath) {
+    if (!imgElement || !filePath) return;
+
+    try {
+        if (window.chatAPI?.readImageAsBase64) {
+            const result = await window.chatAPI.readImageAsBase64(filePath);
+            if (result.success && result.dataUrl) {
+                imgElement.src = result.dataUrl;
+                return true;
+            }
+        }
+    } catch (err) {
+        console.error('로컬 이미지 로드 실패:', err);
+    }
+    return false;
+}
+
+// 클라우드 이미지 미리보기 로드
+async function loadCloudImagePreview(imgElement, cloudFileId, filename) {
+    if (!imgElement || !cloudFileId) return;
+
+    try {
+        const status = await window.p2pAPI.getStatus();
+        let imageUrl;
+
+        if (status.mode === 'host') {
+            const cloudStatus = await window.p2pAPI.getCloudStatus();
+            if (cloudStatus.status === 'running') {
+                imageUrl = `http://localhost:${cloudStatus.port}/files/${cloudFileId}/${encodeURIComponent(filename)}`;
+            }
+        } else if (status.mode === 'guest' && status.host) {
+            const cloudPort = status.cloudPort || (parseInt(status.port) + 1);
+            imageUrl = `http://${status.host}:${cloudPort}/files/${cloudFileId}/${encodeURIComponent(filename)}`;
+        }
+
+        if (imageUrl) {
+            imgElement.src = imageUrl;
+        }
+    } catch (err) {
+        console.error('클라우드 이미지 로드 실패:', err);
+    }
+}
+
+// 이미지 뷰어 열기
+function openImageViewer(imageUrl, filename, localFilePath) {
+    // 모달 생성
+    const modal = document.createElement('div');
+    modal.className = 'image-viewer-modal';
+    modal.innerHTML = `
+        <div class="image-viewer-backdrop" onclick="closeImageViewer()"></div>
+        <div class="image-viewer-content">
+            <div class="image-viewer-header">
+                <span class="image-viewer-title">${escapeHtml(filename)}</span>
+                <button class="image-viewer-close" onclick="closeImageViewer()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="image-viewer-body">
+                <div class="image-loading-placeholder">
+                    <div class="loading-spinner"></div>
+                </div>
+                <img src="" alt="${escapeHtml(filename)}"
+                     data-cloud-url="${imageUrl}"
+                     data-local-path="${localFilePath || ''}"
+                     style="display: none;"
+                     onload="this.style.display='block'; this.previousElementSibling.style.display='none';" />
+            </div>
+            <div class="image-viewer-footer">
+                <button class="image-viewer-btn" onclick="downloadImageFromViewer('${escapeHtml(imageUrl)}', '${escapeHtml(filename)}')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                    다운로드
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const img = modal.querySelector('.image-viewer-body img');
+
+    // 로컬 파일인 경우 Base64로 로드
+    if (localFilePath) {
+        loadLocalImageAsBase64(img, localFilePath);
+    } else if (imageUrl.startsWith('cloud://')) {
+        // 클라우드 URL인 경우 실제 URL로 변환
+        const parts = imageUrl.replace('cloud://', '').split('/');
+        const cloudFileId = parts[0];
+        const fname = decodeURIComponent(parts.slice(1).join('/'));
+        loadCloudImagePreview(img, cloudFileId, fname);
+    } else if (imageUrl) {
+        // 일반 URL
+        img.src = imageUrl;
+    }
+
+    // ESC 키로 닫기
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeImageViewer();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // 애니메이션
+    setTimeout(() => modal.classList.add('visible'), 10);
+}
+
+// 이미지 뷰어 닫기
+function closeImageViewer() {
+    const modal = document.querySelector('.image-viewer-modal');
+    if (modal) {
+        modal.classList.remove('visible');
+        setTimeout(() => modal.remove(), 200);
+    }
+}
+
+// 이미지 뷰어에서 다운로드
+async function downloadImageFromViewer(imageUrl, filename) {
+    if (imageUrl.startsWith('cloud://')) {
+        const parts = imageUrl.replace('cloud://', '').split('/');
+        const cloudFileId = parts[0];
+        await downloadCloudFile(cloudFileId, filename);
+    } else if (imageUrl.startsWith('file://')) {
+        openLocalFile(imageUrl.replace('file://', '').replace(/\//g, '\\'));
+    } else {
+        // HTTP URL 직접 다운로드
+        const a = document.createElement('a');
+        a.href = imageUrl;
+        a.download = filename;
+        a.click();
     }
 }
 
@@ -1930,16 +1586,15 @@ async function loadRoomMessages(roomId) {
                 const message = {
                     id: msg.id,
                     type: msg.type || 'text',
-                    sender: msg.sender_name || msg.sender_id,
+                    sender: msg.sender_name || msg.sender_nickname || msg.sender_id,
                     content: msg.content,
                     filename: msg.file_name,
                     fileSize: msg.file_size,
                     filePath: msg.file_path,
-                    cloudFileId: msg.cloud_file_id || '',
-                    cloudUrl: msg.cloud_url || '',
                     timestamp: new Date(msg.created_at).getTime(),
                     isOwn,
-                    transferring: false  // DB에서 로드된 메시지는 전송 완료 상태
+                    replyTo: msg.reply_to || null,
+                    replyPreview: msg.reply_preview || null
                 };
 
                 state.messages.push(message);
@@ -1975,56 +1630,6 @@ async function saveMessageToDB(roomId, message) {
         }
     } catch (err) {
         console.error('메시지 저장 실패:', err);
-    }
-}
-
-// 파일 메시지 DB 저장 (전송 완료 시 호출)
-async function saveFileMessageToDB(msgId, cloudInfo = null) {
-    try {
-        // state.messages에서 해당 메시지 찾기
-        const msg = state.messages.find(m => m.id === msgId);
-        if (!msg) {
-            console.warn('saveFileMessageToDB: 메시지를 찾을 수 없음:', msgId);
-            return;
-        }
-
-        // 현재 채팅방이 없으면 저장하지 않음
-        if (!state.currentRoom) {
-            console.warn('saveFileMessageToDB: 현재 채팅방 없음');
-            return;
-        }
-
-        // 이미 DB에 저장된 메시지인지 확인 (transferring이 false면 이미 저장됨)
-        if (!msg.transferring) {
-            console.log('saveFileMessageToDB: 이미 저장된 메시지:', msgId);
-            return;
-        }
-
-        // 전송 완료 상태로 업데이트
-        msg.transferring = false;
-        if (cloudInfo) {
-            msg.cloudFileId = cloudInfo.cloudFileId || '';
-            msg.cloudUrl = cloudInfo.cloudUrl || '';
-        }
-
-        // DB에 저장
-        if (window.messengerDB) {
-            await window.messengerDB.saveMessage({
-                roomId: state.currentRoom,
-                senderId: state.myContactId || 'self',
-                senderNickname: state.nickname,
-                type: 'file',
-                content: msg.filename || '',
-                fileName: msg.filename,
-                fileSize: msg.fileSize,
-                filePath: msg.filePath || '',
-                cloudFileId: msg.cloudFileId || '',
-                cloudUrl: msg.cloudUrl || ''
-            });
-            console.log('saveFileMessageToDB: 파일 메시지 DB 저장 완료:', msgId);
-        }
-    } catch (err) {
-        console.error('파일 메시지 DB 저장 실패:', err);
     }
 }
 
@@ -2092,15 +1697,20 @@ async function leaveRoom(roomId) {
 async function deleteRoom(roomId) {
     try {
         if (window.messengerDB) {
+            const wasCurrentRoom = state.currentRoom === roomId;
             await window.messengerDB.deleteRoom(roomId);
             await loadRooms();
 
-            if (state.currentRoom === roomId) {
+            if (wasCurrentRoom) {
                 state.currentRoom = null;
-                if (state.rooms.length === 0) {
-                    showEmptyRoomMessage();
-                } else {
-                    hideChatView();
+                // 채팅방이 없으면 빈 상태 표시, 있으면 채팅 뷰 숨기기
+                hideChatView();
+                // 메시지 컨테이너 초기화
+                if (elements.messagesContainer) {
+                    elements.messagesContainer.innerHTML = '';
+                }
+                if (elements.messageList) {
+                    elements.messageList.innerHTML = '';
                 }
             }
         }
@@ -2210,106 +1820,6 @@ function initSidebarTabs() {
     document.getElementById('createGroupBtn')?.addEventListener('click', () => {
         openModal('groupModal');
     });
-}
-
-// ============================================
-// 이미지 뷰어
-// ============================================
-
-// 이미지 뷰어 열기
-function openImageViewer(imageUrl, filename) {
-    // 기존 뷰어가 있으면 제거
-    const existingViewer = document.getElementById('imageViewerModal');
-    if (existingViewer) {
-        existingViewer.remove();
-    }
-
-    // 이미지 뷰어 모달 생성
-    const viewer = document.createElement('div');
-    viewer.id = 'imageViewerModal';
-    viewer.className = 'image-viewer-modal';
-    viewer.innerHTML = `
-        <div class="image-viewer-backdrop" onclick="closeImageViewer()"></div>
-        <div class="image-viewer-container">
-            <div class="image-viewer-header">
-                <span class="image-viewer-title" title="${escapeHtml(filename)}">${escapeHtml(filename)}</span>
-                <div class="image-viewer-controls">
-                    <button class="image-viewer-btn" onclick="zoomImage(-0.2)" title="축소">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM7 9h5v1H7z"/>
-                        </svg>
-                    </button>
-                    <button class="image-viewer-btn" onclick="zoomImage(0.2)" title="확대">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zm-2-4h2v2H9V9h2v1h-2z"/>
-                            <path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/>
-                        </svg>
-                    </button>
-                    <button class="image-viewer-btn" onclick="resetZoom()" title="원본 크기">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
-                        </svg>
-                    </button>
-                    <button class="image-viewer-btn close-btn" onclick="closeImageViewer()" title="닫기">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="image-viewer-body">
-                <img id="viewerImage" src="${imageUrl}" alt="${escapeHtml(filename)}"
-                     style="transform: scale(1);"
-                     ondragstart="return false;" />
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(viewer);
-
-    // ESC 키로 닫기
-    const handleEsc = (e) => {
-        if (e.key === 'Escape') {
-            closeImageViewer();
-            document.removeEventListener('keydown', handleEsc);
-        }
-    };
-    document.addEventListener('keydown', handleEsc);
-
-    // 애니메이션을 위해 다음 프레임에서 visible 클래스 추가
-    requestAnimationFrame(() => {
-        viewer.classList.add('visible');
-    });
-}
-
-// 이미지 뷰어 닫기
-function closeImageViewer() {
-    const viewer = document.getElementById('imageViewerModal');
-    if (viewer) {
-        viewer.classList.remove('visible');
-        setTimeout(() => viewer.remove(), 200);
-    }
-}
-
-// 현재 줌 레벨 저장
-let currentZoom = 1;
-
-// 이미지 줌
-function zoomImage(delta) {
-    const img = document.getElementById('viewerImage');
-    if (!img) return;
-
-    currentZoom = Math.max(0.2, Math.min(5, currentZoom + delta));
-    img.style.transform = `scale(${currentZoom})`;
-}
-
-// 줌 리셋
-function resetZoom() {
-    const img = document.getElementById('viewerImage');
-    if (!img) return;
-
-    currentZoom = 1;
-    img.style.transform = 'scale(1)';
 }
 
 // ============================================
@@ -2588,15 +2098,7 @@ async function leaveCurrentRoom() {
 
     try {
         await deleteRoom(state.currentRoom);
-        state.currentRoom = null;
-        elements.messagesContainer.innerHTML = '';
-
-        // 채팅방이 없으면 안내 메시지 표시
-        if (state.rooms.length === 0) {
-            showEmptyRoomMessage();
-        } else {
-            hideChatView();
-        }
+        // deleteRoom 내부에서 state.currentRoom, elements 초기화 처리됨
     } catch (err) {
         console.error('채팅방 삭제 실패:', err);
         alert('채팅방 삭제 실패: ' + err.message);
@@ -2627,9 +2129,6 @@ async function saveRoom() {
 
                 closeModal('roomModal');
                 await loadRooms();
-
-                // 생성된 채팅방 자동 선택
-                selectRoom(result.id);
             } else {
                 alert('채팅방 생성 실패: ' + (result.error || '알 수 없는 오류'));
             }
@@ -2644,89 +2143,127 @@ async function saveRoom() {
 // 초기화 업데이트
 // ============================================
 
+// 로딩 상태 업데이트
+function updateLoadingStatus(status) {
+    const loadingStatus = document.getElementById('loadingStatus');
+    if (loadingStatus) {
+        loadingStatus.textContent = status;
+    }
+}
+
+// 로딩 오버레이 숨기기
+function hideLoadingOverlay() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+        // 트랜지션 후 제거
+        setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+        }, 300);
+    }
+}
+
+// 로딩 오버레이 표시
+function showLoadingOverlay(message = '메신저 초기화 중...') {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = loadingOverlay?.querySelector('.loading-text');
+    if (loadingOverlay) {
+        loadingOverlay.style.display = 'flex';
+        loadingOverlay.classList.remove('hidden');
+        if (loadingText) loadingText.textContent = message;
+    }
+}
+
+// API 준비 대기
+async function waitForAPIs(maxAttempts = 100) {
+    for (let i = 0; i < maxAttempts; i++) {
+        updateLoadingStatus(`API 연결 중... (${i + 1}/${maxAttempts})`);
+
+        const p2pReady = window.p2pAPI && typeof window.p2pAPI.getStatus === 'function';
+        const dbReady = window.messengerDB && typeof window.messengerDB.getRooms === 'function';
+        const chatReady = window.chatAPI && typeof window.chatAPI.minimize === 'function';
+
+        if (p2pReady && dbReady && chatReady) {
+            updateLoadingStatus('API 연결 완료');
+            return true;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return false;
+}
+
 // DOMContentLoaded 이벤트에 사이드바 탭 초기화 추가
+const originalDOMContentLoaded = document.addEventListener;
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[ChatWindow] DOMContentLoaded 시작');
-    console.log('[ChatWindow] chatAPI 존재:', !!window.chatAPI);
-    console.log('[ChatWindow] p2pAPI 존재:', !!window.p2pAPI);
-    console.log('[ChatWindow] messengerDB 존재:', !!window.messengerDB);
+    console.log('[ChatWindow] 초기화 시작');
+    updateLoadingStatus('UI 초기화 중...');
 
-    // DOM 요소 먼저 초기화 (가장 먼저 실행!)
-    initElements();
-
+    // 기본 UI 초기화 (API 대기 전)
     initTitlebar();
     initTabs();
     initSidebarTabs();
+    initSettingsBtn();
+    initUsersPanelClose();
+    initUsersPanelResize();
+    initSidebarToggle();
+    initSidebarResize();
+    initEmojiPicker();
+    addToastStyles();
+
+    // API 준비 대기
+    updateLoadingStatus('API 연결 대기...');
+    const apisReady = await waitForAPIs();
+
+    if (!apisReady) {
+        console.warn('[ChatWindow] API 연결 타임아웃');
+        updateLoadingStatus('API 연결 실패 - 일부 기능이 제한될 수 있습니다');
+        // 3초 후 로딩 오버레이 숨기기
+        setTimeout(hideLoadingOverlay, 3000);
+    } else {
+        console.log('[ChatWindow] API 연결 완료');
+    }
+
+    // 채팅 초기화 (API 의존)
+    updateLoadingStatus('채팅 기능 초기화...');
     initChat();
     initP2PListeners();
-    initChatAPIListeners(); // 메인 윈도우에서 보내는 이벤트 리스너
-    initSettingsBtn(); // 설정 버튼 이벤트 리스너
-    initUsersPanelClose(); // 참여자 패널 닫기 버튼
-    initUsersPanelResize(); // 참여자 패널 리사이즈
-    initSidebarToggle(); // 좌측 사이드바 토글
-    initSidebarResize(); // 좌측 사이드바 리사이즈
-    initEmojiPicker(); // 이모지 피커
-    initCloudTabButtons(); // 클라우드 탭 버튼 이벤트
-    initCloudEventListeners(); // 클라우드 이벤트 리스너
-    addToastStyles(); // 토스트 스타일 추가
+    initChatAPIListeners();
+    initCloudTabButtons();
+    initCloudEventListeners();
+    initMentionDetection();
 
     // 데이터 로드
+    updateLoadingStatus('프로필 로드...');
     await loadMyProfile();
+
+    updateLoadingStatus('연락처 로드...');
     await loadContacts();
+
+    updateLoadingStatus('그룹 로드...');
     await loadGroups();
+
+    updateLoadingStatus('채팅방 로드...');
     await loadRooms();
 
     // UI 렌더링
+    updateLoadingStatus('UI 렌더링...');
     renderContactList();
     renderGroupList();
     renderRoomList();
 
     // 현재 P2P 상태 확인 및 동기화
+    updateLoadingStatus('P2P 상태 확인...');
     await checkP2PStatus();
 
     // 클라우드 데이터 로드
+    updateLoadingStatus('클라우드 데이터 로드...');
     await loadCloudData();
 
-    // 기본 그룹 채팅방 자동 생성 및 선택
-    await ensureDefaultGroupRoom();
+    // 초기화 완료 - 로딩 오버레이 숨기기
+    console.log('[ChatWindow] 초기화 완료');
+    hideLoadingOverlay();
 });
-
-// 기본 그룹 채팅방이 없으면 생성하고 선택
-async function ensureDefaultGroupRoom() {
-    const DEFAULT_ROOM_ID = 'default-group-room';
-
-    // 이미 기본 채팅방이 있는지 확인
-    let defaultRoom = state.rooms.find(r => r.id === DEFAULT_ROOM_ID);
-
-    if (!defaultRoom && window.messengerDB) {
-        try {
-            // 기본 그룹 채팅방 생성
-            const result = await window.messengerDB.createRoom({
-                id: DEFAULT_ROOM_ID,
-                name: '그룹 채팅',
-                type: 'group',
-                avatar: '💬'
-            });
-
-            if (result && result.success) {
-                console.log('기본 그룹 채팅방 생성됨:', DEFAULT_ROOM_ID);
-                // 채팅방 목록 새로고침
-                await loadRooms();
-                renderRoomList();
-                defaultRoom = state.rooms.find(r => r.id === DEFAULT_ROOM_ID);
-            }
-        } catch (err) {
-            console.error('기본 채팅방 생성 실패:', err);
-        }
-    }
-
-    // 현재 선택된 방이 없으면 기본 방 또는 첫 번째 방 선택
-    if (!state.currentRoom && state.rooms.length > 0) {
-        const roomToSelect = defaultRoom || state.rooms[0];
-        selectRoom(roomToSelect.id);
-        console.log('기본 채팅방 선택됨:', roomToSelect.id);
-    }
-}
 
 // 메인 윈도우 API 이벤트 리스너
 function initChatAPIListeners() {
@@ -3232,7 +2769,7 @@ function renderCloudFileList() {
                 </div>
             </div>
             <div class="cloud-file-actions">
-                <button class="cloud-file-action-btn" onclick="downloadCloudFileFromList('${file.id}')" title="다운로드">
+                <button class="cloud-file-action-btn" onclick="downloadCloudFile('${file.id}')" title="다운로드">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                     </svg>
@@ -3307,8 +2844,8 @@ async function uploadToCloud() {
     }
 }
 
-// 클라우드 탭에서 파일 다운로드
-async function downloadCloudFileFromList(fileId) {
+// 클라우드 파일 다운로드
+async function downloadCloudFile(fileId) {
     try {
         const file = state.cloudFiles.find(f => f.id === fileId);
         if (!file) return;
@@ -3455,6 +2992,272 @@ function addToastStyles() {
     document.head.appendChild(style);
 }
 
+// ============================================
+// 리액션 기능
+// ============================================
+
+// 리액션 피커 표시
+function showReactionPicker(messageId) {
+    // 기존 피커 제거
+    closeReactionPicker();
+
+    const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!msgElement) return;
+
+    const picker = document.createElement('div');
+    picker.className = 'reaction-picker';
+    picker.id = 'reactionPicker';
+    picker.innerHTML = REACTIONS.map(r => `
+        <button class="reaction-btn-item" onclick="addReaction('${messageId}', '${r}')">${r}</button>
+    `).join('');
+
+    // 메시지 위에 위치시키기
+    const msgContent = msgElement.querySelector('.message-content');
+    if (msgContent) {
+        msgContent.appendChild(picker);
+    }
+
+    // 외부 클릭 시 닫기
+    setTimeout(() => {
+        document.addEventListener('click', closeReactionPickerOnClick);
+    }, 100);
+}
+
+// 외부 클릭 시 피커 닫기
+function closeReactionPickerOnClick(e) {
+    const picker = document.getElementById('reactionPicker');
+    if (picker && !picker.contains(e.target) && !e.target.classList.contains('reaction-btn')) {
+        closeReactionPicker();
+    }
+}
+
+// 리액션 피커 닫기
+function closeReactionPicker() {
+    const picker = document.getElementById('reactionPicker');
+    if (picker) picker.remove();
+    document.removeEventListener('click', closeReactionPickerOnClick);
+}
+
+// 리액션 추가/토글
+async function addReaction(messageId, reaction) {
+    closeReactionPicker();
+
+    if (!window.messengerDB) return;
+
+    try {
+        const userId = state.myContactId || 'self';
+        const userNickname = state.nickname || 'User';
+        await window.messengerDB.toggleReaction(messageId, userId, userNickname, reaction);
+        await loadMessageReactions(messageId);
+    } catch (err) {
+        console.error('리액션 추가 실패:', err);
+    }
+}
+
+// 메시지 리액션 로드
+async function loadMessageReactions(messageId) {
+    const reactionsContainer = document.getElementById(`reactions-${messageId}`);
+    if (!reactionsContainer || !window.messengerDB) return;
+
+    try {
+        const reactions = await window.messengerDB.getMessageReactions(messageId);
+        if (reactions.length === 0) {
+            reactionsContainer.innerHTML = '';
+            return;
+        }
+
+        reactionsContainer.innerHTML = reactions.map(r => `
+            <span class="reaction-badge" onclick="addReaction('${messageId}', '${r.reaction}')" title="${r.users.join(', ')}">
+                ${r.reaction} ${r.count}
+            </span>
+        `).join('');
+    } catch (err) {
+        console.error('리액션 로드 실패:', err);
+    }
+}
+
+// ============================================
+// 회신/인용 기능
+// ============================================
+
+// 회신 대상 설정
+function setReplyTo(messageId, sender, preview) {
+    state.replyTo = { id: messageId, sender, preview };
+    showReplyBar();
+}
+
+// 회신 바 표시
+function showReplyBar() {
+    let replyBar = document.getElementById('replyBar');
+    if (!replyBar) {
+        const inputContainer = document.querySelector('.message-input-container') ||
+                              document.querySelector('.chat-input');
+        if (!inputContainer) return;
+
+        replyBar = document.createElement('div');
+        replyBar.id = 'replyBar';
+        replyBar.className = 'reply-bar-container';
+        inputContainer.insertBefore(replyBar, inputContainer.firstChild);
+    }
+
+    if (state.replyTo) {
+        replyBar.innerHTML = `
+            <div class="reply-bar-content">
+                <div class="reply-bar-indicator"></div>
+                <div class="reply-bar-info">
+                    <span class="reply-bar-sender">${escapeHtml(state.replyTo.sender)}</span>
+                    <span class="reply-bar-preview">${escapeHtml(state.replyTo.preview)}</span>
+                </div>
+                <button class="reply-bar-close" onclick="clearReplyTo()">×</button>
+            </div>
+        `;
+        replyBar.style.display = 'flex';
+    }
+
+    // 입력창에 포커스
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) messageInput.focus();
+}
+
+// 회신 대상 초기화
+function clearReplyTo() {
+    state.replyTo = null;
+    const replyBar = document.getElementById('replyBar');
+    if (replyBar) replyBar.style.display = 'none';
+}
+
+// 메시지 인용
+function quoteMessage(messageId, sender, content) {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    // 인용 형식으로 삽입
+    const quote = `"${content}" - ${sender}\n\n`;
+    messageInput.value = quote + messageInput.value;
+    messageInput.focus();
+
+    // 커서를 끝으로 이동
+    messageInput.setSelectionRange(messageInput.value.length, messageInput.value.length);
+
+    // 전송 버튼 활성화
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.disabled = false;
+}
+
+// 특정 메시지로 스크롤
+function scrollToMessage(messageId) {
+    const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (msgElement) {
+        msgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // 하이라이트 효과
+        msgElement.classList.add('highlight');
+        setTimeout(() => msgElement.classList.remove('highlight'), 2000);
+    }
+}
+
+// ============================================
+// @멘션 기능
+// ============================================
+
+// @멘션 형식으로 텍스트 변환
+function formatMentions(text) {
+    if (!text) return '';
+
+    // @[이름] 형식을 하이라이트된 스팬으로 변환
+    const escaped = escapeHtml(text);
+    return escaped.replace(/@\[([^\]]+)\]/g, '<span class="mention-tag">@$1</span>');
+}
+
+// 멘션 자동완성 표시
+function showMentionSuggestions(query) {
+    const inputContainer = document.querySelector('.message-input-container') ||
+                          document.querySelector('.chat-input');
+    if (!inputContainer) return;
+
+    // 기존 제안 제거
+    hideMentionSuggestions();
+
+    // 현재 사용자 목록에서 검색
+    const filtered = state.users.filter(u =>
+        u.nickname !== state.nickname &&
+        u.nickname.toLowerCase().includes(query.toLowerCase())
+    );
+
+    if (filtered.length === 0) return;
+
+    const suggestions = document.createElement('div');
+    suggestions.id = 'mentionSuggestions';
+    suggestions.className = 'mention-suggestions';
+    suggestions.innerHTML = filtered.slice(0, 5).map(u => `
+        <div class="mention-suggestion-item" onclick="insertMention('${escapeHtml(u.nickname)}')">
+            <span class="mention-avatar">${u.nickname.charAt(0).toUpperCase()}</span>
+            <span class="mention-name">${escapeHtml(u.nickname)}</span>
+        </div>
+    `).join('');
+
+    inputContainer.appendChild(suggestions);
+}
+
+// 멘션 제안 숨기기
+function hideMentionSuggestions() {
+    const suggestions = document.getElementById('mentionSuggestions');
+    if (suggestions) suggestions.remove();
+}
+
+// 멘션 삽입
+function insertMention(nickname) {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    const text = messageInput.value;
+    const cursorPos = messageInput.selectionStart;
+
+    // @ 위치 찾기
+    const beforeCursor = text.substring(0, cursorPos);
+    const atIndex = beforeCursor.lastIndexOf('@');
+
+    if (atIndex !== -1) {
+        const before = text.substring(0, atIndex);
+        const after = text.substring(cursorPos);
+        messageInput.value = before + `@[${nickname}] ` + after;
+
+        // 커서 위치 업데이트
+        const newPos = before.length + nickname.length + 4;
+        messageInput.setSelectionRange(newPos, newPos);
+    }
+
+    hideMentionSuggestions();
+    messageInput.focus();
+}
+
+// 메시지 입력 시 @ 감지
+function initMentionDetection() {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    messageInput.addEventListener('input', (e) => {
+        const text = messageInput.value;
+        const cursorPos = messageInput.selectionStart;
+        const beforeCursor = text.substring(0, cursorPos);
+
+        // @ 이후 텍스트 감지
+        const atMatch = beforeCursor.match(/@([^\s\[\]]*?)$/);
+        if (atMatch) {
+            state.mentionQuery = atMatch[1];
+            showMentionSuggestions(state.mentionQuery);
+        } else {
+            hideMentionSuggestions();
+        }
+    });
+
+    // ESC 키로 제안 닫기
+    messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            hideMentionSuggestions();
+        }
+    });
+}
+
 // 전역 함수 노출
 window.selectRoom = selectRoom;
 window.openFile = openFile;
@@ -3462,6 +3265,10 @@ window.openLocalFile = openLocalFile;
 window.openFileFolder = openFileFolder;
 window.downloadAndOpenFile = downloadAndOpenFile;
 window.downloadCloudFile = downloadCloudFile;
+window.loadCloudImagePreview = loadCloudImagePreview;
+window.openImageViewer = openImageViewer;
+window.closeImageViewer = closeImageViewer;
+window.downloadImageFromViewer = downloadImageFromViewer;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.saveContact = saveContact;
@@ -3475,6 +3282,7 @@ window.startDirectChat = startDirectChat;
 window.leaveCurrentRoom = leaveCurrentRoom;
 window.createNewRoom = createNewRoom;
 window.deleteRoom = deleteRoom;
+window.confirmDeleteRoom = confirmDeleteRoom;
 window.openSettingsModal = openSettingsModal;
 window.saveSettings = saveSettings;
 window.openInviteModal = openInviteModal;
@@ -3484,3 +3292,13 @@ window.uploadToCloud = uploadToCloud;
 window.downloadCloudFile = downloadCloudFile;
 window.deleteCloudFile = deleteCloudFile;
 window.openCloudStorage = openCloudStorage;
+
+// 리액션/회신/멘션 기능
+window.showReactionPicker = showReactionPicker;
+window.closeReactionPicker = closeReactionPicker;
+window.addReaction = addReaction;
+window.setReplyTo = setReplyTo;
+window.clearReplyTo = clearReplyTo;
+window.quoteMessage = quoteMessage;
+window.scrollToMessage = scrollToMessage;
+window.insertMention = insertMention;

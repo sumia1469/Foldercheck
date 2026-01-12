@@ -5138,13 +5138,15 @@ async function loadAiModelStatus() {
             // 설치 버튼 및 안내 메시지 표시/숨김
             if (installBtn && installHelp) {
                 if (status.ollamaRunning && !status.hasModel) {
-                    // ollama 실행 중이지만 모델이 없는 경우 - 설치 버튼 표시
+                    // ollama 실행 중이지만 모델이 없는 경우 - 모델 설치 버튼 표시
+                    installBtn.textContent = '🔽 AI 모델 설치 (~2GB)';
                     installBtn.style.display = 'inline-block';
                     installHelp.style.display = 'none';
                 } else if (!status.ollamaRunning && !status.ollamaInstalled) {
-                    // ollama가 설치되지 않은 경우 - 안내 메시지
-                    installBtn.style.display = 'none';
-                    installHelp.textContent = '내장 AI 엔진이 설치되지 않았습니다. 앱을 재시작하면 자동으로 설치됩니다.';
+                    // ollama가 설치되지 않은 경우 - AI 엔진 설치 버튼 표시
+                    installBtn.textContent = '🔽 AI 엔진 설치 (~2GB)';
+                    installBtn.style.display = 'inline-block';
+                    installHelp.textContent = 'AI 엔진이 설치되지 않았습니다. 버튼을 클릭하여 설치를 시작하세요.';
                     installHelp.style.display = 'block';
                 } else if (!status.ollamaRunning) {
                     // ollama가 설치되었지만 시작 중인 경우 - 안내 메시지
@@ -5190,7 +5192,49 @@ async function installOllamaModel() {
         installBtn.style.display = 'none';
     }
 
-    // 인라인 로딩 박스 표시
+    // 먼저 Ollama 상태 확인
+    let status;
+    try {
+        const statusRes = await fetch('/api/ollama/status');
+        status = await statusRes.json();
+    } catch (e) {
+        status = { ollamaRunning: false, ollamaInstalled: false };
+    }
+
+    // Ollama 엔진이 설치되지 않은 경우 - Electron API로 다운로드
+    if (!status.ollamaRunning && !status.ollamaInstalled) {
+        if (window.electronAPI?.downloadOllamaEngine) {
+            InlineDownload.show('ollama', 'AI 엔진 설치 중', '다운로드 준비 중...');
+
+            try {
+                // 엔진 다운로드 시작
+                const result = await window.electronAPI.downloadOllamaEngine();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'AI 엔진 다운로드 실패');
+                }
+
+                // 다운로드 진행 상황 폴링 시작
+                startOllamaEngineProgressPolling();
+            } catch (e) {
+                InlineDownload.error('ollama', 'AI 엔진 설치 실패: ' + e.message);
+                if (installBtn) {
+                    installBtn.disabled = false;
+                    installBtn.style.display = 'inline-flex';
+                }
+            }
+        } else {
+            // Electron API가 없는 경우 (브라우저 모드)
+            InlineDownload.error('ollama', 'AI 엔진을 설치하려면 앱을 재시작해주세요.');
+            if (installBtn) {
+                installBtn.disabled = false;
+                installBtn.style.display = 'inline-flex';
+            }
+        }
+        return;
+    }
+
+    // Ollama가 실행 중이지만 모델이 없는 경우 - 모델 다운로드
     InlineDownload.show('ollama', 'AI 모델 설치 중', '서버에 연결 중...');
 
     try {
@@ -5215,6 +5259,58 @@ async function installOllamaModel() {
             installBtn.style.display = 'inline-flex';
         }
     }
+}
+
+// Ollama 엔진 다운로드 진행 상황 폴링
+let ollamaEngineProgressInterval = null;
+
+function startOllamaEngineProgressPolling() {
+    if (ollamaEngineProgressInterval) return;
+
+    ollamaEngineProgressInterval = setInterval(async () => {
+        if (!window.electronAPI?.getOllamaDownloadProgress) return;
+
+        const progress = await window.electronAPI.getOllamaDownloadProgress();
+
+        if (progress) {
+            InlineDownload.update('ollama', progress.status || '다운로드 중...', progress.progress || 0);
+        }
+
+        if (progress && !progress.downloading) {
+            clearInterval(ollamaEngineProgressInterval);
+            ollamaEngineProgressInterval = null;
+
+            if (progress.error) {
+                InlineDownload.error('ollama', 'AI 엔진 설치 오류: ' + progress.error);
+                const installBtn = document.getElementById('ollamaInstallBtn');
+                if (installBtn) {
+                    installBtn.disabled = false;
+                    installBtn.style.display = 'inline-flex';
+                }
+            } else if (progress.progress >= 100) {
+                // 엔진 설치 완료 - 모델 다운로드 시작
+                InlineDownload.update('ollama', 'AI 엔진 설치 완료! 모델 다운로드 시작...', 0);
+
+                // 잠시 후 모델 다운로드 시작
+                setTimeout(async () => {
+                    try {
+                        const res = await fetch('/api/ollama/pull', { method: 'POST' });
+                        const data = await res.json();
+
+                        if (data.success) {
+                            startOllamaProgressPolling();
+                        } else {
+                            InlineDownload.success('ollama', 'AI 엔진이 설치되었습니다. 앱을 재시작 후 모델을 설치해주세요.');
+                            showRestartButton('ollama');
+                        }
+                    } catch (e) {
+                        InlineDownload.success('ollama', 'AI 엔진이 설치되었습니다. 앱을 재시작 후 모델을 설치해주세요.');
+                        showRestartButton('ollama');
+                    }
+                }, 2000);
+            }
+        }
+    }, 500);
 }
 
 // 내장 AI 다운로드 진행 상황 폴링

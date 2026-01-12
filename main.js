@@ -434,7 +434,8 @@ async function startEmbeddedOllama() {
     }
 
     const ollamaDir = getEmbeddedOllamaPath();
-    const ollamaBinary = path.join(ollamaDir, process.platform === 'win32' ? 'ollama.exe' : 'ollama');
+    let ollamaBinary = path.join(ollamaDir, process.platform === 'win32' ? 'ollama.exe' : 'ollama');
+    let usingSystemOllama = false;
 
     // 내장 Ollama 존재 확인
     if (!fs.existsSync(ollamaBinary)) {
@@ -444,13 +445,14 @@ async function startEmbeddedOllama() {
         const systemOllama = findSystemOllama();
         if (systemOllama) {
             console.log('시스템 Ollama 사용:', systemOllama);
-            return true; // 시스템 Ollama가 있으면 사용
+            ollamaBinary = systemOllama;
+            usingSystemOllama = true;
+        } else {
+            return false;
         }
-
-        return false;
     }
 
-    console.log('내장 Ollama 실행 중...', ollamaBinary);
+    console.log('Ollama 실행 중...', ollamaBinary);
 
     // 환경 변수 설정 (모델 경로)
     const env = {
@@ -498,7 +500,7 @@ async function startEmbeddedOllama() {
 
             const checkReady = async () => {
                 if (await isOllamaRunning()) {
-                    console.log('내장 Ollama 시작 완료!');
+                    console.log(usingSystemOllama ? '시스템 Ollama 시작 완료!' : '내장 Ollama 시작 완료!');
                     resolve(true);
                 } else if (retries < maxRetries) {
                     retries++;

@@ -938,11 +938,32 @@ function renderMessage(msg) {
             <span class="message-unread-count" title="${unreadCount}명이 안 읽음">${unreadCount}</span>
         ` : '';
 
+        // 이모지만 있는 메시지인지 확인
+        const content = msg.content || '';
+        const emojiRegex = /^(?:[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|\s)+$/u;
+        const isEmojiOnly = emojiRegex.test(content.trim());
+
+        // 이모지 개수 세기 (이모지만 있는 경우)
+        let emojiCount = 0;
+        if (isEmojiOnly) {
+            const matches = content.match(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu);
+            emojiCount = matches ? matches.length : 0;
+        }
+
+        // 버블 클래스 결정
+        let bubbleClass = 'message-bubble';
+        if (isEmojiOnly) {
+            bubbleClass += ' emoji-only';
+            if (emojiCount > 3) {
+                bubbleClass += ' many-emojis';
+            }
+        }
+
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="message-bubble">${escapeHtml(msg.content)}</div>
+                <div class="${bubbleClass}">${escapeHtml(msg.content)}</div>
                 <div class="message-meta">
                     ${unreadBadge}
                     <span class="message-time">${time}</span>

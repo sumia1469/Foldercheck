@@ -836,6 +836,34 @@
             border-top-right-radius: 4px;
         }
 
+        /* 메시지 내 이모지 크기 조정 */
+        .message-bubble {
+            font-size: 14px;
+        }
+
+        /* 이모지만 있는 메시지 (1-3개) */
+        .message-bubble.emoji-only {
+            background: transparent !important;
+            padding: 4px 8px;
+            font-size: 40px;
+            line-height: 1.2;
+        }
+
+        /* 이모지가 많은 메시지 */
+        .message-bubble.emoji-only.many-emojis {
+            font-size: 28px;
+        }
+
+        /* 일반 텍스트 내 이모지 */
+        .message-bubble:not(.emoji-only) {
+            font-size: 14px;
+        }
+
+        .message-bubble:not(.emoji-only) .emoji {
+            font-size: 18px;
+            vertical-align: middle;
+        }
+
         .message-meta {
             display: flex;
             align-items: center;

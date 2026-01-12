@@ -3331,7 +3331,7 @@ function showConnectDialog() {
 }
 
 // P2P 모달 표시
-function showP2PModal(mode) {
+async function showP2PModal(mode) {
     // 기존 모달 제거
     const existingModal = document.getElementById('p2pModal');
     if (existingModal) existingModal.remove();
@@ -3339,6 +3339,10 @@ function showP2PModal(mode) {
     const isHost = mode === 'host';
     const savedNickname = localStorage.getItem('p2pNickname') || (isHost ? '호스트' : '게스트');
     const savedPort = localStorage.getItem('p2pPort') || '9900';
+
+    // p2pAPI 준비 상태 확인
+    let isP2PReady = false;
+    let loadingMessage = '메신저 확장을 초기화하는 중...';
 
     const modal = document.createElement('div');
     modal.id = 'p2pModal';
@@ -3361,7 +3365,13 @@ function showP2PModal(mode) {
                     </svg>
                 </button>
             </div>
-            <div class="modal-body">
+            <!-- 로딩 오버레이 -->
+            <div class="p2p-modal-loading" id="p2pModalLoading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
+                <div class="loading-spinner" style="width: 32px; height: 32px; border: 3px solid var(--border-color); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
+                <div style="color: var(--text-secondary); font-size: 14px;">메신저 확장을 초기화하는 중...</div>
+            </div>
+            <!-- 실제 폼 (초기에는 숨김) -->
+            <div class="modal-body" id="p2pModalBody" style="display: none;">
                 <div class="form-group">
                     <label>닉네임</label>
                     <input type="text" id="p2pModalNickname" placeholder="이름 입력" value="${savedNickname}">
@@ -3390,7 +3400,7 @@ function showP2PModal(mode) {
                     </div>
                 `}
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" id="p2pModalFooter" style="display: none;">
                 <button class="btn btn-secondary" onclick="closeP2PModal()">취소</button>
                 <button class="btn btn-primary" onclick="confirmP2PConnection('${mode}')">
                     ${isHost ? '서버 시작' : '연결'}
@@ -3400,6 +3410,54 @@ function showP2PModal(mode) {
     `;
 
     document.body.appendChild(modal);
+
+    // p2pAPI가 준비될 때까지 대기 (최대 10초)
+    const checkP2PReady = async () => {
+        const maxAttempts = 100; // 100ms * 100 = 10초
+        for (let i = 0; i < maxAttempts; i++) {
+            try {
+                if (window.p2pAPI && typeof window.p2pAPI.getStatus === 'function') {
+                    await window.p2pAPI.getStatus();
+                    return true;
+                }
+            } catch (e) {
+                // 아직 준비 안됨
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return false;
+    };
+
+    isP2PReady = await checkP2PReady();
+
+    const loadingEl = document.getElementById('p2pModalLoading');
+    const bodyEl = document.getElementById('p2pModalBody');
+    const footerEl = document.getElementById('p2pModalFooter');
+
+    if (isP2PReady) {
+        // 로딩 완료 - 폼 표시
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (bodyEl) bodyEl.style.display = 'block';
+        if (footerEl) footerEl.style.display = 'flex';
+
+        // 첫 번째 입력 필드에 포커스
+        setTimeout(() => {
+            const firstInput = modal.querySelector('#p2pModalBody input');
+            if (firstInput) firstInput.focus();
+        }, 100);
+    } else {
+        // 로딩 실패
+        if (loadingEl) {
+            loadingEl.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2" style="width: 32px; height: 32px; margin-bottom: 16px;">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <div style="color: var(--text-secondary); font-size: 14px; margin-bottom: 8px;">메신저 확장을 불러올 수 없습니다</div>
+                <div style="color: var(--text-muted); font-size: 12px;">확장이 설치되어 있는지 확인해주세요</div>
+                <button class="btn btn-secondary" onclick="closeP2PModal()" style="margin-top: 16px;">닫기</button>
+            `;
+        }
+    }
 
     // 배경 클릭 시 닫기
     modal.addEventListener('click', (e) => {

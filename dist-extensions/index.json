@@ -3,13 +3,13 @@
     {
       "id": "p2p-messenger",
       "name": "P2P 메신저",
-      "version": "1.0.13",
+      "version": "1.0.16",
       "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
-      "filename": "p2p-messenger-v1.0.13.zip",
-      "size": 56225,
-      "sha256": "a7972d9bac4d47c21647cc618d782cb4f368eeb24617d73fa203b08faf5d8f3c",
+      "filename": "p2p-messenger-v1.0.16.zip",
+      "size": 57180,
+      "sha256": "d1236dd13c6ba465b400f32934bb5ed417a3e15eca20709a09baa5f498274a1d",
       "minAppVersion": "1.0.0"
     }
   ],
-  "lastUpdated": "2026-01-12T01:53:06.279Z"
+  "lastUpdated": "2026-01-12T02:10:21.507Z"
 }

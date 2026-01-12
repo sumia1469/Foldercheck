@@ -369,14 +369,19 @@ class MessengerDB {
         const avatar = contact.avatar || null;
         const status = contact.status || 'offline';
 
-        if (this.isSqlJs) {
-            this.db.run(sql, [id, nickname, ip, port, avatar, status]);
-            this.saveToFile();
-        } else {
-            this.db.prepare(sql).run(id, nickname, ip, port, avatar, status);
-        }
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, nickname, ip, port, avatar, status]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, nickname, ip, port, avatar, status);
+            }
 
-        return id;
+            return { success: true, id: id };
+        } catch (err) {
+            console.error('연락처 추가 오류:', err);
+            return { success: false, error: err.message };
+        }
     }
 
     /**
@@ -461,14 +466,19 @@ class MessengerDB {
         const description = group.description || null;
         const avatar = group.avatar || null;
 
-        if (this.isSqlJs) {
-            this.db.run(sql, [id, name, description, avatar]);
-            this.saveToFile();
-        } else {
-            this.db.prepare(sql).run(id, name, description, avatar);
-        }
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, name, description, avatar]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, name, description, avatar);
+            }
 
-        return id;
+            return { success: true, id: id };
+        } catch (err) {
+            console.error('그룹 생성 오류:', err);
+            return { success: false, error: err.message };
+        }
     }
 
     /**
@@ -585,14 +595,19 @@ class MessengerDB {
         const name = room.name || null;
         const avatar = room.avatar || null;
 
-        if (this.isSqlJs) {
-            this.db.run(sql, [id, type, name, avatar]);
-            this.saveToFile();
-        } else {
-            this.db.prepare(sql).run(id, type, name, avatar);
-        }
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, type, name, avatar]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, type, name, avatar);
+            }
 
-        return id;
+            return { success: true, id: id };
+        } catch (err) {
+            console.error('채팅방 생성 오류:', err);
+            return { success: false, error: err.message };
+        }
     }
 
     /**

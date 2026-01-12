@@ -122,15 +122,25 @@ function setupEventListeners() {
 }
 
 /**
- * 메인 윈도우로 이벤트 브로드캐스트
+ * 모든 윈도우로 이벤트 브로드캐스트 (mainWindow + chatWindow)
  */
 function broadcast(channel, data) {
-    console.log('[P2P Extension] broadcast 호출:', channel, 'mainWindow:', !!mainWindow);
+    console.log('[P2P Extension] broadcast 호출:', channel, 'mainWindow:', !!mainWindow, 'chatWindow:', !!chatWindow);
+
+    // 메인 윈도우로 전송
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send(channel, data);
-        console.log('[P2P Extension] 이벤트 전송 완료:', channel);
-    } else {
-        console.warn('[P2P Extension] mainWindow 없음, 이벤트 전송 실패:', channel);
+        console.log('[P2P Extension] mainWindow로 이벤트 전송 완료:', channel);
+    }
+
+    // 채팅 윈도우로 전송
+    if (chatWindow && !chatWindow.isDestroyed()) {
+        chatWindow.webContents.send(channel, data);
+        console.log('[P2P Extension] chatWindow로 이벤트 전송 완료:', channel);
+    }
+
+    if ((!mainWindow || mainWindow.isDestroyed()) && (!chatWindow || chatWindow.isDestroyed())) {
+        console.warn('[P2P Extension] 전송 가능한 윈도우 없음:', channel);
     }
 }
 
@@ -184,6 +194,21 @@ function registerIpcHandlers() {
     ipcMain.handle('p2p:sendFile', async (event, filePath, targetUserId) => {
         if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
         return await p2pMessenger.sendFile(filePath, targetUserId);
+    });
+
+    // 파일 선택 다이얼로그
+    ipcMain.handle('p2p:selectFile', async () => {
+        const { dialog } = require('electron');
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile'],
+            filters: [
+                { name: '모든 파일', extensions: ['*'] }
+            ]
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+        return result.filePaths[0];
     });
 
     // 채팅 윈도우 열기
@@ -360,6 +385,46 @@ function registerIpcHandlers() {
         return p2pMessenger.getCloudFiles();
     });
 
+    // 클라우드 파일 업로드 (cloud: 네임스페이스)
+    ipcMain.handle('cloud:uploadFile', async (event, filePath) => {
+        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+        return await p2pMessenger.uploadToCloud(filePath);
+    });
+
+    // 클라우드 파일 삭제 (cloud: 네임스페이스)
+    ipcMain.handle('cloud:deleteFile', async (event, fileId) => {
+        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+        return p2pMessenger.deleteFromCloud(fileId);
+    });
+
+    // 파일 선택 후 클라우드 업로드
+    ipcMain.handle('cloud:selectAndUpload', async () => {
+        const { dialog } = require('electron');
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile'],
+            filters: [
+                { name: '모든 파일', extensions: ['*'] }
+            ]
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+            return { success: false, canceled: true };
+        }
+        if (!p2pMessenger) throw new Error('P2P 메신저가 초기화되지 않았습니다');
+        return await p2pMessenger.uploadToCloud(result.filePaths[0]);
+    });
+
+    // 클라우드 저장소 폴더 열기
+    ipcMain.handle('cloud:openStorage', async () => {
+        if (!p2pMessenger || !p2pMessenger.cloudStoragePath) {
+            // 기본 경로 사용
+            const defaultPath = path.join(process.env.USERPROFILE || process.env.HOME, 'Downloads', 'P2PCloud');
+            await shell.openPath(defaultPath);
+            return { success: true, path: defaultPath };
+        }
+        await shell.openPath(p2pMessenger.cloudStoragePath);
+        return { success: true, path: p2pMessenger.cloudStoragePath };
+    });
+
     // ============================================
     // MessengerDB 관련 IPC 핸들러
     // ============================================
@@ -504,11 +569,11 @@ function unregisterIpcHandlers() {
     const channels = [
         'p2p:startHost', 'p2p:stopHost', 'p2p:connect', 'p2p:disconnect',
         'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:sendFile',
-        'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
+        'p2p:selectFile', 'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
         'p2p:openDownloads',
         'chat:minimize', 'chat:maximize', 'chat:close', 'chat:showNotification',
         'chat:openFile', 'chat:openFileFolder', 'chat:downloadAndOpenFile',
-        'cloud:getStatus', 'cloud:getFiles',
+        'cloud:getStatus', 'cloud:getFiles', 'cloud:uploadFile', 'cloud:deleteFile', 'cloud:selectAndUpload', 'cloud:openStorage',
         'messenger:getContacts', 'messenger:addContact', 'messenger:deleteContact', 'messenger:updateContactStatus',
         'messenger:getGroups', 'messenger:createGroup', 'messenger:getGroupMembers', 'messenger:addGroupMember', 'messenger:deleteGroup',
         'messenger:getRooms', 'messenger:createRoom', 'messenger:getRoom', 'messenger:getRoomParticipants',

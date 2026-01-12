@@ -2,6 +2,73 @@
  * P2P 메신저 채팅 윈도우 - 카카오톡 스타일
  */
 
+// 파일 타입별 아이콘 및 색상 반환
+function getFileTypeInfo(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const types = {
+        // 문서
+        xlsx: { icon: '📊', color: '#217346', label: 'Excel' },
+        xls: { icon: '📊', color: '#217346', label: 'Excel' },
+        docx: { icon: '📝', color: '#2B579A', label: 'Word' },
+        doc: { icon: '📝', color: '#2B579A', label: 'Word' },
+        pptx: { icon: '📽️', color: '#D24726', label: 'PowerPoint' },
+        ppt: { icon: '📽️', color: '#D24726', label: 'PowerPoint' },
+        pdf: { icon: '📕', color: '#FF0000', label: 'PDF' },
+        hwp: { icon: '📄', color: '#0078D7', label: '한글' },
+        hwpx: { icon: '📄', color: '#0078D7', label: '한글' },
+        txt: { icon: '📃', color: '#666', label: 'Text' },
+        // 이미지
+        jpg: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        jpeg: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        png: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        gif: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        bmp: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        svg: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        webp: { icon: '🖼️', color: '#4CAF50', label: 'Image' },
+        // 압축
+        zip: { icon: '📦', color: '#FFC107', label: 'ZIP' },
+        rar: { icon: '📦', color: '#FFC107', label: 'RAR' },
+        '7z': { icon: '📦', color: '#FFC107', label: '7-Zip' },
+        tar: { icon: '📦', color: '#FFC107', label: 'TAR' },
+        gz: { icon: '📦', color: '#FFC107', label: 'GZIP' },
+        // 미디어
+        mp3: { icon: '🎵', color: '#9C27B0', label: 'Audio' },
+        wav: { icon: '🎵', color: '#9C27B0', label: 'Audio' },
+        mp4: { icon: '🎬', color: '#E91E63', label: 'Video' },
+        avi: { icon: '🎬', color: '#E91E63', label: 'Video' },
+        mkv: { icon: '🎬', color: '#E91E63', label: 'Video' },
+        mov: { icon: '🎬', color: '#E91E63', label: 'Video' },
+        // 코드
+        js: { icon: '📜', color: '#F7DF1E', label: 'JavaScript' },
+        ts: { icon: '📜', color: '#3178C6', label: 'TypeScript' },
+        py: { icon: '🐍', color: '#3776AB', label: 'Python' },
+        java: { icon: '☕', color: '#007396', label: 'Java' },
+        html: { icon: '🌐', color: '#E34F26', label: 'HTML' },
+        css: { icon: '🎨', color: '#1572B6', label: 'CSS' },
+        json: { icon: '📋', color: '#000', label: 'JSON' },
+        xml: { icon: '📋', color: '#000', label: 'XML' },
+        // 실행
+        exe: { icon: '⚙️', color: '#00599C', label: 'EXE' },
+        msi: { icon: '⚙️', color: '#00599C', label: 'MSI' },
+        // 기본
+        default: { icon: '📄', color: '#999', label: 'File' }
+    };
+    return types[ext] || types.default;
+}
+
+// 파일이 바로 열 수 있는 타입인지 확인
+function isOpenableFileType(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    // 문서, 이미지, 미디어 등 일반적으로 열 수 있는 파일 타입
+    const openableTypes = [
+        'xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt', 'pdf', 'hwp', 'hwpx', 'txt',
+        'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp',
+        'mp3', 'wav', 'mp4', 'avi', 'mkv', 'mov',
+        'html', 'htm'
+    ];
+    return openableTypes.includes(ext);
+}
+
 // 상태 관리
 const state = {
     mode: 'offline', // offline, host, guest
@@ -1206,7 +1273,13 @@ function renderMessage(msg) {
                         </div>
                         ${statusHtml}
                         <div class="file-actions">
-                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="event.stopPropagation(); openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
+                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="event.stopPropagation(); openLocalFile('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="파일 열기">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                                </svg>
+                                <span>열기</span>
+                            </button>` : ''}
+                            ${hasCloudUrl && !msg.filePath ? `<button class="file-action-btn download-open-btn" onclick="event.stopPropagation(); downloadAndOpenFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드 후 열기">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                                 </svg>
@@ -1217,6 +1290,12 @@ function renderMessage(msg) {
                                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                                 </svg>
                                 <span>다운로드</span>
+                            </button>` : ''}
+                            ${msg.filePath ? `<button class="file-action-btn folder-btn" onclick="event.stopPropagation(); openFileFolder('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="폴더 열기">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                                </svg>
+                                <span>폴더</span>
                             </button>` : ''}
                         </div>
                     </div>
@@ -1249,7 +1328,13 @@ function renderMessage(msg) {
                             <div class="file-progress-bar" style="width: 0%;"></div>
                         </div>
                         <div class="file-actions">
-                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath)}')" title="파일 열기">
+                            ${msg.filePath ? `<button class="file-action-btn open-btn" onclick="openLocalFile('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="파일 열기">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                                </svg>
+                                <span>열기</span>
+                            </button>` : ''}
+                            ${hasCloudUrl && !msg.filePath ? `<button class="file-action-btn download-open-btn" onclick="downloadAndOpenFile('${escapeHtml(msg.cloudFileId || '')}', '${escapeHtml(msg.filename)}')" title="다운로드 후 열기">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                                 </svg>
@@ -1260,6 +1345,12 @@ function renderMessage(msg) {
                                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                                 </svg>
                                 <span>다운로드</span>
+                            </button>` : ''}
+                            ${msg.filePath ? `<button class="file-action-btn folder-btn" onclick="openFileFolder('${escapeHtml(msg.filePath).replace(/\\/g, '\\\\')}')" title="폴더 열기">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                                </svg>
+                                <span>폴더</span>
                             </button>` : ''}
                         </div>
                     </div>
@@ -1646,13 +1737,86 @@ function openFile(filePath) {
 // 로컬 파일 열기
 function openLocalFile(filePath) {
     if (!filePath) {
-        alert('파일 경로가 없습니다.');
+        showToast('파일 경로가 없습니다.', 'error');
         return;
     }
     if (window.chatAPI?.openFile) {
         window.chatAPI.openFile(filePath);
     } else {
-        alert('파일을 열 수 없습니다.');
+        showToast('파일을 열 수 없습니다.', 'error');
+    }
+}
+
+// 파일이 있는 폴더 열기
+function openFileFolder(filePath) {
+    if (!filePath) {
+        showToast('파일 경로가 없습니다.', 'error');
+        return;
+    }
+    if (window.chatAPI?.openFileFolder) {
+        window.chatAPI.openFileFolder(filePath);
+    } else if (window.chatAPI?.openFile) {
+        // openFileFolder가 없으면 파일의 상위 디렉토리 경로로 시도
+        const folderPath = filePath.replace(/[/\\][^/\\]+$/, '');
+        window.chatAPI.openFile(folderPath);
+    } else {
+        showToast('폴더를 열 수 없습니다.', 'error');
+    }
+}
+
+// 클라우드 파일 다운로드 후 바로 열기
+async function downloadAndOpenFile(fileId, filename) {
+    if (!fileId) {
+        showToast('클라우드 파일 ID가 없습니다.', 'error');
+        return;
+    }
+
+    try {
+        showToast('파일 다운로드 중...', 'info');
+
+        // P2P 상태 확인
+        const status = await window.p2pAPI.getStatus();
+        let downloadUrl;
+
+        if (status.mode === 'host') {
+            const cloudStatus = await window.p2pAPI.getCloudStatus();
+            if (cloudStatus.status !== 'running') {
+                showToast('클라우드 서버가 실행 중이 아닙니다.', 'error');
+                return;
+            }
+            downloadUrl = `http://localhost:${cloudStatus.port}/files/${fileId}/${encodeURIComponent(filename)}`;
+        } else if (status.mode === 'guest' && status.host && status.cloudPort) {
+            downloadUrl = `http://${status.host}:${status.cloudPort}/files/${fileId}/${encodeURIComponent(filename)}`;
+        } else if (status.mode === 'guest' && status.host) {
+            const cloudPort = parseInt(status.port) + 1;
+            downloadUrl = `http://${status.host}:${cloudPort}/files/${fileId}/${encodeURIComponent(filename)}`;
+        } else {
+            showToast('연결 상태를 확인할 수 없습니다.', 'error');
+            return;
+        }
+
+        // IPC를 통해 다운로드 및 열기 요청
+        if (window.chatAPI?.downloadAndOpenFile) {
+            const result = await window.chatAPI.downloadAndOpenFile(downloadUrl, filename);
+            if (result.success) {
+                showToast('파일을 열었습니다.', 'success');
+            } else {
+                showToast('파일 열기 실패: ' + (result.error || '알 수 없는 오류'), 'error');
+            }
+        } else {
+            // fallback: 브라우저 다운로드 후 안내
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('다운로드가 시작됩니다. 다운로드 폴더에서 파일을 열어주세요.', 'info');
+        }
+    } catch (err) {
+        console.error('다운로드 및 열기 실패:', err);
+        showToast('다운로드 실패: ' + err.message, 'error');
     }
 }
 
@@ -3295,6 +3459,8 @@ function addToastStyles() {
 window.selectRoom = selectRoom;
 window.openFile = openFile;
 window.openLocalFile = openLocalFile;
+window.openFileFolder = openFileFolder;
+window.downloadAndOpenFile = downloadAndOpenFile;
 window.downloadCloudFile = downloadCloudFile;
 window.openModal = openModal;
 window.closeModal = closeModal;

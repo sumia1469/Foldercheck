@@ -1315,6 +1315,22 @@ async function initializeExtensions() {
         console.log('[Extensions] 확장 시스템 초기화 완료');
         console.log(`[Extensions] 활성 확장 수: ${extensionHost.getActiveCount()}`);
 
+        // 확장 업데이트 자동 확인 (3초 후 비동기 실행)
+        setTimeout(async () => {
+            try {
+                const updates = await extensionManager.checkForUpdates();
+                if (updates && updates.length > 0) {
+                    console.log(`[Extensions] ${updates.length}개 확장 업데이트 가능`);
+                    // 렌더러에 업데이트 알림 전송
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('extensions:updates-available', updates);
+                    }
+                }
+            } catch (err) {
+                console.error('[Extensions] 업데이트 확인 실패:', err.message);
+            }
+        }, 3000);
+
     } catch (err) {
         console.error('[Extensions] 확장 시스템 초기화 실패:', err);
     }

@@ -11713,6 +11713,14 @@ function initExtensionsUI() {
             // 확장 활성화 시 동적 메뉴 업데이트 (일반적인 시스템)
             updateExtensionMenus();
         });
+
+        // 확장 업데이트 알림 수신
+        window.extensionAPI.onExtensionUpdatesAvailable((updates) => {
+            console.log('[Extensions] 업데이트 가능한 확장:', updates);
+            if (updates && updates.length > 0) {
+                showExtensionUpdateNotification(updates);
+            }
+        });
     }
 
     // 초기 로드
@@ -13799,6 +13807,165 @@ function showToast(message, type = 'info') {
         toast.style.animation = 'fadeOut 0.3s ease';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+// 확장 업데이트 알림 표시
+function showExtensionUpdateNotification(updates) {
+    // 기존 알림 제거
+    const existing = document.getElementById('extension-update-notification');
+    if (existing) existing.remove();
+
+    const updateList = updates.map(u => `${u.name || u.id}: ${u.currentVersion} → ${u.newVersion}`).join('\n');
+
+    const notification = document.createElement('div');
+    notification.id = 'extension-update-notification';
+    notification.innerHTML = `
+        <div class="extension-update-header">
+            <span class="extension-update-icon">🔄</span>
+            <span class="extension-update-title">확장 업데이트 가능</span>
+            <button class="extension-update-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+        </div>
+        <div class="extension-update-body">
+            <p>${updates.length}개의 확장에 새 버전이 있습니다:</p>
+            <ul class="extension-update-list">
+                ${updates.map(u => `
+                    <li>
+                        <span class="ext-name">${escapeHtml(u.name || u.id)}</span>
+                        <span class="ext-version">${escapeHtml(u.currentVersion)} → ${escapeHtml(u.newVersion)}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+        <div class="extension-update-actions">
+            <button class="btn btn-sm btn-outline-secondary" onclick="this.parentElement.parentElement.remove()">나중에</button>
+            <button class="btn btn-sm btn-primary" onclick="updateAllExtensionsFromNotification()">모두 업데이트</button>
+        </div>
+    `;
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        background: var(--bg-tertiary, #2d2d2d);
+        border: 1px solid var(--border-color, #444);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        z-index: 10001;
+        animation: slideInUp 0.3s ease;
+        font-size: 13px;
+    `;
+
+    // 스타일 추가
+    if (!document.getElementById('extension-update-styles')) {
+        const style = document.createElement('style');
+        style.id = 'extension-update-styles';
+        style.textContent = `
+            .extension-update-header {
+                display: flex;
+                align-items: center;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border-color, #444);
+                background: var(--bg-secondary, #252525);
+                border-radius: 8px 8px 0 0;
+            }
+            .extension-update-icon {
+                font-size: 18px;
+                margin-right: 8px;
+            }
+            .extension-update-title {
+                flex: 1;
+                font-weight: 600;
+                color: var(--text-primary, #e0e0e0);
+            }
+            .extension-update-close {
+                background: none;
+                border: none;
+                color: var(--text-secondary, #999);
+                font-size: 20px;
+                cursor: pointer;
+                padding: 0;
+                line-height: 1;
+            }
+            .extension-update-close:hover {
+                color: var(--text-primary, #e0e0e0);
+            }
+            .extension-update-body {
+                padding: 12px 16px;
+            }
+            .extension-update-body p {
+                margin: 0 0 8px 0;
+                color: var(--text-secondary, #999);
+            }
+            .extension-update-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+            .extension-update-list li {
+                display: flex;
+                justify-content: space-between;
+                padding: 6px 0;
+                border-bottom: 1px solid var(--border-color, #333);
+            }
+            .extension-update-list li:last-child {
+                border-bottom: none;
+            }
+            .ext-name {
+                color: var(--text-primary, #e0e0e0);
+                font-weight: 500;
+            }
+            .ext-version {
+                color: var(--primary, #4a9eff);
+                font-size: 12px;
+            }
+            .extension-update-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+                padding: 12px 16px;
+                border-top: 1px solid var(--border-color, #444);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(notification);
+}
+
+// 알림에서 모든 확장 업데이트
+async function updateAllExtensionsFromNotification() {
+    const notification = document.getElementById('extension-update-notification');
+    if (notification) {
+        const actionsDiv = notification.querySelector('.extension-update-actions');
+        if (actionsDiv) {
+            actionsDiv.innerHTML = '<span style="color: var(--text-secondary);">업데이트 중...</span>';
+        }
+    }
+
+    try {
+        if (window.extensionAPI && window.extensionAPI.updateAllExtensions) {
+            const results = await window.extensionAPI.updateAllExtensions();
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.filter(r => !r.success).length;
+
+            if (notification) notification.remove();
+
+            if (failCount === 0) {
+                showToast(`${successCount}개 확장 업데이트 완료`, 'success');
+            } else {
+                showToast(`${successCount}개 성공, ${failCount}개 실패`, 'warning');
+            }
+
+            // 확장 목록 새로고침
+            if (typeof loadExtensions === 'function') {
+                loadExtensions();
+            }
+        }
+    } catch (err) {
+        console.error('확장 업데이트 실패:', err);
+        showToast('확장 업데이트 실패: ' + err.message, 'error');
+        if (notification) notification.remove();
+    }
 }
 
 // 페이지 로드 시 설정 로드

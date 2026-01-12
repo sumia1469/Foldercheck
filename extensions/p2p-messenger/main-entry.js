@@ -317,6 +317,62 @@ function registerIpcHandlers() {
         return { success: false, error: '파일을 찾을 수 없습니다' };
     });
 
+    // 파일이 있는 폴더 열기
+    ipcMain.handle('chat:openFileFolder', async (event, filePath) => {
+        const { shell } = require('electron');
+        if (filePath && fs.existsSync(filePath)) {
+            shell.showItemInFolder(filePath);
+            return { success: true };
+        }
+        return { success: false, error: '파일을 찾을 수 없습니다' };
+    });
+
+    // 파일 다운로드 후 열기
+    ipcMain.handle('chat:downloadAndOpenFile', async (event, url, filename) => {
+        const { shell, app, net } = require('electron');
+        const downloadsPath = app.getPath('downloads');
+        const savePath = path.join(downloadsPath, filename);
+
+        try {
+            // 파일 다운로드
+            const response = await new Promise((resolve, reject) => {
+                const request = net.request(url);
+                let data = [];
+
+                request.on('response', (response) => {
+                    if (response.statusCode !== 200) {
+                        reject(new Error(`HTTP ${response.statusCode}`));
+                        return;
+                    }
+
+                    response.on('data', (chunk) => {
+                        data.push(chunk);
+                    });
+
+                    response.on('end', () => {
+                        resolve(Buffer.concat(data));
+                    });
+
+                    response.on('error', reject);
+                });
+
+                request.on('error', reject);
+                request.end();
+            });
+
+            // 파일 저장
+            fs.writeFileSync(savePath, response);
+
+            // 파일 열기
+            await shell.openPath(savePath);
+
+            return { success: true, filePath: savePath };
+        } catch (err) {
+            console.error('[P2P Extension] 다운로드 및 열기 실패:', err);
+            return { success: false, error: err.message };
+        }
+    });
+
     // 알림 표시
     ipcMain.handle('chat:showNotification', async (event, title, body) => {
         const { Notification } = require('electron');
@@ -508,7 +564,7 @@ function unregisterIpcHandlers() {
         'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:selectFile', 'p2p:sendFile',
         'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
         // 채팅 윈도우 컨트롤 핸들러
-        'chat:minimize', 'chat:maximize', 'chat:close', 'chat:openFile', 'chat:showNotification',
+        'chat:minimize', 'chat:maximize', 'chat:close', 'chat:openFile', 'chat:openFileFolder', 'chat:downloadAndOpenFile', 'chat:showNotification',
         // Messenger DB 핸들러
         'messenger:getContacts', 'messenger:addContact', 'messenger:deleteContact', 'messenger:updateContactStatus',
         'messenger:getGroups', 'messenger:createGroup', 'messenger:getGroupMembers', 'messenger:addGroupMember', 'messenger:deleteGroup',

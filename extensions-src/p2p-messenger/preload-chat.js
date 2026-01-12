@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('chatAPI', {
 
     // 파일 열기
     openFile: (filePath) => ipcRenderer.invoke('chat:openFile', filePath),
+    openFileFolder: (filePath) => ipcRenderer.invoke('chat:openFileFolder', filePath),
+    downloadAndOpenFile: (url, filename) => ipcRenderer.invoke('chat:downloadAndOpenFile', url, filename),
     openDownloads: () => ipcRenderer.invoke('p2p:openDownloads'),
 
     // 1:1 채팅 시작 이벤트 수신

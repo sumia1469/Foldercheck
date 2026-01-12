@@ -125,7 +125,17 @@ contextBridge.exposeInMainWorld('extensionAPI', {
         const handler = (event, data) => callback(data);
         ipcRenderer.on('marketplace-event', handler);
         return () => ipcRenderer.removeListener('marketplace-event', handler);
-    }
+    },
+
+    // 확장 업데이트 알림 수신
+    onExtensionUpdatesAvailable: (callback) => {
+        const handler = (event, updates) => callback(updates);
+        ipcRenderer.on('extensions:updates-available', handler);
+        return () => ipcRenderer.removeListener('extensions:updates-available', handler);
+    },
+
+    // 특정 확장 업데이트
+    updateExtension: (extensionId) => ipcRenderer.invoke('marketplace:install', extensionId)
 });
 
 // Messenger Database API (P2P 확장이 활성화될 때만 동작)

@@ -1492,6 +1492,226 @@
             margin-bottom: 12px;
             opacity: 0.3;
         }
+
+        /* 이미지 미리보기 컨테이너 */
+        .message-image-container {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            overflow: hidden;
+            max-width: 300px;
+        }
+
+        .image-preview-wrapper {
+            position: relative;
+            cursor: pointer;
+            min-height: 100px;
+            background: var(--bg-secondary);
+        }
+
+        .message-image-preview {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .image-loading-placeholder,
+        .image-error-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+        }
+
+        .message-image-container.image-loaded .image-loading-placeholder {
+            display: none;
+        }
+
+        .message-image-container.image-error .image-error-placeholder {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .message-image-container:not(.image-error) .image-error-placeholder {
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .image-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .image-preview-wrapper:hover .image-overlay {
+            opacity: 1;
+        }
+
+        .image-info {
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-tertiary);
+        }
+
+        .image-filename {
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+
+        .image-size {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .message-image-container .file-actions {
+            padding: 8px 12px;
+            display: flex;
+            gap: 8px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
+        }
+
+        /* 이미지 뷰어 모달 */
+        .image-viewer-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .image-viewer-modal.visible {
+            opacity: 1;
+        }
+
+        .image-viewer-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .image-viewer-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .image-viewer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .image-viewer-title {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .image-viewer-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .image-viewer-close:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .image-viewer-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow: auto;
+        }
+
+        .image-viewer-body img {
+            max-width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+        }
+
+        .image-viewer-footer {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
+        }
+
+        .image-viewer-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .image-viewer-btn:hover {
+            background: var(--accent-hover);
+        }
     </style>
 </head>
 <body>

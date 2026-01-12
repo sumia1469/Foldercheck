@@ -9482,40 +9482,10 @@ checkDevMode();  // 개발 모드 확인
 
 // 개발 모드 확인 및 UI 표시
 async function checkDevMode() {
-    try {
-        const res = await fetch('/api/dev-mode');
-        const data = await res.json();
-
-        if (data.devMode) {
-            const devControls = document.getElementById('devModeControls');
-            if (devControls) {
-                devControls.style.display = 'block';
-            }
-
-            // Pro 토글 버튼 이벤트
-            const toggleProBtn = document.getElementById('toggleProBtn');
-            if (toggleProBtn) {
-                toggleProBtn.addEventListener('click', async () => {
-                    try {
-                        const res = await fetch('/api/license/toggle', { method: 'POST' });
-                        const result = await res.json();
-
-                        if (result.success) {
-                            alert(`라이선스가 ${result.newType}으로 변경되었습니다.`);
-                            // ExtensionManager 라이선스 업데이트 후 UI 새로고침
-                            await loadLicenseStatus(true);
-                            location.reload();  // 페이지 새로고침하여 UI 갱신
-                        } else {
-                            alert('라이선스 변경 실패: ' + (result.error || '알 수 없는 오류'));
-                        }
-                    } catch (e) {
-                        alert('라이선스 변경 실패: ' + e.message);
-                    }
-                });
-            }
-        }
-    } catch (e) {
-        console.log('개발 모드 확인 실패:', e.message);
+    // 라이선스 변경 버튼은 항상 숨김 처리
+    const devControls = document.getElementById('devModeControls');
+    if (devControls) {
+        devControls.style.display = 'none';
     }
 }
 

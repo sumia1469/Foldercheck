@@ -10,11 +10,24 @@ const crypto = require('crypto');
 const os = require('os');
 const http = require('http');
 const https = require('https');
+const dgram = require('dgram');
 
 // 설정
 const LICENSE_FILE = path.join(__dirname, 'data', 'license.json');
 const TRIAL_DAYS = 14;
 const LICENSE_SERVER = 'https://license.docwatch.io'; // 실제 라이선스 서버 URL로 변경 필요
+
+// NTP 서버 목록 (시간 검증용)
+const NTP_SERVERS = [
+    'time.google.com',
+    'time.windows.com',
+    'pool.ntp.org',
+    'time.apple.com'
+];
+
+// 마지막으로 검증된 시간 (오프라인 시 사용)
+let lastVerifiedTime = null;
+let lastVerifiedAt = null;
 
 // 공개키 (오프라인 검증용) - 실제 배포 시 서버에서 생성한 공개키로 교체
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
@@ -37,6 +50,105 @@ const DEFAULT_LICENSE = {
     },
     signature: null
 };
+
+/**
+ * NTP 서버에서 현재 시간 가져오기
+ * 로컬 시계 조작 방지를 위해 네트워크 시간 사용
+ */
+async function getNTPTime(server = 'time.google.com', timeout = 3000) {
+    return new Promise((resolve, reject) => {
+        const client = dgram.createSocket('udp4');
+        const ntpData = Buffer.alloc(48);
+        ntpData[0] = 0x1B; // NTP request header
+
+        const timer = setTimeout(() => {
+            client.close();
+            reject(new Error('NTP timeout'));
+        }, timeout);
+
+        client.on('error', (err) => {
+            clearTimeout(timer);
+            client.close();
+            reject(err);
+        });
+
+        client.on('message', (msg) => {
+            clearTimeout(timer);
+            client.close();
+
+            // NTP 응답에서 시간 추출
+            const intPart = msg.readUInt32BE(40);
+            const fracPart = msg.readUInt32BE(44);
+            // NTP epoch (1900-01-01)에서 Unix epoch (1970-01-01)로 변환
+            const ntpTime = new Date((intPart - 2208988800) * 1000 + (fracPart / 4294967296) * 1000);
+            resolve(ntpTime);
+        });
+
+        client.send(ntpData, 0, ntpData.length, 123, server, (err) => {
+            if (err) {
+                clearTimeout(timer);
+                client.close();
+                reject(err);
+            }
+        });
+    });
+}
+
+/**
+ * 신뢰할 수 있는 현재 시간 가져오기
+ * NTP 서버 실패 시 로컬 시간 + 마지막 검증 시간으로 보정
+ */
+async function getTrustedTime() {
+    // NTP 서버들에서 시간 가져오기 시도
+    for (const server of NTP_SERVERS) {
+        try {
+            const ntpTime = await getNTPTime(server, 3000);
+            lastVerifiedTime = ntpTime;
+            lastVerifiedAt = Date.now();
+            return ntpTime;
+        } catch (e) {
+            // 다음 서버 시도
+            continue;
+        }
+    }
+
+    // 모든 NTP 서버 실패 시
+    if (lastVerifiedTime && lastVerifiedAt) {
+        // 마지막 검증된 시간 + 경과 시간으로 추정
+        const elapsed = Date.now() - lastVerifiedAt;
+        const estimatedTime = new Date(lastVerifiedTime.getTime() + elapsed);
+
+        // 로컬 시간과 추정 시간 비교 (1시간 이상 차이나면 조작 의심)
+        const localTime = new Date();
+        const diff = Math.abs(localTime - estimatedTime);
+        if (diff > 60 * 60 * 1000) {
+            console.warn('[License] 시간 조작 의심: 로컬 시간과 추정 시간 차이가 큼');
+            return estimatedTime; // 추정 시간 사용
+        }
+    }
+
+    // 폴백: 로컬 시간 사용 (오프라인 + 첫 실행)
+    return new Date();
+}
+
+/**
+ * 시간 조작 감지
+ * 라이선스 저장 시 마지막 확인 시간 기록하여 역행 감지
+ */
+function detectTimeManipulation(license) {
+    if (!license || !license.lastCheckedAt) return false;
+
+    const lastChecked = new Date(license.lastCheckedAt);
+    const now = new Date();
+
+    // 현재 시간이 마지막 확인 시간보다 이전이면 조작 의심
+    if (now < lastChecked) {
+        console.warn('[License] 시간 역행 감지: 시스템 시간이 과거로 변경됨');
+        return true;
+    }
+
+    return false;
+}
 
 /**
  * 기기 고유 ID 생성
@@ -121,7 +233,7 @@ function initializeTrial() {
 }
 
 /**
- * 라이선스 상태 확인
+ * 라이선스 상태 확인 (동기 버전 - 로컬 시간 사용)
  */
 function getLicenseStatus() {
     let license = loadLicense();
@@ -131,13 +243,25 @@ function getLicenseStatus() {
         license = initializeTrial();
     }
 
+    // 시간 역행 감지 (로컬 시계가 과거로 변경된 경우)
+    const timeManipulated = detectTimeManipulation(license);
+
     const now = new Date();
     const expiresAt = license.expiresAt ? new Date(license.expiresAt) : null;
-    const isExpired = expiresAt ? now > expiresAt : false;
+    let isExpired = expiresAt ? now > expiresAt : false;
+
+    // 시간 조작 감지 시 만료 처리
+    if (timeManipulated) {
+        isExpired = true;
+    }
+
+    // 마지막 확인 시간 업데이트
+    license.lastCheckedAt = now.toISOString();
+    saveLicense(license);
 
     // Trial 만료 시 기능 제한
     let features = { ...license.features };
-    if (license.type === 'trial' && isExpired) {
+    if ((license.type === 'trial' && isExpired) || timeManipulated) {
         features = {
             documentMonitoring: false,
             meetingTranscription: false,
@@ -154,14 +278,87 @@ function getLicenseStatus() {
     return {
         type: license.type,
         machineId: license.machineId || generateMachineId(),
-        isValid: !isExpired || license.type === 'pro',
+        isValid: !isExpired && !timeManipulated,
         isExpired,
         isTrial: license.type === 'trial',
         isPro: license.type === 'pro',
         activatedAt: license.activatedAt,
         expiresAt: license.expiresAt,
         daysRemaining,
-        features
+        features,
+        timeManipulated
+    };
+}
+
+/**
+ * 라이선스 상태 확인 (비동기 버전 - NTP 시간 검증)
+ * 정확한 시간 검증이 필요한 경우 사용
+ */
+async function getLicenseStatusAsync() {
+    let license = loadLicense();
+
+    // 라이선스가 없으면 Trial 초기화
+    if (!license) {
+        license = initializeTrial();
+    }
+
+    // NTP 서버에서 신뢰할 수 있는 시간 가져오기
+    let now;
+    let ntpVerified = false;
+    try {
+        now = await getTrustedTime();
+        ntpVerified = true;
+    } catch (e) {
+        now = new Date();
+    }
+
+    // 시간 역행 감지
+    const timeManipulated = detectTimeManipulation(license);
+
+    const expiresAt = license.expiresAt ? new Date(license.expiresAt) : null;
+    let isExpired = expiresAt ? now > expiresAt : false;
+
+    // 시간 조작 감지 시 만료 처리
+    if (timeManipulated) {
+        isExpired = true;
+    }
+
+    // 마지막 확인 시간 업데이트
+    license.lastCheckedAt = now.toISOString();
+    if (ntpVerified) {
+        license.lastNtpVerifiedAt = now.toISOString();
+    }
+    saveLicense(license);
+
+    // Trial/Free 만료 시 기능 제한
+    let features = { ...license.features };
+    if ((license.type === 'trial' && isExpired) || timeManipulated) {
+        features = {
+            documentMonitoring: false,
+            meetingTranscription: false,
+            aiSummary: false
+        };
+    }
+
+    // 남은 일수 계산
+    let daysRemaining = 0;
+    if (expiresAt && !isExpired) {
+        daysRemaining = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
+    }
+
+    return {
+        type: license.type,
+        machineId: license.machineId || generateMachineId(),
+        isValid: !isExpired && !timeManipulated,
+        isExpired,
+        isTrial: license.type === 'trial',
+        isPro: license.type === 'pro',
+        activatedAt: license.activatedAt,
+        expiresAt: license.expiresAt,
+        daysRemaining,
+        features,
+        timeManipulated,
+        ntpVerified
     };
 }
 
@@ -509,6 +706,8 @@ function generateOfflineKey(machineId, expiresAt, secretKey) {
 module.exports = {
     generateMachineId,
     getLicenseStatus,
+    getLicenseStatusAsync,
+    getTrustedTime,
     canUseFeature,
     activateOnline,
     activateOffline,

@@ -1974,41 +1974,125 @@ async function saveRoom() {
 // 초기화 업데이트
 // ============================================
 
+// 로딩 상태 업데이트
+function updateLoadingStatus(status) {
+    const loadingStatus = document.getElementById('loadingStatus');
+    if (loadingStatus) {
+        loadingStatus.textContent = status;
+    }
+}
+
+// 로딩 오버레이 숨기기
+function hideLoadingOverlay() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+        // 트랜지션 후 제거
+        setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+        }, 300);
+    }
+}
+
+// 로딩 오버레이 표시
+function showLoadingOverlay(message = '메신저 초기화 중...') {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = loadingOverlay?.querySelector('.loading-text');
+    if (loadingOverlay) {
+        loadingOverlay.style.display = 'flex';
+        loadingOverlay.classList.remove('hidden');
+        if (loadingText) loadingText.textContent = message;
+    }
+}
+
+// API 준비 대기
+async function waitForAPIs(maxAttempts = 100) {
+    for (let i = 0; i < maxAttempts; i++) {
+        updateLoadingStatus(`API 연결 중... (${i + 1}/${maxAttempts})`);
+
+        const p2pReady = window.p2pAPI && typeof window.p2pAPI.getStatus === 'function';
+        const dbReady = window.messengerDB && typeof window.messengerDB.getRooms === 'function';
+        const chatReady = window.chatAPI && typeof window.chatAPI.minimize === 'function';
+
+        if (p2pReady && dbReady && chatReady) {
+            updateLoadingStatus('API 연결 완료');
+            return true;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return false;
+}
+
 // DOMContentLoaded 이벤트에 사이드바 탭 초기화 추가
 const originalDOMContentLoaded = document.addEventListener;
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[ChatWindow] 초기화 시작');
+    updateLoadingStatus('UI 초기화 중...');
+
+    // 기본 UI 초기화 (API 대기 전)
     initTitlebar();
     initTabs();
     initSidebarTabs();
+    initSettingsBtn();
+    initUsersPanelClose();
+    initUsersPanelResize();
+    initSidebarToggle();
+    initSidebarResize();
+    initEmojiPicker();
+    addToastStyles();
+
+    // API 준비 대기
+    updateLoadingStatus('API 연결 대기...');
+    const apisReady = await waitForAPIs();
+
+    if (!apisReady) {
+        console.warn('[ChatWindow] API 연결 타임아웃');
+        updateLoadingStatus('API 연결 실패 - 일부 기능이 제한될 수 있습니다');
+        // 3초 후 로딩 오버레이 숨기기
+        setTimeout(hideLoadingOverlay, 3000);
+    } else {
+        console.log('[ChatWindow] API 연결 완료');
+    }
+
+    // 채팅 초기화 (API 의존)
+    updateLoadingStatus('채팅 기능 초기화...');
     initChat();
     initP2PListeners();
-    initChatAPIListeners(); // 메인 윈도우에서 보내는 이벤트 리스너
-    initSettingsBtn(); // 설정 버튼 이벤트 리스너
-    initUsersPanelClose(); // 참여자 패널 닫기 버튼
-    initUsersPanelResize(); // 참여자 패널 리사이즈
-    initSidebarToggle(); // 좌측 사이드바 토글
-    initSidebarResize(); // 좌측 사이드바 리사이즈
-    initEmojiPicker(); // 이모지 피커
-    initCloudTabButtons(); // 클라우드 탭 버튼 이벤트
-    initCloudEventListeners(); // 클라우드 이벤트 리스너
-    addToastStyles(); // 토스트 스타일 추가
+    initChatAPIListeners();
+    initCloudTabButtons();
+    initCloudEventListeners();
 
     // 데이터 로드
+    updateLoadingStatus('프로필 로드...');
     await loadMyProfile();
+
+    updateLoadingStatus('연락처 로드...');
     await loadContacts();
+
+    updateLoadingStatus('그룹 로드...');
     await loadGroups();
+
+    updateLoadingStatus('채팅방 로드...');
     await loadRooms();
 
     // UI 렌더링
+    updateLoadingStatus('UI 렌더링...');
     renderContactList();
     renderGroupList();
     renderRoomList();
 
     // 현재 P2P 상태 확인 및 동기화
+    updateLoadingStatus('P2P 상태 확인...');
     await checkP2PStatus();
 
     // 클라우드 데이터 로드
+    updateLoadingStatus('클라우드 데이터 로드...');
     await loadCloudData();
+
+    // 초기화 완료 - 로딩 오버레이 숨기기
+    console.log('[ChatWindow] 초기화 완료');
+    hideLoadingOverlay();
 });
 
 // 메인 윈도우 API 이벤트 리스너

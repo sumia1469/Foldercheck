@@ -419,10 +419,18 @@ function initP2PListeners() {
     // 메시지 수신
     window.p2pAPI.onMessage(async (data) => {
         console.log('메시지 수신:', data);
-        // 게스트 모드에서 자신의 메시지는 이미 sendMessage에서 추가했으므로 무시
-        if (state.mode === 'guest' && data.nickname === state.nickname) {
-            console.log('게스트 모드: 자신의 메시지 에코 무시');
-            return;
+
+        // 자신의 메시지 처리:
+        // - 게스트 모드: sendMessage()에서 이미 addMessage() 호출됨 → 무시
+        // - 호스트 모드 1:1 채팅: sendMessage()에서 이미 addMessage() 호출됨 → 무시
+        // - 호스트 모드 그룹 채팅: sendMessage()에서 addMessage() 안 호출됨 → emit으로 표시 필요
+        if (data.nickname === state.nickname) {
+            // 호스트 모드 그룹 채팅은 emit으로 표시해야 함
+            const isHostGroupChat = state.mode === 'host' && !data.targetNickname;
+            if (!isHostGroupChat) {
+                console.log('자신의 메시지 에코 무시:', data.nickname);
+                return;
+            }
         }
 
         // 1:1 채팅 메시지인 경우

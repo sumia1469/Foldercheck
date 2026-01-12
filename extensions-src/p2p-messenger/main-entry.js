@@ -5,13 +5,16 @@
  * IPC 핸들러를 등록합니다.
  */
 
-const { ipcMain, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const http = require('http');
 
 let p2pMessenger = null;
 let mainWindow = null;
 let extensionPath = null;
+let chatWindow = null;
 
 /**
  * 확장 활성화
@@ -167,13 +170,29 @@ function registerIpcHandlers() {
             throw new Error('채팅 윈도우 파일을 찾을 수 없습니다');
         }
 
-        const chatWindow = new BrowserWindow({
+        // 아이콘 경로 설정
+        let iconPath = null;
+        const possibleIconPaths = [
+            path.join(__dirname, '..', '..', 'build', 'icons', 'icon.ico'),  // 개발 환경
+            path.join(process.resourcesPath, 'build', 'icons', 'icon.ico'),  // 빌드된 앱
+            path.join(__dirname, '..', '..', 'build', 'icon.ico'),
+            path.join(process.resourcesPath, 'icon.ico')
+        ];
+        for (const iconCandidate of possibleIconPaths) {
+            if (fs.existsSync(iconCandidate)) {
+                iconPath = iconCandidate;
+                break;
+            }
+        }
+
+        chatWindow = new BrowserWindow({
             width: 900,
             height: 700,
             minWidth: 600,
             minHeight: 400,
             frame: false,
             autoHideMenuBar: true,
+            icon: iconPath,
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
@@ -186,6 +205,103 @@ function registerIpcHandlers() {
         chatWindow.setMenu(null);
 
         chatWindow.loadFile(chatHtmlPath);
+
+        chatWindow.on('closed', () => {
+            chatWindow = null;
+        });
+
+        return { success: true };
+    });
+
+    // 채팅 윈도우 컨트롤
+    ipcMain.handle('chat:minimize', () => {
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.minimize();
+            return { success: true };
+        }
+        return { success: false };
+    });
+
+    ipcMain.handle('chat:maximize', () => {
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            if (chatWindow.isMaximized()) {
+                chatWindow.unmaximize();
+            } else {
+                chatWindow.maximize();
+            }
+            return { success: true };
+        }
+        return { success: false };
+    });
+
+    ipcMain.handle('chat:close', () => {
+        if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.close();
+            return { success: true };
+        }
+        return { success: false };
+    });
+
+    // 알림
+    ipcMain.handle('chat:showNotification', async (event, title, body) => {
+        const { Notification } = require('electron');
+        if (Notification.isSupported()) {
+            new Notification({ title, body }).show();
+            return { success: true };
+        }
+        return { success: false };
+    });
+
+    // 파일 열기
+    ipcMain.handle('chat:openFile', async (event, filePath) => {
+        if (filePath && fs.existsSync(filePath)) {
+            await shell.openPath(filePath);
+            return { success: true };
+        }
+        return { success: false, error: '파일을 찾을 수 없습니다' };
+    });
+
+    // 파일 폴더 열기
+    ipcMain.handle('chat:openFileFolder', async (event, filePath) => {
+        if (filePath && fs.existsSync(filePath)) {
+            shell.showItemInFolder(filePath);
+            return { success: true };
+        }
+        return { success: false, error: '파일을 찾을 수 없습니다' };
+    });
+
+    // 파일 다운로드 후 열기
+    ipcMain.handle('chat:downloadAndOpenFile', async (event, url, filename) => {
+        try {
+            const downloadsPath = path.join(process.env.USERPROFILE || process.env.HOME, 'Downloads');
+            const filePath = path.join(downloadsPath, filename);
+
+            const protocol = url.startsWith('https') ? https : http;
+
+            await new Promise((resolve, reject) => {
+                const file = fs.createWriteStream(filePath);
+                protocol.get(url, (response) => {
+                    response.pipe(file);
+                    file.on('finish', () => {
+                        file.close(resolve);
+                    });
+                }).on('error', (err) => {
+                    fs.unlink(filePath, () => {});
+                    reject(err);
+                });
+            });
+
+            await shell.openPath(filePath);
+            return { success: true, path: filePath };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
+
+    // 다운로드 폴더 열기
+    ipcMain.handle('p2p:openDownloads', async () => {
+        const downloadsPath = path.join(process.env.USERPROFILE || process.env.HOME, 'Downloads');
+        await shell.openPath(downloadsPath);
         return { success: true };
     });
 
@@ -217,7 +333,10 @@ function unregisterIpcHandlers() {
     const channels = [
         'p2p:startHost', 'p2p:stopHost', 'p2p:connect', 'p2p:disconnect',
         'p2p:getStatus', 'p2p:getUsers', 'p2p:sendMessage', 'p2p:sendFile',
-        'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud'
+        'p2p:openChatWindow', 'p2p:getCloudFiles', 'p2p:uploadToCloud', 'p2p:deleteFromCloud',
+        'p2p:openDownloads',
+        'chat:minimize', 'chat:maximize', 'chat:close', 'chat:showNotification',
+        'chat:openFile', 'chat:openFileFolder', 'chat:downloadAndOpenFile'
     ];
 
     channels.forEach(channel => {

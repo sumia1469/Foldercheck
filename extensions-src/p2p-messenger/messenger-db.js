@@ -52,48 +52,101 @@ class MessengerDB {
                 // sql.js 폴백 (더 느리지만 네이티브 빌드 필요 없음)
                 // 앱의 node_modules에서 sql.js 찾기
                 let initSqlJs;
-                try {
-                    initSqlJs = require('sql.js');
-                } catch (e) {
-                    // 확장에서 실행 시 앱의 node_modules 경로 시도
-                    const appNodeModules = path.join(__dirname, '..', '..', '..', 'node_modules', 'sql.js');
-                    if (fs.existsSync(appNodeModules)) {
-                        initSqlJs = require(appNodeModules);
-                    } else {
-                        // 개발 환경에서의 경로
-                        const devPath = path.join(process.cwd(), 'node_modules', 'sql.js');
-                        if (fs.existsSync(devPath)) {
-                            initSqlJs = require(devPath);
-                        } else {
-                            throw new Error('sql.js 모듈을 찾을 수 없습니다');
+                let sqlJsDir;
+
+                // 가능한 sql.js 경로들 (우선순위 순)
+                const possibleSqlJsPaths = [
+                    // 1. 직접 require 시도
+                    null,
+                    // 2. 패키징된 앱 (app.asar 내부)
+                    path.join(process.resourcesPath || '', 'app.asar', 'node_modules', 'sql.js'),
+                    // 3. 패키징된 앱 (app.asar.unpacked)
+                    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'node_modules', 'sql.js'),
+                    // 4. 확장 상위의 node_modules
+                    path.join(__dirname, '..', '..', '..', 'node_modules', 'sql.js'),
+                    // 5. 개발 환경 cwd
+                    path.join(process.cwd(), 'node_modules', 'sql.js'),
+                    // 6. 앱 루트 기준
+                    path.join(process.execPath, '..', 'resources', 'app.asar', 'node_modules', 'sql.js'),
+                    // 7. electron app 경로
+                    (() => {
+                        try {
+                            const { app } = require('electron');
+                            return path.join(app.getAppPath(), 'node_modules', 'sql.js');
+                        } catch { return null; }
+                    })()
+                ].filter(p => p !== null);
+
+                console.log('[MessengerDB] sql.js 경로 탐색 시작...');
+                console.log('[MessengerDB] __dirname:', __dirname);
+                console.log('[MessengerDB] process.resourcesPath:', process.resourcesPath);
+                console.log('[MessengerDB] process.cwd():', process.cwd());
+
+                for (const sqlPath of possibleSqlJsPaths) {
+                    if (sqlPath === null) {
+                        // 직접 require 시도
+                        try {
+                            initSqlJs = require('sql.js');
+                            sqlJsDir = path.dirname(require.resolve('sql.js'));
+                            console.log('[MessengerDB] sql.js 직접 require 성공');
+                            break;
+                        } catch (e) {
+                            console.log('[MessengerDB] sql.js 직접 require 실패:', e.message);
+                            continue;
+                        }
+                    }
+
+                    console.log('[MessengerDB] 시도 경로:', sqlPath);
+                    if (fs.existsSync(sqlPath)) {
+                        try {
+                            initSqlJs = require(sqlPath);
+                            sqlJsDir = sqlPath;
+                            console.log('[MessengerDB] sql.js 로드 성공:', sqlPath);
+                            break;
+                        } catch (e) {
+                            console.log('[MessengerDB] sql.js 로드 실패:', sqlPath, e.message);
                         }
                     }
                 }
 
+                if (!initSqlJs) {
+                    throw new Error('sql.js 모듈을 찾을 수 없습니다. 시도한 경로들: ' + possibleSqlJsPaths.filter(p => p).join(', '));
+                }
+
                 // WASM 파일 경로 설정
                 let wasmPath;
-                try {
-                    // node_modules에서 sql.js wasm 파일 찾기
-                    const sqlJsPath = require.resolve('sql.js');
-                    const sqlJsDir = path.dirname(sqlJsPath);
 
-                    // 여러 가능한 경로 확인
-                    const possiblePaths = [
-                        path.join(sqlJsDir, 'dist', 'sql-wasm.wasm'),
-                        path.join(sqlJsDir, 'sql-wasm.wasm'),
-                        path.join(__dirname, 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm')
-                    ];
+                // 가능한 WASM 경로들
+                const possibleWasmPaths = [
+                    // sqlJsDir 기준
+                    sqlJsDir ? path.join(sqlJsDir, 'dist', 'sql-wasm.wasm') : null,
+                    sqlJsDir ? path.join(sqlJsDir, 'sql-wasm.wasm') : null,
+                    // 패키징된 앱
+                    path.join(process.resourcesPath || '', 'app.asar', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+                    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+                    // 개발 환경
+                    path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+                    // electron app 경로
+                    (() => {
+                        try {
+                            const { app } = require('electron');
+                            return path.join(app.getAppPath(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
+                        } catch { return null; }
+                    })()
+                ].filter(p => p !== null);
 
-                    for (const p of possiblePaths) {
-                        if (fs.existsSync(p)) {
-                            wasmPath = p;
-                            break;
-                        }
+                for (const p of possibleWasmPaths) {
+                    if (fs.existsSync(p)) {
+                        wasmPath = p;
+                        console.log('[MessengerDB] WASM 파일 발견:', p);
+                        break;
                     }
+                }
 
+                if (!wasmPath) {
+                    console.warn('[MessengerDB] WASM 파일을 찾지 못함. 기본 로케이터 사용.');
+                } else {
                     console.log('[MessengerDB] WASM 파일 경로:', wasmPath);
-                } catch (e) {
-                    console.error('[MessengerDB] WASM 경로 찾기 실패:', e);
                 }
 
                 // sql.js 초기화 옵션

@@ -69,6 +69,9 @@ function isOpenableFileType(filename) {
     return openableTypes.includes(ext);
 }
 
+// 리액션 이모지 목록
+const REACTIONS = ['👍', '❤️', '😊', '😮', '😢', '👏'];
+
 // 상태 관리
 const state = {
     mode: 'offline', // offline, host, guest
@@ -81,7 +84,9 @@ const state = {
     contacts: [],    // 연락처 목록
     groups: [],      // 그룹 목록
     cloudFiles: [],  // 클라우드 파일 목록
-    cloudStatus: { status: 'stopped' } // 클라우드 서버 상태
+    cloudStatus: { status: 'stopped' }, // 클라우드 서버 상태
+    replyTo: null,   // 회신 대상 메시지
+    mentionQuery: '' // @멘션 검색어
 };
 
 // DOM 요소
@@ -301,6 +306,10 @@ async function sendMessage() {
     const room = state.rooms.find(r => r.id === state.currentRoom);
     const isDirectChat = room && room.type === 'direct';
 
+    // 회신 정보 가져오기
+    const replyTo = state.replyTo ? state.replyTo.id : null;
+    const replyPreview = state.replyTo ? state.replyTo.preview : null;
+
     try {
         // P2P 연결 상태에서 그룹 채팅인 경우 P2P로 전송
         if (state.mode !== 'offline' && !isDirectChat) {
@@ -312,7 +321,9 @@ async function sendMessage() {
                     type: 'chat',
                     nickname: state.nickname || '나',
                     content: content,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    replyTo,
+                    replyPreview
                 };
                 addMessage(messageData);
             }
@@ -323,10 +334,15 @@ async function sendMessage() {
                 id: Date.now(),
                 nickname: state.nickname || '나',
                 content: content,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                replyTo,
+                replyPreview
             };
             addMessage(messageData);
         }
+
+        // 회신 바 초기화
+        clearReplyTo();
 
         elements.messageInput.value = '';
         elements.sendBtn.disabled = true;
@@ -339,10 +355,13 @@ async function sendMessage() {
                 id: Date.now(),
                 nickname: state.nickname || '나',
                 content: content,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                replyTo,
+                replyPreview
             };
             addMessage(messageData);
         }
+        clearReplyTo();
         elements.messageInput.value = '';
         elements.sendBtn.disabled = true;
     }
@@ -680,7 +699,9 @@ async function addMessage(data) {
         sender: data.nickname,
         content: data.content,
         timestamp: data.timestamp || Date.now(),
-        isOwn
+        isOwn,
+        replyTo: data.replyTo || null,
+        replyPreview: data.replyPreview || null
     };
 
     state.messages.push(message);
@@ -695,7 +716,9 @@ async function addMessage(data) {
                 senderId: isOwn ? (state.myContactId || 'self') : `remote_${data.nickname}`,
                 senderNickname: data.nickname || state.nickname,
                 type: 'text',
-                content: data.content
+                content: data.content,
+                replyTo: data.replyTo || null,
+                replyPreview: data.replyPreview || null
             });
         } catch (err) {
             console.error('메시지 저장 실패:', err);
@@ -988,17 +1011,51 @@ function renderMessage(msg) {
             }
         }
 
+        // 회신 대상 메시지가 있으면 표시
+        const replyPreview = msg.replyTo ? `
+            <div class="reply-preview" onclick="scrollToMessage('${escapeHtml(msg.replyTo)}')">
+                <div class="reply-bar"></div>
+                <div class="reply-content">${escapeHtml(msg.replyPreview || '원본 메시지')}</div>
+            </div>
+        ` : '';
+
+        // @멘션 처리
+        const contentWithMentions = formatMentions(msg.content || '');
+
         el.innerHTML = `
             <div class="message-avatar">${initial}</div>
             <div class="message-content">
                 <div class="message-sender">${escapeHtml(msg.sender)}</div>
-                <div class="${bubbleClass}">${escapeHtml(msg.content)}</div>
+                ${replyPreview}
+                <div class="${bubbleClass}">${contentWithMentions}</div>
+                <div class="message-reactions" id="reactions-${msg.id}"></div>
                 <div class="message-meta">
                     ${unreadBadge}
                     <span class="message-time">${time}</span>
                 </div>
             </div>
+            <div class="message-actions">
+                <button class="msg-action-btn reaction-btn" onclick="showReactionPicker('${msg.id}')" title="리액션">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                    </svg>
+                </button>
+                <button class="msg-action-btn reply-btn" onclick="setReplyTo('${msg.id}', '${escapeHtml(msg.sender)}', '${escapeHtml((msg.content || '').substring(0, 50))}')" title="회신">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
+                    </svg>
+                </button>
+                <button class="msg-action-btn quote-btn" onclick="quoteMessage('${msg.id}', '${escapeHtml(msg.sender)}', '${escapeHtml((msg.content || '').replace(/'/g, "\\'"))}')" title="인용">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/>
+                    </svg>
+                </button>
+            </div>
         `;
+
+        // 리액션 표시
+        el.setAttribute('data-message-id', msg.id);
+        loadMessageReactions(msg.id);
     }
 
     elements.messagesContainer.appendChild(el);
@@ -1459,13 +1516,15 @@ async function loadRoomMessages(roomId) {
                 const message = {
                     id: msg.id,
                     type: msg.type || 'text',
-                    sender: msg.sender_name || msg.sender_id,
+                    sender: msg.sender_name || msg.sender_nickname || msg.sender_id,
                     content: msg.content,
                     filename: msg.file_name,
                     fileSize: msg.file_size,
                     filePath: msg.file_path,
                     timestamp: new Date(msg.created_at).getTime(),
-                    isOwn
+                    isOwn,
+                    replyTo: msg.reply_to || null,
+                    replyPreview: msg.reply_preview || null
                 };
 
                 state.messages.push(message);
@@ -2102,6 +2161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initChatAPIListeners();
     initCloudTabButtons();
     initCloudEventListeners();
+    initMentionDetection();
 
     // 데이터 로드
     updateLoadingStatus('프로필 로드...');
@@ -2862,6 +2922,272 @@ function addToastStyles() {
     document.head.appendChild(style);
 }
 
+// ============================================
+// 리액션 기능
+// ============================================
+
+// 리액션 피커 표시
+function showReactionPicker(messageId) {
+    // 기존 피커 제거
+    closeReactionPicker();
+
+    const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!msgElement) return;
+
+    const picker = document.createElement('div');
+    picker.className = 'reaction-picker';
+    picker.id = 'reactionPicker';
+    picker.innerHTML = REACTIONS.map(r => `
+        <button class="reaction-btn-item" onclick="addReaction('${messageId}', '${r}')">${r}</button>
+    `).join('');
+
+    // 메시지 위에 위치시키기
+    const msgContent = msgElement.querySelector('.message-content');
+    if (msgContent) {
+        msgContent.appendChild(picker);
+    }
+
+    // 외부 클릭 시 닫기
+    setTimeout(() => {
+        document.addEventListener('click', closeReactionPickerOnClick);
+    }, 100);
+}
+
+// 외부 클릭 시 피커 닫기
+function closeReactionPickerOnClick(e) {
+    const picker = document.getElementById('reactionPicker');
+    if (picker && !picker.contains(e.target) && !e.target.classList.contains('reaction-btn')) {
+        closeReactionPicker();
+    }
+}
+
+// 리액션 피커 닫기
+function closeReactionPicker() {
+    const picker = document.getElementById('reactionPicker');
+    if (picker) picker.remove();
+    document.removeEventListener('click', closeReactionPickerOnClick);
+}
+
+// 리액션 추가/토글
+async function addReaction(messageId, reaction) {
+    closeReactionPicker();
+
+    if (!window.messengerDB) return;
+
+    try {
+        const userId = state.myContactId || 'self';
+        const userNickname = state.nickname || 'User';
+        await window.messengerDB.toggleReaction(messageId, userId, userNickname, reaction);
+        await loadMessageReactions(messageId);
+    } catch (err) {
+        console.error('리액션 추가 실패:', err);
+    }
+}
+
+// 메시지 리액션 로드
+async function loadMessageReactions(messageId) {
+    const reactionsContainer = document.getElementById(`reactions-${messageId}`);
+    if (!reactionsContainer || !window.messengerDB) return;
+
+    try {
+        const reactions = await window.messengerDB.getMessageReactions(messageId);
+        if (reactions.length === 0) {
+            reactionsContainer.innerHTML = '';
+            return;
+        }
+
+        reactionsContainer.innerHTML = reactions.map(r => `
+            <span class="reaction-badge" onclick="addReaction('${messageId}', '${r.reaction}')" title="${r.users.join(', ')}">
+                ${r.reaction} ${r.count}
+            </span>
+        `).join('');
+    } catch (err) {
+        console.error('리액션 로드 실패:', err);
+    }
+}
+
+// ============================================
+// 회신/인용 기능
+// ============================================
+
+// 회신 대상 설정
+function setReplyTo(messageId, sender, preview) {
+    state.replyTo = { id: messageId, sender, preview };
+    showReplyBar();
+}
+
+// 회신 바 표시
+function showReplyBar() {
+    let replyBar = document.getElementById('replyBar');
+    if (!replyBar) {
+        const inputContainer = document.querySelector('.message-input-container') ||
+                              document.querySelector('.chat-input');
+        if (!inputContainer) return;
+
+        replyBar = document.createElement('div');
+        replyBar.id = 'replyBar';
+        replyBar.className = 'reply-bar-container';
+        inputContainer.insertBefore(replyBar, inputContainer.firstChild);
+    }
+
+    if (state.replyTo) {
+        replyBar.innerHTML = `
+            <div class="reply-bar-content">
+                <div class="reply-bar-indicator"></div>
+                <div class="reply-bar-info">
+                    <span class="reply-bar-sender">${escapeHtml(state.replyTo.sender)}</span>
+                    <span class="reply-bar-preview">${escapeHtml(state.replyTo.preview)}</span>
+                </div>
+                <button class="reply-bar-close" onclick="clearReplyTo()">×</button>
+            </div>
+        `;
+        replyBar.style.display = 'flex';
+    }
+
+    // 입력창에 포커스
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) messageInput.focus();
+}
+
+// 회신 대상 초기화
+function clearReplyTo() {
+    state.replyTo = null;
+    const replyBar = document.getElementById('replyBar');
+    if (replyBar) replyBar.style.display = 'none';
+}
+
+// 메시지 인용
+function quoteMessage(messageId, sender, content) {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    // 인용 형식으로 삽입
+    const quote = `"${content}" - ${sender}\n\n`;
+    messageInput.value = quote + messageInput.value;
+    messageInput.focus();
+
+    // 커서를 끝으로 이동
+    messageInput.setSelectionRange(messageInput.value.length, messageInput.value.length);
+
+    // 전송 버튼 활성화
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.disabled = false;
+}
+
+// 특정 메시지로 스크롤
+function scrollToMessage(messageId) {
+    const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (msgElement) {
+        msgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // 하이라이트 효과
+        msgElement.classList.add('highlight');
+        setTimeout(() => msgElement.classList.remove('highlight'), 2000);
+    }
+}
+
+// ============================================
+// @멘션 기능
+// ============================================
+
+// @멘션 형식으로 텍스트 변환
+function formatMentions(text) {
+    if (!text) return '';
+
+    // @[이름] 형식을 하이라이트된 스팬으로 변환
+    const escaped = escapeHtml(text);
+    return escaped.replace(/@\[([^\]]+)\]/g, '<span class="mention-tag">@$1</span>');
+}
+
+// 멘션 자동완성 표시
+function showMentionSuggestions(query) {
+    const inputContainer = document.querySelector('.message-input-container') ||
+                          document.querySelector('.chat-input');
+    if (!inputContainer) return;
+
+    // 기존 제안 제거
+    hideMentionSuggestions();
+
+    // 현재 사용자 목록에서 검색
+    const filtered = state.users.filter(u =>
+        u.nickname !== state.nickname &&
+        u.nickname.toLowerCase().includes(query.toLowerCase())
+    );
+
+    if (filtered.length === 0) return;
+
+    const suggestions = document.createElement('div');
+    suggestions.id = 'mentionSuggestions';
+    suggestions.className = 'mention-suggestions';
+    suggestions.innerHTML = filtered.slice(0, 5).map(u => `
+        <div class="mention-suggestion-item" onclick="insertMention('${escapeHtml(u.nickname)}')">
+            <span class="mention-avatar">${u.nickname.charAt(0).toUpperCase()}</span>
+            <span class="mention-name">${escapeHtml(u.nickname)}</span>
+        </div>
+    `).join('');
+
+    inputContainer.appendChild(suggestions);
+}
+
+// 멘션 제안 숨기기
+function hideMentionSuggestions() {
+    const suggestions = document.getElementById('mentionSuggestions');
+    if (suggestions) suggestions.remove();
+}
+
+// 멘션 삽입
+function insertMention(nickname) {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    const text = messageInput.value;
+    const cursorPos = messageInput.selectionStart;
+
+    // @ 위치 찾기
+    const beforeCursor = text.substring(0, cursorPos);
+    const atIndex = beforeCursor.lastIndexOf('@');
+
+    if (atIndex !== -1) {
+        const before = text.substring(0, atIndex);
+        const after = text.substring(cursorPos);
+        messageInput.value = before + `@[${nickname}] ` + after;
+
+        // 커서 위치 업데이트
+        const newPos = before.length + nickname.length + 4;
+        messageInput.setSelectionRange(newPos, newPos);
+    }
+
+    hideMentionSuggestions();
+    messageInput.focus();
+}
+
+// 메시지 입력 시 @ 감지
+function initMentionDetection() {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    messageInput.addEventListener('input', (e) => {
+        const text = messageInput.value;
+        const cursorPos = messageInput.selectionStart;
+        const beforeCursor = text.substring(0, cursorPos);
+
+        // @ 이후 텍스트 감지
+        const atMatch = beforeCursor.match(/@([^\s\[\]]*?)$/);
+        if (atMatch) {
+            state.mentionQuery = atMatch[1];
+            showMentionSuggestions(state.mentionQuery);
+        } else {
+            hideMentionSuggestions();
+        }
+    });
+
+    // ESC 키로 제안 닫기
+    messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            hideMentionSuggestions();
+        }
+    });
+}
+
 // 전역 함수 노출
 window.selectRoom = selectRoom;
 window.openFile = openFile;
@@ -2896,3 +3222,13 @@ window.uploadToCloud = uploadToCloud;
 window.downloadCloudFile = downloadCloudFile;
 window.deleteCloudFile = deleteCloudFile;
 window.openCloudStorage = openCloudStorage;
+
+// 리액션/회신/멘션 기능
+window.showReactionPicker = showReactionPicker;
+window.closeReactionPicker = closeReactionPicker;
+window.addReaction = addReaction;
+window.setReplyTo = setReplyTo;
+window.clearReplyTo = clearReplyTo;
+window.quoteMessage = quoteMessage;
+window.scrollToMessage = scrollToMessage;
+window.insertMention = insertMention;

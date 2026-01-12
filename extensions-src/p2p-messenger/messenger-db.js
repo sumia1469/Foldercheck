@@ -258,10 +258,24 @@ class MessengerDB {
                 file_name TEXT,
                 file_size INTEGER,
                 file_path TEXT,
-                reply_to TEXT,
+                reply_to TEXT, -- 회신 대상 메시지 ID
+                reply_preview TEXT, -- 회신 대상 메시지 미리보기
+                mentions TEXT, -- 멘션된 사용자 목록 (JSON)
                 is_read INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+            );
+
+            -- 메시지 리액션
+            CREATE TABLE IF NOT EXISTS message_reactions (
+                id TEXT PRIMARY KEY,
+                message_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                user_nickname TEXT NOT NULL,
+                reaction TEXT NOT NULL, -- 👍, ❤️, 😊, 😮, ➕ 등
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                UNIQUE (message_id, user_id, reaction)
             );
 
             -- 설정
@@ -274,6 +288,7 @@ class MessengerDB {
             CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room_id);
             CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
             CREATE INDEX IF NOT EXISTS idx_rooms_updated ON rooms(updated_at);
+            CREATE INDEX IF NOT EXISTS idx_reactions_message ON message_reactions(message_id);
         `;
 
         if (this.isSqlJs) {
@@ -854,8 +869,8 @@ class MessengerDB {
     saveMessage(message) {
         const id = message.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const sql = `
-            INSERT INTO messages (id, room_id, sender_id, sender_nickname, type, content, file_name, file_size, file_path, reply_to)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (id, room_id, sender_id, sender_nickname, type, content, file_name, file_size, file_path, reply_to, reply_preview)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const roomId = message.roomId || null;
         const senderId = message.senderId || 'unknown'; // 기본값 설정
@@ -866,12 +881,13 @@ class MessengerDB {
         const fileSize = message.fileSize || null;
         const filePath = message.filePath || null;
         const replyTo = message.replyTo || null;
+        const replyPreview = message.replyPreview || null;
 
         if (this.isSqlJs) {
-            this.db.run(sql, [id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo]);
+            this.db.run(sql, [id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo, replyPreview]);
             this.saveToFile();
         } else {
-            this.db.prepare(sql).run(id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo);
+            this.db.prepare(sql).run(id, roomId, senderId, senderNickname, type, content, fileName, fileSize, filePath, replyTo, replyPreview);
         }
 
         // 채팅방 업데이트
@@ -1022,6 +1038,103 @@ class MessengerDB {
                 }
             }
             return defaultValue;
+        }
+    }
+
+    // ============================================
+    // 리액션 관리
+    // ============================================
+
+    /**
+     * 리액션 추가/토글
+     */
+    toggleReaction(messageId, userId, userNickname, reaction) {
+        // 먼저 기존 리액션 확인
+        const checkSql = 'SELECT id FROM message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?';
+        let exists = false;
+
+        if (this.isSqlJs) {
+            const stmt = this.db.prepare(checkSql);
+            stmt.bind([messageId, userId, reaction]);
+            exists = stmt.step();
+            stmt.free();
+        } else {
+            const row = this.db.prepare(checkSql).get(messageId, userId, reaction);
+            exists = !!row;
+        }
+
+        if (exists) {
+            // 리액션 삭제
+            const deleteSql = 'DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND reaction = ?';
+            if (this.isSqlJs) {
+                this.db.run(deleteSql, [messageId, userId, reaction]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(deleteSql).run(messageId, userId, reaction);
+            }
+            return { action: 'removed', reaction };
+        } else {
+            // 리액션 추가
+            const id = `reaction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const insertSql = 'INSERT INTO message_reactions (id, message_id, user_id, user_nickname, reaction) VALUES (?, ?, ?, ?, ?)';
+            if (this.isSqlJs) {
+                this.db.run(insertSql, [id, messageId, userId, userNickname, reaction]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(insertSql).run(id, messageId, userId, userNickname, reaction);
+            }
+            return { action: 'added', reaction, id };
+        }
+    }
+
+    /**
+     * 메시지의 모든 리액션 조회
+     */
+    getMessageReactions(messageId) {
+        const sql = `
+            SELECT reaction, GROUP_CONCAT(user_nickname) as users, COUNT(*) as count
+            FROM message_reactions
+            WHERE message_id = ?
+            GROUP BY reaction
+            ORDER BY MIN(created_at)
+        `;
+
+        if (this.isSqlJs) {
+            const results = [];
+            const stmt = this.db.prepare(sql);
+            stmt.bind([messageId]);
+            while (stmt.step()) {
+                const row = stmt.getAsObject();
+                row.users = row.users ? row.users.split(',') : [];
+                results.push(row);
+            }
+            stmt.free();
+            return results;
+        } else {
+            return this.db.prepare(sql).all(messageId).map(row => ({
+                ...row,
+                users: row.users ? row.users.split(',') : []
+            }));
+        }
+    }
+
+    /**
+     * 특정 사용자의 리액션 조회
+     */
+    getUserReactions(messageId, userId) {
+        const sql = 'SELECT reaction FROM message_reactions WHERE message_id = ? AND user_id = ?';
+
+        if (this.isSqlJs) {
+            const results = [];
+            const stmt = this.db.prepare(sql);
+            stmt.bind([messageId, userId]);
+            while (stmt.step()) {
+                results.push(stmt.getAsObject().reaction);
+            }
+            stmt.free();
+            return results;
+        } else {
+            return this.db.prepare(sql).all(messageId, userId).map(r => r.reaction);
         }
     }
 

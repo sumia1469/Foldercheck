@@ -1,7 +1,7 @@
 {
   "id": "p2p-messenger",
   "name": "P2P 메신저",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "폐쇄망 환경을 위한 호스트/게스트 방식 P2P 메신저",
   "author": "DocWatch Team",
   "main": "p2p-messenger.js",

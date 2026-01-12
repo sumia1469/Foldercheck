@@ -260,6 +260,19 @@ function registerIpcHandlers() {
 
         chatWindow.loadFile(chatHtmlPath);
 
+        // 개발자 도구 열기 차단 (프로덕션에서만)
+        const isPackaged = require('electron').app.isPackaged;
+        if (isPackaged) {
+            chatWindow.webContents.on('before-input-event', (event, input) => {
+                // F12, Ctrl+Shift+I, Cmd+Option+I 차단
+                if (input.key === 'F12' ||
+                    (input.control && input.shift && input.key.toLowerCase() === 'i') ||
+                    (input.meta && input.alt && input.key.toLowerCase() === 'i')) {
+                    event.preventDefault();
+                }
+            });
+        }
+
         chatWindow.on('closed', () => {
             chatWindow = null;
         });
@@ -595,6 +608,25 @@ function registerIpcHandlers() {
         return true;
     });
 
+    // 리액션 관리
+    ipcMain.handle('messenger:toggleReaction', (event, messageId, userId, userNickname, reaction) => {
+        if (!messengerDB || !messengerDBReady) return null;
+        const result = messengerDB.toggleReaction(messageId, userId, userNickname, reaction);
+        // 다른 윈도우에 리액션 변경 알림
+        broadcast('messenger:reactionChanged', { messageId, ...result });
+        return result;
+    });
+
+    ipcMain.handle('messenger:getMessageReactions', (event, messageId) => {
+        if (!messengerDB || !messengerDBReady) return [];
+        return messengerDB.getMessageReactions(messageId);
+    });
+
+    ipcMain.handle('messenger:getUserReactions', (event, messageId, userId) => {
+        if (!messengerDB || !messengerDBReady) return [];
+        return messengerDB.getUserReactions(messageId, userId);
+    });
+
     console.log('[P2P Extension] IPC 핸들러 등록 완료');
 }
 
@@ -615,7 +647,8 @@ function unregisterIpcHandlers() {
         'messenger:getRooms', 'messenger:createRoom', 'messenger:getRoom', 'messenger:getRoomParticipants',
         'messenger:addRoomParticipant', 'messenger:leaveRoom', 'messenger:updateRoom', 'messenger:deleteRoom',
         'messenger:saveMessage', 'messenger:getRoomMessages', 'messenger:markAsRead', 'messenger:searchMessages',
-        'messenger:getSetting', 'messenger:setSetting'
+        'messenger:getSetting', 'messenger:setSetting',
+        'messenger:toggleReaction', 'messenger:getMessageReactions', 'messenger:getUserReactions'
     ];
 
     channels.forEach(channel => {

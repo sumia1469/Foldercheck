@@ -73,6 +73,19 @@ contextBridge.exposeInMainWorld('messengerDB', {
     getSetting: (key, defaultValue) => ipcRenderer.invoke('messenger:getSetting', key, defaultValue),
     setSetting: (key, value) => ipcRenderer.invoke('messenger:setSetting', key, value),
 
+    // 리액션 관리
+    toggleReaction: (messageId, userId, userNickname, reaction) =>
+        ipcRenderer.invoke('messenger:toggleReaction', messageId, userId, userNickname, reaction),
+    getMessageReactions: (messageId) => ipcRenderer.invoke('messenger:getMessageReactions', messageId),
+    getUserReactions: (messageId, userId) => ipcRenderer.invoke('messenger:getUserReactions', messageId, userId),
+
+    // 리액션 변경 이벤트 수신
+    onReactionChanged: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on('messenger:reactionChanged', handler);
+        return () => ipcRenderer.removeListener('messenger:reactionChanged', handler);
+    },
+
     // 데이터 변경 이벤트 수신
     onRoomChanged: (callback) => {
         const handler = (event, data) => callback(data);

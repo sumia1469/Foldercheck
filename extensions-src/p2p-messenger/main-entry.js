@@ -116,6 +116,10 @@ function setupEventListeners() {
         broadcast('p2p:file-received', file);
     });
 
+    p2pMessenger.on('file_sent', (file) => {
+        broadcast('p2p:file-sent', file);
+    });
+
     p2pMessenger.on('cloud_file_uploaded', (file) => {
         broadcast('cloud:file-uploaded', file);
     });
@@ -206,9 +210,9 @@ function registerIpcHandlers() {
             ]
         });
         if (result.canceled || result.filePaths.length === 0) {
-            return null;
+            return { success: false, canceled: true };
         }
-        return result.filePaths[0];
+        return { success: true, filePath: result.filePaths[0] };
     });
 
     // 채팅 윈도우 열기

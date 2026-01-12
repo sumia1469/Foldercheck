@@ -23,6 +23,10 @@ bin/
 resources/ollama/
 offline-install/
 
+# VS Code extensions built for distribution
+.vscode
+dist-extensions/
+
 # Temporary/build files
 nul
 

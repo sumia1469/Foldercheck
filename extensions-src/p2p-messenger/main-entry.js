@@ -16,6 +16,7 @@ let mainWindow = null;
 let extensionPath = null;
 let chatWindow = null;
 let messengerDB = null;
+let messengerDBReady = false;
 
 /**
  * 확장 활성화
@@ -34,6 +35,7 @@ function activate(context) {
     const MessengerDB = require(path.join(extensionPath, 'messenger-db.js'));
     messengerDB = new MessengerDB();
     messengerDB.initialize().then(() => {
+        messengerDBReady = true;
         console.log('[P2P Extension] MessengerDB 초기화 완료');
     }).catch(err => {
         console.error('[P2P Extension] MessengerDB 초기화 실패:', err);
@@ -339,136 +341,142 @@ function registerIpcHandlers() {
         return p2pMessenger.getCloudStatus ? p2pMessenger.getCloudStatus() : { connected: false };
     });
 
+    // 클라우드 파일 목록 (cloud: 네임스페이스)
+    ipcMain.handle('cloud:getFiles', () => {
+        if (!p2pMessenger) return [];
+        return p2pMessenger.getCloudFiles();
+    });
+
     // ============================================
     // MessengerDB 관련 IPC 핸들러
     // ============================================
 
     // 연락처 관리
     ipcMain.handle('messenger:getContacts', () => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.getAllContacts();
     });
 
     ipcMain.handle('messenger:addContact', (event, contact) => {
-        if (!messengerDB) return null;
+        if (!messengerDB || !messengerDBReady) return null;
         return messengerDB.addContact(contact);
     });
 
     ipcMain.handle('messenger:deleteContact', (event, id) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.deleteContact(id);
         return true;
     });
 
     ipcMain.handle('messenger:updateContactStatus', (event, id, status) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.updateContactStatus(id, status);
         return true;
     });
 
     // 그룹 관리
     ipcMain.handle('messenger:getGroups', () => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.getAllGroups();
     });
 
     ipcMain.handle('messenger:createGroup', (event, group) => {
-        if (!messengerDB) return null;
+        if (!messengerDB || !messengerDBReady) return null;
         return messengerDB.createGroup(group);
     });
 
     ipcMain.handle('messenger:getGroupMembers', (event, groupId) => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.getGroupMembers(groupId);
     });
 
     ipcMain.handle('messenger:addGroupMember', (event, groupId, contactId, role) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.addGroupMember(groupId, contactId, role);
         return true;
     });
 
     ipcMain.handle('messenger:deleteGroup', (event, id) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.deleteGroup(id);
         return true;
     });
 
     // 채팅방 관리
     ipcMain.handle('messenger:getRooms', () => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.getAllRooms();
     });
 
     ipcMain.handle('messenger:createRoom', (event, room) => {
-        if (!messengerDB) return null;
+        if (!messengerDB || !messengerDBReady) return null;
         return messengerDB.createRoom(room);
     });
 
     ipcMain.handle('messenger:getRoom', (event, id) => {
-        if (!messengerDB) return null;
+        if (!messengerDB || !messengerDBReady) return null;
         return messengerDB.getRoom(id);
     });
 
     ipcMain.handle('messenger:getRoomParticipants', (event, roomId) => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.getRoomParticipants(roomId);
     });
 
     ipcMain.handle('messenger:addRoomParticipant', (event, roomId, contactId, nickname) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.addRoomParticipant(roomId, contactId, nickname);
         return true;
     });
 
     ipcMain.handle('messenger:leaveRoom', (event, roomId, contactId) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.leaveRoom(roomId, contactId);
         return true;
     });
 
     ipcMain.handle('messenger:updateRoom', (event, id, updates) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.updateRoom(id, updates);
         return true;
     });
 
     ipcMain.handle('messenger:deleteRoom', (event, id) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.deleteRoom(id);
         return true;
     });
 
     // 메시지 관리
     ipcMain.handle('messenger:saveMessage', (event, message) => {
-        if (!messengerDB) return null;
+        if (!messengerDB || !messengerDBReady) return null;
         return messengerDB.saveMessage(message);
     });
 
     ipcMain.handle('messenger:getRoomMessages', (event, roomId, limit, offset) => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.getRoomMessages(roomId, limit, offset);
     });
 
     ipcMain.handle('messenger:markAsRead', (event, roomId, contactId) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.markMessagesAsRead(roomId, contactId);
         return true;
     });
 
     ipcMain.handle('messenger:searchMessages', (event, query, roomId) => {
-        if (!messengerDB) return [];
+        if (!messengerDB || !messengerDBReady) return [];
         return messengerDB.searchMessages(query, roomId);
     });
 
     // 설정 관리
     ipcMain.handle('messenger:getSetting', (event, key, defaultValue) => {
-        if (!messengerDB) return defaultValue;
+        if (!messengerDB || !messengerDBReady) return defaultValue;
         return messengerDB.getSetting(key, defaultValue);
     });
 
     ipcMain.handle('messenger:setSetting', (event, key, value) => {
-        if (!messengerDB) return false;
+        if (!messengerDB || !messengerDBReady) return false;
         messengerDB.setSetting(key, value);
         return true;
     });
@@ -487,7 +495,7 @@ function unregisterIpcHandlers() {
         'p2p:openDownloads',
         'chat:minimize', 'chat:maximize', 'chat:close', 'chat:showNotification',
         'chat:openFile', 'chat:openFileFolder', 'chat:downloadAndOpenFile',
-        'cloud:getStatus',
+        'cloud:getStatus', 'cloud:getFiles',
         'messenger:getContacts', 'messenger:addContact', 'messenger:deleteContact', 'messenger:updateContactStatus',
         'messenger:getGroups', 'messenger:createGroup', 'messenger:getGroupMembers', 'messenger:addGroupMember', 'messenger:deleteGroup',
         'messenger:getRooms', 'messenger:createRoom', 'messenger:getRoom', 'messenger:getRoomParticipants',

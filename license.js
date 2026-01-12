@@ -13,7 +13,16 @@ const https = require('https');
 const dgram = require('dgram');
 
 // 설정
-const LICENSE_FILE = path.join(__dirname, 'data', 'license.json');
+// Electron 환경에서는 userData 폴더에 저장, 그 외에는 __dirname/data 사용
+let LICENSE_FILE;
+try {
+    const { app } = require('electron');
+    const userDataPath = app.getPath('userData');
+    LICENSE_FILE = path.join(userDataPath, 'license.json');
+} catch (e) {
+    // Electron이 아닌 환경 (테스트 등)
+    LICENSE_FILE = path.join(__dirname, 'data', 'license.json');
+}
 const TRIAL_DAYS = 14;
 const LICENSE_SERVER = 'https://license.docwatch.io'; // 실제 라이선스 서버 URL로 변경 필요
 
@@ -172,6 +181,7 @@ function generateMachineId() {
 
 /**
  * 라이선스 파일 로드
+ * Electron 환경에서는 userData 폴더 사용, 기존 data 폴더에서 마이그레이션 지원
  */
 function loadLicense() {
     try {
@@ -181,9 +191,38 @@ function loadLicense() {
             fs.mkdirSync(dataDir, { recursive: true });
         }
 
+        // 새 위치에 라이선스가 있으면 사용
         if (fs.existsSync(LICENSE_FILE)) {
             const data = fs.readFileSync(LICENSE_FILE, 'utf8');
             return JSON.parse(data);
+        }
+
+        // 기존 위치(data/license.json)에서 마이그레이션 시도
+        // Electron 패키지 앱에서 기존 개발 경로에 라이선스가 있을 수 있음
+        const legacyPaths = [
+            path.join(__dirname, 'data', 'license.json'),
+            path.join(process.resourcesPath || '', 'app', 'data', 'license.json'),
+            path.join(process.resourcesPath || '', 'data', 'license.json')
+        ];
+
+        for (const legacyPath of legacyPaths) {
+            try {
+                if (legacyPath && fs.existsSync(legacyPath)) {
+                    console.log('[License] 기존 라이선스 발견, 마이그레이션:', legacyPath);
+                    const data = fs.readFileSync(legacyPath, 'utf8');
+                    const license = JSON.parse(data);
+
+                    // Pro 또는 유효한 라이선스면 새 위치에 저장
+                    if (license && (license.type === 'pro' || license.licenseKey)) {
+                        saveLicense(license);
+                        console.log('[License] 라이선스 마이그레이션 완료:', LICENSE_FILE);
+                        return license;
+                    }
+                }
+            } catch (e) {
+                // 해당 경로에서 로드 실패, 다음 경로 시도
+                continue;
+            }
         }
     } catch (e) {
         console.error('라이선스 파일 로드 실패:', e.message);

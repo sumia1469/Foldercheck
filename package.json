@@ -101,6 +101,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "build/icons",
+        "to": "build/icons",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asar": true,

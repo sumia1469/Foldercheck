@@ -707,27 +707,49 @@ function createWindow() {
 
 function createTray() {
     let trayIcon;
-    if (process.platform === 'darwin') {
-        // Mac: Template 이미지 사용 (메뉴바에 맞게 자동 색상 조정)
-        const trayPath = path.join(__dirname, 'build', 'icons', 'tray', 'trayTemplate-22.png');
-        if (fs.existsSync(trayPath)) {
-            trayIcon = nativeImage.createFromPath(trayPath);
-            trayIcon.setTemplateImage(true);
+
+    // 패키징된 앱에서는 resources 경로 사용, 개발 환경에서는 __dirname 사용
+    const basePath = isPackaged ? process.resourcesPath : __dirname;
+
+    // 가능한 트레이 아이콘 경로들 (우선순위 순)
+    const getTrayPaths = () => {
+        if (process.platform === 'darwin') {
+            return [
+                path.join(basePath, 'build', 'icons', 'tray', 'trayTemplate-22.png'),
+                path.join(basePath, 'app.asar.unpacked', 'build', 'icons', 'tray', 'trayTemplate-22.png'),
+                path.join(__dirname, 'build', 'icons', 'tray', 'trayTemplate-22.png')
+            ];
         } else {
-            trayIcon = nativeImage.createEmpty();
+            return [
+                path.join(basePath, 'build', 'icons', 'tray', 'tray.ico'),
+                path.join(basePath, 'app.asar.unpacked', 'build', 'icons', 'tray', 'tray.ico'),
+                path.join(__dirname, 'build', 'icons', 'tray', 'tray.ico'),
+                path.join(basePath, 'build', 'icons', 'icon.ico'),
+                path.join(__dirname, 'build', 'icons', 'icon.ico')
+            ];
+        }
+    };
+
+    const trayPaths = getTrayPaths();
+    let foundPath = null;
+
+    for (const p of trayPaths) {
+        console.log('[Tray] 아이콘 경로 시도:', p);
+        if (fs.existsSync(p)) {
+            foundPath = p;
+            console.log('[Tray] 아이콘 발견:', p);
+            break;
+        }
+    }
+
+    if (foundPath) {
+        trayIcon = nativeImage.createFromPath(foundPath);
+        if (process.platform === 'darwin') {
+            trayIcon.setTemplateImage(true);
         }
     } else {
-        // Windows: 전용 트레이 ICO 사용 (여백 없이 크게)
-        const trayIcoPath = path.join(__dirname, 'build', 'icons', 'tray', 'tray.ico');
-        const fallbackPath = path.join(__dirname, 'build', 'icons', 'icon.ico');
-
-        if (fs.existsSync(trayIcoPath)) {
-            trayIcon = nativeImage.createFromPath(trayIcoPath);
-        } else if (fs.existsSync(fallbackPath)) {
-            trayIcon = nativeImage.createFromPath(fallbackPath);
-        } else {
-            trayIcon = nativeImage.createEmpty();
-        }
+        console.warn('[Tray] 트레이 아이콘을 찾을 수 없습니다. 시도한 경로:', trayPaths);
+        trayIcon = nativeImage.createEmpty();
     }
 
     try {
@@ -740,8 +762,9 @@ function createTray() {
         tray.setToolTip('DocWatch - 로컬 업무 자동화');
         tray.setContextMenu(contextMenu);
         tray.on('double-click', () => { if (mainWindow) mainWindow.show(); });
+        console.log('[Tray] 트레이 생성 완료');
     } catch (e) {
-        console.log('트레이 생성 실패:', e.message);
+        console.error('[Tray] 트레이 생성 실패:', e.message);
     }
 }
 

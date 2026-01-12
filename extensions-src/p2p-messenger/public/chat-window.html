@@ -513,11 +513,12 @@
         .room-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px;
+            gap: 8px;
+            padding: 4px 8px 4px 4px;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s;
+            position: relative;
         }
 
         .room-item:hover {
@@ -527,6 +528,39 @@
         .room-item.active {
             background: var(--bg-tertiary);
             border-left: 3px solid var(--accent);
+        }
+
+        .room-item-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+            padding: 8px;
+        }
+
+        .room-delete-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .room-item:hover .room-delete-btn {
+            display: flex;
+        }
+
+        .room-delete-btn:hover {
+            background: var(--danger);
+            color: white;
         }
 
         .room-avatar {

@@ -542,21 +542,41 @@ function renderRoomList() {
 
         return `
             <div class="room-item ${room.id === state.currentRoom ? 'active' : ''}"
-                 data-room-id="${room.id}" onclick="selectRoom('${room.id}')">
-                <div class="room-avatar" style="background: ${avatarBg}; display: flex; align-items: center; justify-content: center;">
-                    ${isGroup ? icon : `<span>${icon}</span>`}
+                 data-room-id="${room.id}">
+                <div class="room-item-content" onclick="selectRoom('${room.id}')">
+                    <div class="room-avatar" style="background: ${avatarBg}; display: flex; align-items: center; justify-content: center;">
+                        ${isGroup ? icon : `<span>${icon}</span>`}
+                    </div>
+                    <div class="room-info">
+                        <div class="room-name">${escapeHtml(room.name)}</div>
+                        <div class="room-preview">${escapeHtml(room.lastMessage || (isGroup ? '그룹 채팅' : '1:1 채팅'))}</div>
+                    </div>
+                    <div class="room-meta">
+                        <div class="room-time">${room.lastTime || ''}</div>
+                        ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
+                    </div>
                 </div>
-                <div class="room-info">
-                    <div class="room-name">${escapeHtml(room.name)}</div>
-                    <div class="room-preview">${escapeHtml(room.lastMessage || (isGroup ? '그룹 채팅' : '1:1 채팅'))}</div>
-                </div>
-                <div class="room-meta">
-                    <div class="room-time">${room.lastTime || ''}</div>
-                    ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
-                </div>
+                <button class="room-delete-btn" onclick="event.stopPropagation(); confirmDeleteRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')" title="채팅방 삭제">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                </button>
             </div>
         `;
     }).join('');
+}
+
+// 채팅방 삭제 확인
+async function confirmDeleteRoom(roomId, roomName) {
+    if (!confirm(`'${roomName}' 채팅방을 삭제하시겠습니까?`)) return;
+
+    try {
+        await deleteRoom(roomId);
+        showToast('채팅방이 삭제되었습니다.');
+    } catch (err) {
+        console.error('채팅방 삭제 실패:', err);
+        alert('채팅방 삭제 실패: ' + err.message);
+    }
 }
 
 // 채팅방 선택
@@ -1508,15 +1528,20 @@ async function leaveRoom(roomId) {
 async function deleteRoom(roomId) {
     try {
         if (window.messengerDB) {
+            const wasCurrentRoom = state.currentRoom === roomId;
             await window.messengerDB.deleteRoom(roomId);
             await loadRooms();
 
-            if (state.currentRoom === roomId) {
+            if (wasCurrentRoom) {
                 state.currentRoom = null;
-                if (state.rooms.length === 0) {
-                    showEmptyRoomMessage();
-                } else {
-                    hideChatView();
+                // 채팅방이 없으면 빈 상태 표시, 있으면 채팅 뷰 숨기기
+                hideChatView();
+                // 메시지 컨테이너 초기화
+                if (elements.messagesContainer) {
+                    elements.messagesContainer.innerHTML = '';
+                }
+                if (elements.messageList) {
+                    elements.messageList.innerHTML = '';
                 }
             }
         }
@@ -1904,15 +1929,7 @@ async function leaveCurrentRoom() {
 
     try {
         await deleteRoom(state.currentRoom);
-        state.currentRoom = null;
-        elements.messagesContainer.innerHTML = '';
-
-        // 채팅방이 없으면 안내 메시지 표시
-        if (state.rooms.length === 0) {
-            showEmptyRoomMessage();
-        } else {
-            hideChatView();
-        }
+        // deleteRoom 내부에서 state.currentRoom, elements 초기화 처리됨
     } catch (err) {
         console.error('채팅방 삭제 실패:', err);
         alert('채팅방 삭제 실패: ' + err.message);
@@ -2745,6 +2762,7 @@ window.startDirectChat = startDirectChat;
 window.leaveCurrentRoom = leaveCurrentRoom;
 window.createNewRoom = createNewRoom;
 window.deleteRoom = deleteRoom;
+window.confirmDeleteRoom = confirmDeleteRoom;
 window.openSettingsModal = openSettingsModal;
 window.saveSettings = saveSettings;
 window.openInviteModal = openInviteModal;

@@ -104,12 +104,16 @@ function setupEventListeners() {
         broadcast('p2p:message', msg);
     });
 
-    p2pMessenger.on('userJoined', (user) => {
+    p2pMessenger.on('user_joined', (user) => {
         broadcast('p2p:user-joined', user);
     });
 
-    p2pMessenger.on('userLeft', (user) => {
+    p2pMessenger.on('user_left', (user) => {
         broadcast('p2p:user-left', user);
+    });
+
+    p2pMessenger.on('user_list', (users) => {
+        broadcast('p2p:user-list', users);
     });
 
     p2pMessenger.on('file_received', (file) => {

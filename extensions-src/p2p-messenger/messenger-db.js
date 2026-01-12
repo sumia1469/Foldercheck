@@ -224,6 +224,7 @@ class MessengerDB {
                 id TEXT PRIMARY KEY,
                 type TEXT NOT NULL DEFAULT 'direct', -- direct, group
                 name TEXT,
+                target_nickname TEXT, -- 1:1 채팅 대상 닉네임
                 avatar TEXT,
                 last_message TEXT,
                 last_message_at DATETIME,
@@ -302,6 +303,8 @@ class MessengerDB {
         this._migrateAddNotificationColumn();
         // 마이그레이션: messages 테이블 sender_nickname 컬럼 및 sender_id 기본값 수정
         this._migrateMessagesTable();
+        // 마이그레이션: rooms 테이블 target_nickname 컬럼 추가
+        this._migrateAddTargetNicknameColumn();
     }
 
     /**
@@ -404,6 +407,35 @@ class MessengerDB {
             }
         } catch (e) {
             // 업데이트 실패해도 무시 (테이블이 없거나 이미 처리됨)
+        }
+    }
+
+    /**
+     * 마이그레이션: rooms 테이블에 target_nickname 컬럼 추가
+     */
+    _migrateAddTargetNicknameColumn() {
+        try {
+            const checkSql = "SELECT target_nickname FROM rooms LIMIT 1";
+            if (this.isSqlJs) {
+                this.db.exec(checkSql);
+            } else {
+                this.db.prepare(checkSql).get();
+            }
+        } catch (e) {
+            // 컬럼이 없으면 추가
+            console.log('[MessengerDB] target_nickname 컬럼 추가 마이그레이션 실행');
+            const alterSql = "ALTER TABLE rooms ADD COLUMN target_nickname TEXT";
+            try {
+                if (this.isSqlJs) {
+                    this.db.run(alterSql);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql);
+                }
+                console.log('[MessengerDB] target_nickname 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] target_nickname 컬럼 추가 실패:', alterErr.message);
+            }
         }
     }
 
@@ -658,17 +690,18 @@ class MessengerDB {
      */
     createRoom(room) {
         const id = room.id || `room_${Date.now()}`;
-        const sql = 'INSERT OR REPLACE INTO rooms (id, type, name, avatar) VALUES (?, ?, ?, ?)';
+        const sql = 'INSERT OR REPLACE INTO rooms (id, type, name, target_nickname, avatar) VALUES (?, ?, ?, ?, ?)';
         const type = room.type || 'direct';
         const name = room.name || null;
+        const targetNickname = room.targetNickname || null; // 1:1 채팅 대상 닉네임
         const avatar = room.avatar || null;
 
         try {
             if (this.isSqlJs) {
-                this.db.run(sql, [id, type, name, avatar]);
+                this.db.run(sql, [id, type, name, targetNickname, avatar]);
                 this.saveToFile();
             } else {
-                this.db.prepare(sql).run(id, type, name, avatar);
+                this.db.prepare(sql).run(id, type, name, targetNickname, avatar);
             }
 
             return { success: true, id: id };

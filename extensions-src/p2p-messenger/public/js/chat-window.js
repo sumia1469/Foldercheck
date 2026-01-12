@@ -1567,6 +1567,7 @@ async function loadRooms() {
                 id: r.id,
                 name: r.name || '채팅방',
                 type: r.type,
+                targetNickname: r.target_nickname || r.name, // 1:1 채팅 대상 닉네임
                 lastMessage: r.last_message,
                 lastTime: r.last_message_at ? formatTime(new Date(r.last_message_at)) : '',
                 unread: r.unread_count || 0,

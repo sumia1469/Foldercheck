@@ -50,7 +50,25 @@ class MessengerDB {
                 this.db.pragma('journal_mode = WAL');
             } else {
                 // sql.js 폴백 (더 느리지만 네이티브 빌드 필요 없음)
-                const initSqlJs = require('sql.js');
+                // 앱의 node_modules에서 sql.js 찾기
+                let initSqlJs;
+                try {
+                    initSqlJs = require('sql.js');
+                } catch (e) {
+                    // 확장에서 실행 시 앱의 node_modules 경로 시도
+                    const appNodeModules = path.join(__dirname, '..', '..', '..', 'node_modules', 'sql.js');
+                    if (fs.existsSync(appNodeModules)) {
+                        initSqlJs = require(appNodeModules);
+                    } else {
+                        // 개발 환경에서의 경로
+                        const devPath = path.join(process.cwd(), 'node_modules', 'sql.js');
+                        if (fs.existsSync(devPath)) {
+                            initSqlJs = require(devPath);
+                        } else {
+                            throw new Error('sql.js 모듈을 찾을 수 없습니다');
+                        }
+                    }
+                }
 
                 // WASM 파일 경로 설정
                 let wasmPath;

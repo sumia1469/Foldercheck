@@ -32,14 +32,27 @@ function activate(context) {
     p2pMessenger = new P2PMessenger();
 
     // MessengerDB 인스턴스 생성
-    const MessengerDB = require(path.join(extensionPath, 'messenger-db.js'));
-    messengerDB = new MessengerDB();
-    messengerDB.initialize().then(() => {
-        messengerDBReady = true;
-        console.log('[P2P Extension] MessengerDB 초기화 완료');
-    }).catch(err => {
-        console.error('[P2P Extension] MessengerDB 초기화 실패:', err);
-    });
+    try {
+        const MessengerDB = require(path.join(extensionPath, 'messenger-db.js'));
+        messengerDB = new MessengerDB();
+        messengerDB.initialize().then(() => {
+            // db가 실제로 초기화되었는지 확인
+            if (messengerDB && messengerDB.db) {
+                messengerDBReady = true;
+                console.log('[P2P Extension] MessengerDB 초기화 완료');
+            } else {
+                console.error('[P2P Extension] MessengerDB db 객체가 null입니다');
+                messengerDBReady = false;
+            }
+        }).catch(err => {
+            console.error('[P2P Extension] MessengerDB 초기화 실패:', err);
+            messengerDBReady = false;
+        });
+    } catch (err) {
+        console.error('[P2P Extension] MessengerDB 로드 실패:', err);
+        messengerDB = null;
+        messengerDBReady = false;
+    }
 
     console.log('[P2P Extension] 활성화됨, p2pMessenger:', !!p2pMessenger);
 

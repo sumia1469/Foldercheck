@@ -419,6 +419,8 @@ function initP2PListeners() {
     // 메시지 수신
     window.p2pAPI.onMessage(async (data) => {
         console.log('메시지 수신:', data);
+        console.log('현재 상태 - mode:', state.mode, 'nickname:', state.nickname, 'currentRoom:', state.currentRoom);
+        console.log('메시지 정보 - from:', data.nickname, 'targetNickname:', data.targetNickname);
 
         // 자신의 메시지 처리:
         // - 게스트 모드: sendMessage()에서 이미 addMessage() 호출됨 → 무시
@@ -480,8 +482,10 @@ function initP2PListeners() {
 
             // 메시지에 roomId 설정하여 추가
             data.roomId = directRoomId;
+            console.log('1:1 메시지 roomId 설정:', directRoomId, '현재 선택된 방:', state.currentRoom);
         }
 
+        console.log('addMessage 호출 전 - data.roomId:', data.roomId, 'state.currentRoom:', state.currentRoom);
         addMessage(data);
     });
 

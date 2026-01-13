@@ -264,18 +264,18 @@ function registerIpcHandlers() {
 
         chatWindow.loadFile(chatHtmlPath);
 
-        // 개발자 도구 열기 차단 (프로덕션에서만)
-        const isPackaged = require('electron').app.isPackaged;
-        if (isPackaged) {
-            chatWindow.webContents.on('before-input-event', (event, input) => {
-                // F12, Ctrl+Shift+I, Cmd+Option+I 차단
-                if (input.key === 'F12' ||
-                    (input.control && input.shift && input.key.toLowerCase() === 'i') ||
-                    (input.meta && input.alt && input.key.toLowerCase() === 'i')) {
-                    event.preventDefault();
-                }
-            });
-        }
+        // 디버깅용: 개발자 도구 항상 허용
+        // const isPackaged = require('electron').app.isPackaged;
+        // if (isPackaged) {
+        //     chatWindow.webContents.on('before-input-event', (event, input) => {
+        //         // F12, Ctrl+Shift+I, Cmd+Option+I 차단
+        //         if (input.key === 'F12' ||
+        //             (input.control && input.shift && input.key.toLowerCase() === 'i') ||
+        //             (input.meta && input.alt && input.key.toLowerCase() === 'i')) {
+        //             event.preventDefault();
+        //         }
+        //     });
+        // }
 
         chatWindow.on('closed', () => {
             chatWindow = null;

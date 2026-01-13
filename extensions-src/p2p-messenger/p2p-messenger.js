@@ -228,6 +228,8 @@ class P2PMessenger extends EventEmitter {
      * @param {string} options.roomId - 채팅방 ID
      */
     sendMessage(content, options = {}) {
+        console.log('[P2P] sendMessage 호출 - mode:', this.mode, 'targetNickname:', options.targetNickname);
+
         const message = {
             type: 'chat',
             id: crypto.randomUUID(),
@@ -241,16 +243,19 @@ class P2PMessenger extends EventEmitter {
         if (this.mode === 'host') {
             if (options.targetNickname) {
                 // 1:1 채팅: 특정 사용자에게만 전송
+                console.log('[P2P Host] 1:1 메시지 전송 to:', options.targetNickname);
                 this._sendToUser(options.targetNickname, message);
                 // 호스트 자신에게도 메시지 표시 (이미 화면에 표시됨)
             } else {
                 // 그룹 채팅: 모든 클라이언트에게 브로드캐스트
+                console.log('[P2P Host] 그룹 메시지 브로드캐스트');
                 this._broadcast(message);
             }
             this.messageHistory.push(message);
             this.emit('message', message);
         } else if (this.mode === 'guest') {
             // 게스트: 서버에 메시지 전송
+            console.log('[P2P Guest] 서버로 메시지 전송');
             this._sendToServer(message);
         }
 
@@ -261,8 +266,10 @@ class P2PMessenger extends EventEmitter {
      * 특정 닉네임의 사용자에게 메시지 전송 (호스트용)
      */
     _sendToUser(targetNickname, msg) {
+        console.log('[P2P] _sendToUser 호출 - targetNickname:', targetNickname, '현재 users:', Array.from(this.users.entries()));
         for (const [clientId, user] of this.users) {
             if (user.nickname === targetNickname) {
+                console.log('[P2P] 대상 찾음 - clientId:', clientId, 'nickname:', user.nickname);
                 this._sendToClient(clientId, msg);
                 return;
             }
@@ -521,19 +528,23 @@ class P2PMessenger extends EventEmitter {
 
             case 'chat':
                 msg.nickname = this.users.get(clientId)?.nickname || msg.nickname;
+                console.log('[P2P Host] 채팅 메시지 수신 - from:', msg.nickname, 'targetNickname:', msg.targetNickname, 'content:', msg.content?.substring(0, 20));
 
                 if (msg.targetNickname) {
                     // 1:1 채팅: 대상 사용자에게만 전달
                     if (msg.targetNickname === this.nickname) {
                         // 호스트에게 보낸 메시지
+                        console.log('[P2P Host] 호스트에게 보낸 1:1 메시지 - emit');
                         this.emit('message', msg);
                     } else {
                         // 다른 사용자에게 보낸 메시지 - 해당 사용자에게만 전달
+                        console.log('[P2P Host] 다른 게스트에게 전달:', msg.targetNickname);
                         this._sendToUser(msg.targetNickname, msg);
                     }
                     // 발신자에게도 메시지 전달 (확인용) - 발신자 제외
                 } else {
                     // 그룹 채팅: 보낸 클라이언트 제외하고 브로드캐스트
+                    console.log('[P2P Host] 그룹 채팅 브로드캐스트');
                     this._broadcastExcept(clientId, msg);
                     this.emit('message', msg);
                 }

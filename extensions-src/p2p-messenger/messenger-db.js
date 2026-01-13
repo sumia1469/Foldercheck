@@ -305,6 +305,8 @@ class MessengerDB {
         this._migrateMessagesTable();
         // 마이그레이션: rooms 테이블 target_nickname 컬럼 추가
         this._migrateAddTargetNicknameColumn();
+        // 마이그레이션: rooms 테이블 created_by 컬럼 추가 (방 생성자)
+        this._migrateAddCreatedByColumn();
     }
 
     /**
@@ -435,6 +437,35 @@ class MessengerDB {
                 console.log('[MessengerDB] target_nickname 컬럼 추가 완료');
             } catch (alterErr) {
                 console.error('[MessengerDB] target_nickname 컬럼 추가 실패:', alterErr.message);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: rooms 테이블에 created_by 컬럼 추가 (방 생성자)
+     */
+    _migrateAddCreatedByColumn() {
+        try {
+            const checkSql = "SELECT created_by FROM rooms LIMIT 1";
+            if (this.isSqlJs) {
+                this.db.exec(checkSql);
+            } else {
+                this.db.prepare(checkSql).get();
+            }
+        } catch (e) {
+            // 컬럼이 없으면 추가
+            console.log('[MessengerDB] created_by 컬럼 추가 마이그레이션 실행');
+            const alterSql = "ALTER TABLE rooms ADD COLUMN created_by TEXT";
+            try {
+                if (this.isSqlJs) {
+                    this.db.run(alterSql);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql);
+                }
+                console.log('[MessengerDB] created_by 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] created_by 컬럼 추가 실패:', alterErr.message);
             }
         }
     }
@@ -690,21 +721,57 @@ class MessengerDB {
      */
     createRoom(room) {
         const id = room.id || `room_${Date.now()}`;
-        const sql = 'INSERT OR REPLACE INTO rooms (id, type, name, target_nickname, avatar) VALUES (?, ?, ?, ?, ?)';
+        const sql = 'INSERT OR REPLACE INTO rooms (id, type, name, target_nickname, avatar, created_by) VALUES (?, ?, ?, ?, ?, ?)';
         const type = room.type || 'direct';
         const name = room.name || null;
         const targetNickname = room.targetNickname || null; // 1:1 채팅 대상 닉네임
         const avatar = room.avatar || null;
+        const createdBy = room.createdBy || null; // 방 생성자
 
         try {
             if (this.isSqlJs) {
-                this.db.run(sql, [id, type, name, targetNickname, avatar]);
+                this.db.run(sql, [id, type, name, targetNickname, avatar, createdBy]);
                 this.saveToFile();
             } else {
-                this.db.prepare(sql).run(id, type, name, targetNickname, avatar);
+                this.db.prepare(sql).run(id, type, name, targetNickname, avatar, createdBy);
             }
 
             return { success: true, id: id };
+        } catch (err) {
+            console.error('채팅방 생성 오류:', err);
+            return { success: false, error: err.message };
+        }
+    }
+
+    /**
+     * 채팅방 생성 (중복 시 무시)
+     * 기존 방이 있으면 새로 만들지 않음
+     */
+    createRoomIfNotExists(room) {
+        const id = room.id || `room_${Date.now()}`;
+
+        // 먼저 기존 방이 있는지 확인
+        const existing = this.getRoom(id);
+        if (existing) {
+            return { success: true, id: id, existed: true };
+        }
+
+        const sql = 'INSERT OR IGNORE INTO rooms (id, type, name, target_nickname, avatar, created_by) VALUES (?, ?, ?, ?, ?, ?)';
+        const type = room.type || 'direct';
+        const name = room.name || null;
+        const targetNickname = room.targetNickname || null;
+        const avatar = room.avatar || null;
+        const createdBy = room.createdBy || null;
+
+        try {
+            if (this.isSqlJs) {
+                this.db.run(sql, [id, type, name, targetNickname, avatar, createdBy]);
+                this.saveToFile();
+            } else {
+                this.db.prepare(sql).run(id, type, name, targetNickname, avatar, createdBy);
+            }
+
+            return { success: true, id: id, existed: false };
         } catch (err) {
             console.error('채팅방 생성 오류:', err);
             return { success: false, error: err.message };

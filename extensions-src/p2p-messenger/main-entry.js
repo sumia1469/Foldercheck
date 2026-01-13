@@ -409,9 +409,50 @@ function registerIpcHandlers() {
     });
 
     // 클라우드 파일 목록
-    ipcMain.handle('p2p:getCloudFiles', () => {
+    ipcMain.handle('p2p:getCloudFiles', async () => {
         if (!p2pMessenger) return [];
-        return p2pMessenger.getCloudFiles();
+
+        const status = p2pMessenger.getStatus();
+
+        // 호스트인 경우 로컬 파일 목록 반환
+        if (status.mode === 'host') {
+            return p2pMessenger.getCloudFiles();
+        }
+
+        // 게스트인 경우 호스트 HTTP API에서 가져오기
+        if (status.mode === 'guest' && status.host && status.cloudPort) {
+            try {
+                const http = require('http');
+                return new Promise((resolve, reject) => {
+                    const req = http.get(`http://${status.host}:${status.cloudPort}/files`, (res) => {
+                        let data = '';
+                        res.on('data', chunk => data += chunk);
+                        res.on('end', () => {
+                            try {
+                                const result = JSON.parse(data);
+                                resolve(result.files || []);
+                            } catch (e) {
+                                console.error('[Cloud] JSON 파싱 실패:', e);
+                                resolve([]);
+                            }
+                        });
+                    });
+                    req.on('error', (err) => {
+                        console.error('[Cloud] 파일 목록 가져오기 실패:', err.message);
+                        resolve([]);
+                    });
+                    req.setTimeout(5000, () => {
+                        req.destroy();
+                        resolve([]);
+                    });
+                });
+            } catch (err) {
+                console.error('[Cloud] 파일 목록 가져오기 실패:', err);
+                return [];
+            }
+        }
+
+        return [];
     });
 
     // 클라우드 파일 업로드
@@ -429,13 +470,67 @@ function registerIpcHandlers() {
     // 클라우드 상태 조회
     ipcMain.handle('cloud:getStatus', () => {
         if (!p2pMessenger) return { connected: false };
-        return p2pMessenger.getCloudStatus ? p2pMessenger.getCloudStatus() : { connected: false };
+
+        const status = p2pMessenger.getStatus();
+
+        // 호스트인 경우 로컬 클라우드 상태 반환
+        if (status.mode === 'host') {
+            return p2pMessenger.getCloudStatus ? p2pMessenger.getCloudStatus() : { connected: false };
+        }
+
+        // 게스트인 경우 호스트 클라우드 정보 반환
+        if (status.mode === 'guest' && status.host && status.cloudPort) {
+            return {
+                status: 'connected',
+                port: status.cloudPort,
+                host: status.host,
+                isGuest: true
+            };
+        }
+
+        return { connected: false };
     });
 
     // 클라우드 파일 목록 (cloud: 네임스페이스)
-    ipcMain.handle('cloud:getFiles', () => {
+    ipcMain.handle('cloud:getFiles', async () => {
         if (!p2pMessenger) return [];
-        return p2pMessenger.getCloudFiles();
+
+        const status = p2pMessenger.getStatus();
+
+        // 호스트인 경우 로컬 파일 목록 반환
+        if (status.mode === 'host') {
+            return p2pMessenger.getCloudFiles();
+        }
+
+        // 게스트인 경우 호스트 HTTP API에서 가져오기
+        if (status.mode === 'guest' && status.host && status.cloudPort) {
+            try {
+                const http = require('http');
+                return new Promise((resolve) => {
+                    const req = http.get(`http://${status.host}:${status.cloudPort}/files`, (res) => {
+                        let data = '';
+                        res.on('data', chunk => data += chunk);
+                        res.on('end', () => {
+                            try {
+                                const result = JSON.parse(data);
+                                resolve(result.files || []);
+                            } catch (e) {
+                                resolve([]);
+                            }
+                        });
+                    });
+                    req.on('error', () => resolve([]));
+                    req.setTimeout(5000, () => {
+                        req.destroy();
+                        resolve([]);
+                    });
+                });
+            } catch {
+                return [];
+            }
+        }
+
+        return [];
     });
 
     // 클라우드 파일 업로드 (cloud: 네임스페이스)

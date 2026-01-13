@@ -614,10 +614,45 @@ function renderRoomList() {
 
     elements.roomList.innerHTML = state.rooms.map(room => {
         const isGroup = room.type === 'group';
+        const isDirect = room.type === 'direct';
         const avatarBg = isGroup ? 'var(--warning)' : 'var(--accent)';
         const icon = isGroup ?
             `<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>` :
             room.name.charAt(0).toUpperCase();
+
+        // 방 생성자 여부 확인 (내가 만든 방인지)
+        const isOwner = room.createdBy === state.myContactId || room.createdBy === state.nickname;
+
+        // 1:1 채팅방은 나가기만 가능 (삭제 불가), 그룹 채팅방은 생성자만 삭제 가능
+        let actionButton = '';
+        if (isDirect) {
+            // 1:1 채팅방: 나가기 버튼 (숨김 처리)
+            actionButton = `
+                <button class="room-delete-btn" onclick="event.stopPropagation(); confirmLeaveRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')" title="채팅방 나가기">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+            `;
+        } else if (isGroup && isOwner) {
+            // 그룹 채팅방 생성자: 삭제 버튼
+            actionButton = `
+                <button class="room-delete-btn" onclick="event.stopPropagation(); confirmDeleteRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')" title="채팅방 삭제">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                </button>
+            `;
+        } else if (isGroup) {
+            // 그룹 채팅방 참여자: 나가기 버튼
+            actionButton = `
+                <button class="room-delete-btn" onclick="event.stopPropagation(); confirmLeaveRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')" title="채팅방 나가기">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
+            `;
+        }
 
         return `
             <div class="room-item ${room.id === state.currentRoom ? 'active' : ''}"
@@ -635,11 +670,7 @@ function renderRoomList() {
                         ${room.unread > 0 ? `<div class="room-unread">${room.unread}</div>` : ''}
                     </div>
                 </div>
-                <button class="room-delete-btn" onclick="event.stopPropagation(); confirmDeleteRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')" title="채팅방 삭제">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                    </svg>
-                </button>
+                ${actionButton}
             </div>
         `;
     }).join('');
@@ -1160,8 +1191,20 @@ async function startDirectChat(nickname) {
     const sortedNames = [state.nickname, nickname].sort();
     const roomId = `direct_${sortedNames[0]}_${sortedNames[1]}`.replace(/\s+/g, '_');
 
-    // 기존 채팅방이 있는지 확인
-    const existingRoom = state.rooms.find(r => r.id === roomId);
+    // 1. 먼저 state.rooms에서 확인
+    let existingRoom = state.rooms.find(r => r.id === roomId);
+
+    // 2. state.rooms에 없으면 DB에서 직접 확인
+    if (!existingRoom && window.messengerDB) {
+        const dbRoom = await window.messengerDB.getRoom(roomId);
+        if (dbRoom) {
+            // DB에 있으면 state.rooms에 추가하고 기존 방으로 이동
+            console.log('DB에서 기존 1:1 채팅방 발견:', roomId);
+            await loadRooms(); // 전체 목록 새로고침
+            existingRoom = state.rooms.find(r => r.id === roomId);
+        }
+    }
+
     if (existingRoom) {
         // 기존 채팅방으로 이동
         document.querySelector('[data-tab="chats"]')?.click();
@@ -1170,14 +1213,25 @@ async function startDirectChat(nickname) {
         return;
     }
 
-    // 채팅방 생성
+    // 채팅방 생성 (INSERT OR IGNORE 사용하여 중복 방지)
     if (window.messengerDB) {
-        await window.messengerDB.createRoom({
+        const result = await window.messengerDB.createRoomIfNotExists({
             id: roomId,
             type: 'direct',
             name: nickname,
-            targetNickname: nickname // 상대방 닉네임 저장
+            targetNickname: nickname, // 상대방 닉네임 저장
+            createdBy: state.myContactId || state.nickname // 생성자 저장
         });
+
+        // 이미 존재하면 기존 방으로 이동
+        if (result && result.existed) {
+            console.log('채팅방이 이미 존재합니다:', roomId);
+            await loadRooms();
+            document.querySelector('[data-tab="chats"]')?.click();
+            selectRoom(roomId);
+            elements.usersPanel.classList.remove('visible');
+            return;
+        }
 
         if (state.myContactId) {
             await window.messengerDB.addRoomParticipant(roomId, state.myContactId, state.nickname);
@@ -1190,6 +1244,7 @@ async function startDirectChat(nickname) {
         name: nickname,
         type: 'direct',
         targetNickname: nickname,
+        createdBy: state.myContactId || state.nickname,
         unread: 0
     });
 
@@ -1572,6 +1627,7 @@ async function loadRooms() {
                 name: r.name || '채팅방',
                 type: r.type,
                 targetNickname: r.target_nickname || r.name, // 1:1 채팅 대상 닉네임
+                createdBy: r.created_by, // 방 생성자
                 lastMessage: r.last_message,
                 lastTime: r.last_message_at ? formatTime(new Date(r.last_message_at)) : '',
                 unread: r.unread_count || 0,
@@ -1702,6 +1758,39 @@ async function leaveRoom(roomId) {
         }
     } catch (err) {
         console.error('채팅방 나가기 실패:', err);
+        throw err;
+    }
+}
+
+// 채팅방 나가기 확인 (숨김 처리)
+async function confirmLeaveRoom(roomId, roomName) {
+    if (!confirm(`'${roomName}' 채팅방을 나가시겠습니까?\n(메시지 기록은 보존됩니다)`)) return;
+
+    try {
+        await hideRoom(roomId);
+        showToast('채팅방을 나갔습니다.');
+    } catch (err) {
+        console.error('채팅방 나가기 실패:', err);
+        alert('채팅방 나가기 실패: ' + err.message);
+    }
+}
+
+// 채팅방 숨기기 (1:1 채팅방용 - 데이터 보존)
+async function hideRoom(roomId) {
+    try {
+        if (window.messengerDB) {
+            // DB에서는 숨김 처리 (hidden 컬럼 추가 필요시)
+            // 현재는 state에서만 제거
+            state.rooms = state.rooms.filter(r => r.id !== roomId);
+            renderRoomList();
+
+            if (state.currentRoom === roomId) {
+                state.currentRoom = null;
+                hideChatView();
+            }
+        }
+    } catch (err) {
+        console.error('채팅방 숨기기 실패:', err);
         throw err;
     }
 }
@@ -3296,6 +3385,8 @@ window.leaveCurrentRoom = leaveCurrentRoom;
 window.createNewRoom = createNewRoom;
 window.deleteRoom = deleteRoom;
 window.confirmDeleteRoom = confirmDeleteRoom;
+window.confirmLeaveRoom = confirmLeaveRoom;
+window.hideRoom = hideRoom;
 window.openSettingsModal = openSettingsModal;
 window.saveSettings = saveSettings;
 window.openInviteModal = openInviteModal;

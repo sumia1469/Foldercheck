@@ -598,9 +598,7 @@ class P2PMessenger extends EventEmitter {
 
             case 'user_list':
                 this.users.clear();
-                // 호스트 추가
-                this.users.set('host', { nickname: msg.hostNickname });
-                // 다른 사용자들 추가
+                // 사용자들 추가 (호스트는 msg.users에 isHost: true로 이미 포함되어 있음)
                 msg.users.forEach((u, i) => {
                     this.users.set(`user_${i}`, u);
                 });

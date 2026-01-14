@@ -392,13 +392,16 @@ async function sendMessage() {
 // 파일 첨부 (클라우드 업로드 + P2P 전송)
 async function attachFile() {
     if (state.mode === 'offline') {
-        alert('먼저 연결하세요.');
+        showToast('먼저 연결하세요.', 'warning');
         return;
     }
 
     try {
         const result = await window.p2pAPI.selectFile();
         if (result.success && result.filePath) {
+            // 로딩 상태 표시
+            setInputLoading(true, '파일 업로드 중...');
+
             // 호스트 모드인 경우 클라우드에 업로드
             if (state.mode === 'host') {
                 try {
@@ -406,22 +409,28 @@ async function attachFile() {
                     console.log('클라우드 업로드 완료:', cloudResult);
 
                     // P2P로 파일 정보 전송 (클라우드 URL 포함)
+                    setInputLoading(true, '파일 전송 중...');
                     await window.p2pAPI.sendFile(result.filePath, {
                         cloudFileId: cloudResult.fileId,
                         cloudUrl: cloudResult.downloadUrl
                     });
                 } catch (cloudErr) {
                     console.error('클라우드 업로드 실패, P2P로만 전송:', cloudErr);
+                    setInputLoading(true, '파일 전송 중...');
                     await window.p2pAPI.sendFile(result.filePath);
                 }
             } else {
                 // 게스트 모드: P2P로만 전송
+                setInputLoading(true, '파일 전송 중...');
                 await window.p2pAPI.sendFile(result.filePath);
             }
+            showToast('파일 전송 완료');
         }
     } catch (err) {
         console.error('파일 첨부 실패:', err);
-        alert('파일 전송 실패: ' + err.message);
+        showToast('파일 전송 실패: ' + err.message, 'error');
+    } finally {
+        setInputLoading(false);
     }
 }
 

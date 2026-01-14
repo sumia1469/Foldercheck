@@ -307,6 +307,8 @@ class MessengerDB {
         this._migrateAddTargetNicknameColumn();
         // 마이그레이션: rooms 테이블 created_by 컬럼 추가 (방 생성자)
         this._migrateAddCreatedByColumn();
+        // 마이그레이션: messages 테이블 reply_to, reply_preview 컬럼 추가
+        this._migrateAddReplyColumns();
     }
 
     /**
@@ -466,6 +468,59 @@ class MessengerDB {
                 console.log('[MessengerDB] created_by 컬럼 추가 완료');
             } catch (alterErr) {
                 console.error('[MessengerDB] created_by 컬럼 추가 실패:', alterErr.message);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: messages 테이블에 reply_to, reply_preview 컬럼 추가
+     */
+    _migrateAddReplyColumns() {
+        // reply_to 컬럼 확인 및 추가
+        try {
+            const checkSql = "SELECT reply_to FROM messages LIMIT 1";
+            if (this.isSqlJs) {
+                this.db.exec(checkSql);
+            } else {
+                this.db.prepare(checkSql).get();
+            }
+        } catch (e) {
+            console.log('[MessengerDB] reply_to 컬럼 추가 마이그레이션 실행');
+            const alterSql = "ALTER TABLE messages ADD COLUMN reply_to TEXT";
+            try {
+                if (this.isSqlJs) {
+                    this.db.run(alterSql);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql);
+                }
+                console.log('[MessengerDB] reply_to 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] reply_to 컬럼 추가 실패:', alterErr.message);
+            }
+        }
+
+        // reply_preview 컬럼 확인 및 추가
+        try {
+            const checkSql = "SELECT reply_preview FROM messages LIMIT 1";
+            if (this.isSqlJs) {
+                this.db.exec(checkSql);
+            } else {
+                this.db.prepare(checkSql).get();
+            }
+        } catch (e) {
+            console.log('[MessengerDB] reply_preview 컬럼 추가 마이그레이션 실행');
+            const alterSql = "ALTER TABLE messages ADD COLUMN reply_preview TEXT";
+            try {
+                if (this.isSqlJs) {
+                    this.db.run(alterSql);
+                    this.saveToFile();
+                } else {
+                    this.db.exec(alterSql);
+                }
+                console.log('[MessengerDB] reply_preview 컬럼 추가 완료');
+            } catch (alterErr) {
+                console.error('[MessengerDB] reply_preview 컬럼 추가 실패:', alterErr.message);
             }
         }
     }

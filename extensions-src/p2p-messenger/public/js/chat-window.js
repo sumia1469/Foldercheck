@@ -292,6 +292,24 @@ function initChat() {
     });
 }
 
+// 입력 필드 로딩 상태 설정
+function setInputLoading(isLoading, message = '전송 중...') {
+    if (isLoading) {
+        elements.messageInput.disabled = true;
+        elements.messageInput.dataset.originalPlaceholder = elements.messageInput.placeholder;
+        elements.messageInput.placeholder = message;
+        elements.sendBtn.disabled = true;
+        elements.sendBtn.classList.add('loading');
+        elements.attachBtn.disabled = true;
+    } else {
+        elements.messageInput.disabled = false;
+        elements.messageInput.placeholder = elements.messageInput.dataset.originalPlaceholder || '메시지를 입력하세요...';
+        elements.sendBtn.classList.remove('loading');
+        elements.sendBtn.disabled = !elements.messageInput.value.trim();
+        elements.attachBtn.disabled = false;
+    }
+}
+
 // 메시지 전송
 async function sendMessage() {
     const content = elements.messageInput.value.trim();
@@ -322,6 +340,9 @@ async function sendMessage() {
         roomId: state.currentRoom
     };
 
+    // 로딩 상태 표시
+    setInputLoading(true, '메시지 전송 중...');
+
     try {
         // P2P 연결 상태에서만 전송
         if (state.mode !== 'offline') {
@@ -351,7 +372,6 @@ async function sendMessage() {
         clearReplyTo();
 
         elements.messageInput.value = '';
-        elements.sendBtn.disabled = true;
         autoResize(elements.messageInput);
     } catch (err) {
         console.error('메시지 전송 실패:', err);
@@ -361,6 +381,10 @@ async function sendMessage() {
         }
         clearReplyTo();
         elements.messageInput.value = '';
+        showToast('메시지 전송 실패', 'error');
+    } finally {
+        // 로딩 상태 해제
+        setInputLoading(false);
         elements.sendBtn.disabled = true;
     }
 }

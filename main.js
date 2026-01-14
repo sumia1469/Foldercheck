@@ -383,14 +383,32 @@ async function autoDownloadModel() {
                             return;
                         }
                     } catch (e) {
-                        // JSON 파싱 오류 무시
+                        // JSON 파싱 오류 무시 (불완전한 청크)
                     }
                 }
             });
 
             res.on('end', () => {
+                // 남은 buffer 처리
+                if (buffer && buffer.trim()) {
+                    try {
+                        const data = JSON.parse(buffer);
+                        if (data.error) {
+                            console.error('모델 다운로드 오류:', data.error);
+                            resolve(false);
+                            return;
+                        }
+                    } catch (e) {
+                        // 마지막 버퍼가 불완전하면 무시
+                    }
+                }
                 console.log('AI 모델 다운로드 완료!');
                 resolve(true);
+            });
+
+            res.on('error', (err) => {
+                console.error('모델 다운로드 응답 오류:', err.message);
+                resolve(false);
             });
         });
 
